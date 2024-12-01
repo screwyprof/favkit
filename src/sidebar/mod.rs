@@ -1,6 +1,8 @@
 mod cf;
 mod error;
 mod finder;
+#[cfg(test)]
+mod tests;
 mod url;
 
 use core_foundation::string::CFStringRef;
@@ -9,6 +11,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use self::cf::CoreServicesImpl;
 pub use self::error::{Result, SidebarError};
 use self::finder::FinderSidebar;
 
@@ -124,9 +127,11 @@ impl FromStr for SidebarSection {
 
 impl SidebarSection {
     fn list_type(&self) -> CFStringRef {
-        match self {
-            Self::Favorites => unsafe { kLSSharedFileListFavoriteItems },
-            Self::Locations => unsafe { kLSSharedFileListFavoriteVolumes },
+        unsafe {
+            match self {
+                Self::Favorites => kLSSharedFileListFavoriteItems,
+                Self::Locations => kLSSharedFileListFavoriteVolumes,
+            }
         }
     }
 }
@@ -141,7 +146,15 @@ pub struct Sidebar(FinderSidebar);
 
 impl Sidebar {
     pub fn new(section: SidebarSection) -> Result<Self> {
-        FinderSidebar::new(section.list_type()).map(Self)
+        let core_services = CoreServicesImpl::Default(Default::default());
+        FinderSidebar::new(section.list_type(), core_services).map(Self)
+    }
+
+    pub fn with_core_services(
+        section: SidebarSection,
+        core_services: CoreServicesImpl,
+    ) -> Result<Self> {
+        FinderSidebar::new(section.list_type(), core_services).map(Self)
     }
 
     pub fn favorites() -> Result<Self> {
@@ -159,6 +172,15 @@ impl Sidebar {
                 .to_str()
                 .ok_or_else(|| SidebarError::InvalidPath(item.path()))?,
         )
+    }
+
+    /// Add a special location to the sidebar
+    pub fn add_location(&self, _location: SpecialLocation) -> Result<()> {
+        // Special locations are handled differently and may require specific URLs
+        // This is a placeholder for future implementation
+        Err(SidebarError::AddItem(
+            "Special locations cannot be added manually".into(),
+        ))
     }
 }
 
