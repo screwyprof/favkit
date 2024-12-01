@@ -57,9 +57,13 @@ fn main() -> Result<()> {
                 println!("\nLogin Items:");
                 unsafe { list_section(kLSSharedFileListSessionLoginItems)? };
             }
+            Some("icloud") => {
+                println!("\niCloud:");
+                list_icloud_items()?;
+            }
             Some(unknown) => {
                 println!("Unknown section: {}", unknown);
-                println!("Available sections: favorites, locations, login");
+                println!("Available sections: favorites, locations, login, icloud");
             }
         },
         Commands::Add { path } => {
@@ -194,4 +198,38 @@ fn remove_item(list: LSSharedFileListRef, path: &str) -> Result<()> {
         }
         anyhow::bail!("Item not found: {}", path);
     }
+}
+
+fn list_icloud_items() -> Result<()> {
+    // Standard iCloud paths
+    let home = std::env::var("HOME").unwrap_or_default();
+    let icloud_paths = [
+        (
+            "iCloud Drive",
+            format!("{}/Library/Mobile Documents/com~apple~CloudDocs", home),
+        ),
+        (
+            "Documents",
+            format!(
+                "{}/Library/Mobile Documents/com~apple~CloudDocs/Documents",
+                home
+            ),
+        ),
+        (
+            "Desktop",
+            format!(
+                "{}/Library/Mobile Documents/com~apple~CloudDocs/Desktop",
+                home
+            ),
+        ),
+    ];
+
+    for (name, path) in icloud_paths {
+        let path = std::path::PathBuf::from(&path);
+        if path.exists() {
+            println!("{} -> file://{}/", name, path.display());
+        }
+    }
+
+    Ok(())
 }
