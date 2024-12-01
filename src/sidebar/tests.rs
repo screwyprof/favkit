@@ -1,16 +1,14 @@
 use crate::sidebar::{
-    cf::{CoreServicesImpl, CoreServicesOperations},
-    FavoriteItem, Sidebar, SidebarOperations, SidebarSection, SpecialLocation,
+    cf::CoreServicesOperations, FavoriteItem, Sidebar, SidebarOperations, SidebarSection,
+    SpecialLocation,
 };
 use core_foundation::{
     array::CFArray,
-    base::CFType,
+    base::{CFType, TCFType},
     string::{CFString, CFStringRef},
     url::CFURL,
 };
-use core_services::{
-    LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListRef, TCFType,
-};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListRef};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::ptr::NonNull;
@@ -95,11 +93,8 @@ mod integration_tests {
     #[test]
     fn test_add_favorite() {
         let mock = MockCoreServices::default();
-        let sidebar = Sidebar::with_core_services(
-            SidebarSection::Favorites,
-            CoreServicesImpl::Mock(mock.clone()),
-        )
-        .unwrap();
+        let sidebar =
+            Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
 
         let test_path = std::env::temp_dir();
         let path_str = test_path
@@ -118,11 +113,8 @@ mod integration_tests {
         let mock = MockCoreServices::default();
         mock.add_test_item(std::env::temp_dir(), "Test Item");
 
-        let sidebar = Sidebar::with_core_services(
-            SidebarSection::Favorites,
-            CoreServicesImpl::Mock(mock.clone()),
-        )
-        .unwrap();
+        let sidebar =
+            Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
         let items = sidebar.list_items().unwrap();
 
         let ops = mock.operations();
@@ -133,11 +125,8 @@ mod integration_tests {
     #[test]
     fn test_remove_item() {
         let mock = MockCoreServices::default();
-        let sidebar = Sidebar::with_core_services(
-            SidebarSection::Favorites,
-            CoreServicesImpl::Mock(mock.clone()),
-        )
-        .unwrap();
+        let sidebar =
+            Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
 
         let result = sidebar.remove_item("/nonexistent/path");
         assert!(result.is_err());
@@ -191,11 +180,8 @@ mod integration_tests {
     #[test]
     fn test_add_special_location() {
         let mock = MockCoreServices::default();
-        let sidebar = Sidebar::with_core_services(
-            SidebarSection::Favorites,
-            CoreServicesImpl::Mock(mock.clone()),
-        )
-        .unwrap();
+        let sidebar =
+            Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
 
         let result = sidebar.add_location(SpecialLocation::AirDrop);
         assert!(result.is_err());

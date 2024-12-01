@@ -11,7 +11,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use self::cf::CoreServicesImpl;
+use self::cf::CoreServicesOperations;
 pub use self::error::{Result, SidebarError};
 use self::finder::FinderSidebar;
 
@@ -146,15 +146,14 @@ pub struct Sidebar(FinderSidebar);
 
 impl Sidebar {
     pub fn new(section: SidebarSection) -> Result<Self> {
-        let core_services = CoreServicesImpl::Default(Default::default());
-        FinderSidebar::new(section.list_type(), core_services).map(Self)
+        FinderSidebar::new(section.list_type()).map(Self)
     }
 
     pub fn with_core_services(
         section: SidebarSection,
-        core_services: CoreServicesImpl,
+        core_services: Box<dyn CoreServicesOperations>,
     ) -> Result<Self> {
-        FinderSidebar::new(section.list_type(), core_services).map(Self)
+        FinderSidebar::with_core_services(section.list_type(), core_services).map(Self)
     }
 
     pub fn favorites() -> Result<Self> {

@@ -1,4 +1,4 @@
-use crate::sidebar::cf::{CFItem, CoreServicesImpl, CoreServicesOperations};
+use crate::sidebar::cf::{CFItem, CoreServicesOperations, DefaultCoreServices};
 use crate::sidebar::error::{Result, SidebarError};
 use crate::sidebar::url::UrlHandler;
 use crate::sidebar::{SidebarItem, SidebarOperations, SidebarUrl};
@@ -13,11 +13,18 @@ use std::path::Path;
 
 pub struct FinderSidebar {
     list: LSSharedFileListRef,
-    core_services: CoreServicesImpl,
+    core_services: Box<dyn CoreServicesOperations>,
 }
 
 impl FinderSidebar {
-    pub fn new(list_type: CFStringRef, core_services: CoreServicesImpl) -> Result<Self> {
+    pub fn new(list_type: CFStringRef) -> Result<Self> {
+        Self::with_core_services(list_type, Box::new(DefaultCoreServices))
+    }
+
+    pub(crate) fn with_core_services(
+        list_type: CFStringRef,
+        core_services: Box<dyn CoreServicesOperations>,
+    ) -> Result<Self> {
         let list = core_services
             .create_list(list_type)
             .ok_or_else(|| SidebarError::CreateList("Failed to create shared file list".into()))?;
@@ -42,7 +49,7 @@ impl FinderSidebar {
 
     fn parse_item(&self, item: &CFType) -> Option<SidebarItem> {
         let item_ref = item.as_concrete_TypeRef() as *mut std::ffi::c_void;
-        let cf_item = CFItem::new(item_ref.cast(), &self.core_services);
+        let cf_item = CFItem::new(item_ref.cast(), self.core_services.as_ref());
 
         // Get URL and parse it
         let url = cf_item
@@ -99,7 +106,7 @@ impl SidebarOperations for FinderSidebar {
         let items = self.get_items()?;
         for item in items.iter() {
             let item_ref = item.as_concrete_TypeRef() as *mut std::ffi::c_void;
-            let cf_item = CFItem::new(item_ref.cast(), &self.core_services);
+            let cf_item = CFItem::new(item_ref.cast(), self.core_services.as_ref());
 
             if let Some(url) = cf_item.resolved_url() {
                 if let Some(item_path) = url.to_path() {

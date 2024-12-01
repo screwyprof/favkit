@@ -10,7 +10,7 @@ use core_services::{
     LSSharedFileListRef,
 };
 
-/// Trait for Core Services operations that can be mocked in tests
+/// Trait for Core Services operations
 pub trait CoreServicesOperations {
     fn create_list(&self, list_type: CFStringRef) -> Option<LSSharedFileListRef>;
     fn copy_snapshot(&self, list: LSSharedFileListRef) -> Option<CFArray<CFType>>;
@@ -125,63 +125,5 @@ impl<'a> CFItem<'a> {
 
     pub fn resolved_url(&self) -> Option<CFURL> {
         self.core_services.copy_resolved_url(self.item_ref)
-    }
-}
-
-/// Enum representing all possible CoreServices implementations
-#[derive(Clone)]
-pub enum CoreServicesImpl {
-    Default(DefaultCoreServices),
-    #[cfg(test)]
-    Mock(crate::sidebar::tests::MockCoreServices),
-}
-
-impl CoreServicesOperations for CoreServicesImpl {
-    fn create_list(&self, list_type: CFStringRef) -> Option<LSSharedFileListRef> {
-        match self {
-            Self::Default(cs) => cs.create_list(list_type),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.create_list(list_type),
-        }
-    }
-
-    fn copy_snapshot(&self, list: LSSharedFileListRef) -> Option<CFArray<CFType>> {
-        match self {
-            Self::Default(cs) => cs.copy_snapshot(list),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.copy_snapshot(list),
-        }
-    }
-
-    fn copy_display_name(&self, item: LSSharedFileListItemRef) -> Option<CFString> {
-        match self {
-            Self::Default(cs) => cs.copy_display_name(item),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.copy_display_name(item),
-        }
-    }
-
-    fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> Option<CFURL> {
-        match self {
-            Self::Default(cs) => cs.copy_resolved_url(item),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.copy_resolved_url(item),
-        }
-    }
-
-    fn insert_item(&self, list: LSSharedFileListRef, url: &CFURL) {
-        match self {
-            Self::Default(cs) => cs.insert_item(list, url),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.insert_item(list, url),
-        }
-    }
-
-    fn remove_item(&self, list: LSSharedFileListRef, item: LSSharedFileListItemRef) {
-        match self {
-            Self::Default(cs) => cs.remove_item(list, item),
-            #[cfg(test)]
-            Self::Mock(cs) => cs.remove_item(list, item),
-        }
     }
 }
