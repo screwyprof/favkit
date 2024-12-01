@@ -54,10 +54,11 @@ impl SidebarOperations for FinderSidebar {
                 // Get name, with special handling for AirDrop
                 let name = match url {
                     SidebarUrl::AirDrop => String::from("AirDrop"),
+                    SidebarUrl::RemoteDisc => String::from("Remote Disc"),
                     _ => CFWrapper::get_name(item_ref).unwrap_or_default(),
                 };
 
-                // Skip items with no name (except AirDrop which we just named)
+                // Skip Unknown items
                 if name.is_empty() {
                     continue;
                 }

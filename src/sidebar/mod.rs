@@ -21,6 +21,7 @@ pub struct SidebarItem {
 pub enum SidebarUrl {
     File(PathBuf),
     AirDrop,
+    RemoteDisc,
     SystemUrl(String),
     NotFound,
 }
@@ -30,6 +31,7 @@ impl fmt::Display for SidebarUrl {
         match self {
             Self::File(path) => write!(f, "file://{}", path.display()),
             Self::AirDrop => write!(f, "nwnode://domain-AirDrop"),
+            Self::RemoteDisc => write!(f, "com-apple-sfl://IsRemoteDisc"),
             Self::SystemUrl(url) => write!(f, "{}", url),
             Self::NotFound => write!(f, "NOTFOUND"),
         }

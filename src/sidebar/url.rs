@@ -5,7 +5,6 @@ use core_foundation::{
     url::{CFURLGetString, CFURL},
 };
 
-// Constants moved from constants.rs
 const SYSTEM_URL_PREFIX: &str = "com-apple-sfl://";
 const REMOTE_DISC_IDENTIFIER: &str = "IsRemoteDisc";
 
@@ -16,17 +15,15 @@ impl UrlHandler {
         let url_string = Self::get_url_string(url);
 
         match url_string {
-            s if s.starts_with(SYSTEM_URL_PREFIX) => Self::handle_system_url(&s),
+            s if s.starts_with(SYSTEM_URL_PREFIX) => {
+                if s.contains(REMOTE_DISC_IDENTIFIER) {
+                    Some(SidebarUrl::RemoteDisc)
+                } else {
+                    Some(SidebarUrl::SystemUrl(s))
+                }
+            }
             s if s.starts_with("nwnode://") => Some(SidebarUrl::AirDrop),
             _ => url.to_path().map(SidebarUrl::File),
-        }
-    }
-
-    fn handle_system_url(url: &str) -> Option<SidebarUrl> {
-        if url.contains(REMOTE_DISC_IDENTIFIER) {
-            None
-        } else {
-            Some(SidebarUrl::SystemUrl(url.to_string()))
         }
     }
 
