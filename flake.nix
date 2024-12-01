@@ -35,11 +35,9 @@
         devShells.default = pkgs.mkShell {
           inherit nativeBuildInputs buildInputs;
 
-          # Set environment variables
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
         };
 
-        # For future packaging
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "favkit";
           version = "0.1.0";

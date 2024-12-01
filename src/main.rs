@@ -7,9 +7,8 @@ use core_foundation::{
     url::{CFURLGetString, CFURL},
 };
 use core_services::{
-    kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes,
-    kLSSharedFileListSessionLoginItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
-    LSSharedFileListInsertItemURL, LSSharedFileListItemCopyDisplayName,
+    kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes, LSSharedFileListCopySnapshot,
+    LSSharedFileListCreate, LSSharedFileListInsertItemURL, LSSharedFileListItemCopyDisplayName,
     LSSharedFileListItemCopyResolvedURL, LSSharedFileListItemRef, LSSharedFileListItemRemove,
     LSSharedFileListRef,
 };
@@ -53,17 +52,9 @@ fn main() -> Result<()> {
                 println!("\nLocations:");
                 unsafe { list_section(kLSSharedFileListFavoriteVolumes)? };
             }
-            Some("login") => {
-                println!("\nLogin Items:");
-                unsafe { list_section(kLSSharedFileListSessionLoginItems)? };
-            }
-            Some("icloud") => {
-                println!("\niCloud:");
-                list_icloud_items()?;
-            }
             Some(unknown) => {
                 println!("Unknown section: {}", unknown);
-                println!("Available sections: favorites, locations, login, icloud");
+                println!("Available sections: favorites, locations");
             }
         },
         Commands::Add { path } => {
@@ -110,6 +101,22 @@ fn list_items(list: LSSharedFileListRef) -> Result<()> {
                 let cf_name = CFString::wrap_under_create_rule(name_ref);
                 cf_name.to_string()
             } else {
+                // Item has no display name - typically a system item
+                // We'll identify what kind of item it is by its URL
+                let url_ref =
+                    LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
+                if !url_ref.is_null() {
+                    let url = CFURL::wrap_under_create_rule(url_ref);
+                    let url_str_ref = url.as_concrete_TypeRef();
+                    let url_str =
+                        CFString::wrap_under_create_rule(CFURLGetString(url_str_ref).cast());
+                    let url_string = url_str.to_string();
+
+                    // Skip system items immediately
+                    if url_string.starts_with("com-apple-sfl://") {
+                        continue;
+                    }
+                }
                 String::from("")
             };
 
@@ -120,6 +127,14 @@ fn list_items(list: LSSharedFileListRef) -> Result<()> {
                 let url_str_ref = url.as_concrete_TypeRef();
                 let url_str = CFString::wrap_under_create_rule(CFURLGetString(url_str_ref).cast());
                 let url_string = url_str.to_string();
+
+                // Check for special URLs
+                if url_string.starts_with("com-apple-sfl://") {
+                    // Skip Remote Disc placeholder
+                    if url_string.contains("IsRemoteDisc") {
+                        continue;
+                    }
+                }
 
                 // Check for AirDrop using the URL scheme
                 if url_string.starts_with("nwnode://")
@@ -137,6 +152,7 @@ fn list_items(list: LSSharedFileListRef) -> Result<()> {
                     } else {
                         path_str
                     };
+
                     println!("{} -> file://{}", name, path_with_slash);
                 } else {
                     // For other non-file URLs
@@ -198,38 +214,4 @@ fn remove_item(list: LSSharedFileListRef, path: &str) -> Result<()> {
         }
         anyhow::bail!("Item not found: {}", path);
     }
-}
-
-fn list_icloud_items() -> Result<()> {
-    // Standard iCloud paths
-    let home = std::env::var("HOME").unwrap_or_default();
-    let icloud_paths = [
-        (
-            "iCloud Drive",
-            format!("{}/Library/Mobile Documents/com~apple~CloudDocs", home),
-        ),
-        (
-            "Documents",
-            format!(
-                "{}/Library/Mobile Documents/com~apple~CloudDocs/Documents",
-                home
-            ),
-        ),
-        (
-            "Desktop",
-            format!(
-                "{}/Library/Mobile Documents/com~apple~CloudDocs/Desktop",
-                home
-            ),
-        ),
-    ];
-
-    for (name, path) in icloud_paths {
-        let path = std::path::PathBuf::from(&path);
-        if path.exists() {
-            println!("{} -> file://{}/", name, path.display());
-        }
-    }
-
-    Ok(())
 }
