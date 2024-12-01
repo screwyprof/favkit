@@ -3,11 +3,12 @@ use clap::{Parser, Subcommand};
 use core_foundation::{
     array::CFArray,
     base::{CFType, TCFType},
-    string::CFString,
+    string::{CFString, CFStringRef},
     url::{CFURLGetString, CFURL},
 };
 use core_services::{
-    kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
+    kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes,
+    kLSSharedFileListSessionLoginItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
     LSSharedFileListInsertItemURL, LSSharedFileListItemCopyDisplayName,
     LSSharedFileListItemCopyResolvedURL, LSSharedFileListItemRef, LSSharedFileListItemRemove,
     LSSharedFileListRef,
@@ -23,7 +24,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// List all sidebar items
-    List,
+    List {
+        #[arg(short, long)]
+        section: Option<String>,
+    },
     /// Add an item to the sidebar
     Add {
         /// Path to add to the sidebar
@@ -39,32 +43,49 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Get the Favorites list
-    let favorites_list = unsafe {
-        let list = LSSharedFileListCreate(
-            std::ptr::null(),
-            kLSSharedFileListFavoriteItems,
-            std::ptr::null(),
-        );
-        if list.is_null() {
-            anyhow::bail!("Failed to get Favorites list");
-        }
-        list
-    };
-
     match cli.command {
-        Commands::List => {
-            list_items(favorites_list)?;
-        }
+        Commands::List { section } => match section.as_deref() {
+            Some("favorites") | None => {
+                println!("\nFavorites:");
+                unsafe { list_section(kLSSharedFileListFavoriteItems)? };
+            }
+            Some("locations") => {
+                println!("\nLocations:");
+                unsafe { list_section(kLSSharedFileListFavoriteVolumes)? };
+            }
+            Some("login") => {
+                println!("\nLogin Items:");
+                unsafe { list_section(kLSSharedFileListSessionLoginItems)? };
+            }
+            Some(unknown) => {
+                println!("Unknown section: {}", unknown);
+                println!("Available sections: favorites, locations, login");
+            }
+        },
         Commands::Add { path } => {
-            add_item(favorites_list, &path)?;
+            let list = unsafe { create_list(kLSSharedFileListFavoriteItems)? };
+            add_item(list, &path)?;
         }
         Commands::Remove { path } => {
-            remove_item(favorites_list, &path)?;
+            let list = unsafe { create_list(kLSSharedFileListFavoriteItems)? };
+            remove_item(list, &path)?;
         }
     }
 
     Ok(())
+}
+
+unsafe fn create_list(list_type: CFStringRef) -> Result<LSSharedFileListRef> {
+    let list = LSSharedFileListCreate(std::ptr::null(), list_type, std::ptr::null());
+    if list.is_null() {
+        anyhow::bail!("Failed to create list");
+    }
+    Ok(list)
+}
+
+unsafe fn list_section(section_type: CFStringRef) -> Result<()> {
+    let list = create_list(section_type)?;
+    list_items(list)
 }
 
 fn list_items(list: LSSharedFileListRef) -> Result<()> {
