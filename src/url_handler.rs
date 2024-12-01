@@ -1,0 +1,35 @@
+use crate::constants::{REMOTE_DISC_IDENTIFIER, SYSTEM_URL_PREFIX};
+use crate::types::SidebarUrl;
+use core_foundation::{
+    base::TCFType,
+    string::CFString,
+    url::{CFURLGetString, CFURL},
+};
+pub struct UrlHandler;
+
+impl UrlHandler {
+    pub fn parse_url(url: &CFURL) -> Option<SidebarUrl> {
+        let url_string = Self::get_url_string(url);
+
+        match url_string {
+            s if s.starts_with(SYSTEM_URL_PREFIX) => Self::handle_system_url(&s),
+            s if s.starts_with("nwnode://") => Some(SidebarUrl::AirDrop),
+            _ => url.to_path().map(SidebarUrl::File),
+        }
+    }
+
+    fn handle_system_url(url: &str) -> Option<SidebarUrl> {
+        if url.contains(REMOTE_DISC_IDENTIFIER) {
+            None
+        } else {
+            Some(SidebarUrl::SystemUrl(url.to_string()))
+        }
+    }
+
+    fn get_url_string(url: &CFURL) -> String {
+        unsafe {
+            let url_str = CFURLGetString(url.as_concrete_TypeRef());
+            CFString::wrap_under_create_rule(url_str).to_string()
+        }
+    }
+}

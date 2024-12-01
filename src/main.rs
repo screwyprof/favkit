@@ -1,17 +1,13 @@
-use anyhow::{Context, Result};
+mod cf_wrapper;
+mod constants;
+mod error;
+mod sidebar;
+mod types;
+mod url_handler;
+
 use clap::{Parser, Subcommand};
-use core_foundation::{
-    array::CFArray,
-    base::{CFType, TCFType},
-    string::{CFString, CFStringRef},
-    url::{CFURLGetString, CFURL},
-};
-use core_services::{
-    kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes, LSSharedFileListCopySnapshot,
-    LSSharedFileListCreate, LSSharedFileListInsertItemURL, LSSharedFileListItemCopyDisplayName,
-    LSSharedFileListItemCopyResolvedURL, LSSharedFileListItemRef, LSSharedFileListItemRemove,
-    LSSharedFileListRef,
-};
+use error::Result;
+use sidebar::{Sidebar, SidebarOperations, SidebarSection};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -43,175 +39,39 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::List { section } => match section.as_deref() {
-            Some("favorites") | None => {
-                println!("\nFavorites:");
-                unsafe { list_section(kLSSharedFileListFavoriteItems)? };
-            }
-            Some("locations") => {
-                println!("\nLocations:");
-                unsafe { list_section(kLSSharedFileListFavoriteVolumes)? };
-            }
-            Some(unknown) => {
-                println!("Unknown section: {}", unknown);
-                println!("Available sections: favorites, locations");
-            }
-        },
-        Commands::Add { path } => {
-            let list = unsafe { create_list(kLSSharedFileListFavoriteItems)? };
-            add_item(list, &path)?;
-        }
-        Commands::Remove { path } => {
-            let list = unsafe { create_list(kLSSharedFileListFavoriteItems)? };
-            remove_item(list, &path)?;
-        }
-    }
-
-    Ok(())
-}
-
-unsafe fn create_list(list_type: CFStringRef) -> Result<LSSharedFileListRef> {
-    let list = LSSharedFileListCreate(std::ptr::null(), list_type, std::ptr::null());
-    if list.is_null() {
-        anyhow::bail!("Failed to create list");
-    }
-    Ok(list)
-}
-
-unsafe fn list_section(section_type: CFStringRef) -> Result<()> {
-    let list = create_list(section_type)?;
-    list_items(list)
-}
-
-fn list_items(list: LSSharedFileListRef) -> Result<()> {
-    unsafe {
-        let mut seed: u32 = 0;
-        let items_ptr = LSSharedFileListCopySnapshot(list, &mut seed);
-        if items_ptr.is_null() {
-            anyhow::bail!("Failed to get items snapshot");
-        }
-
-        let items: CFArray<CFType> = CFArray::wrap_under_create_rule(items_ptr.cast());
-        for item in items.iter() {
-            let item_ref = item.as_concrete_TypeRef() as LSSharedFileListItemRef;
-
-            // Get the display name
-            let name_ref = LSSharedFileListItemCopyDisplayName(item_ref);
-            let name = if !name_ref.is_null() {
-                let cf_name = CFString::wrap_under_create_rule(name_ref);
-                cf_name.to_string()
-            } else {
-                // Item has no display name - typically a system item
-                // We'll identify what kind of item it is by its URL
-                let url_ref =
-                    LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
-                if !url_ref.is_null() {
-                    let url = CFURL::wrap_under_create_rule(url_ref);
-                    let url_str_ref = url.as_concrete_TypeRef();
-                    let url_str =
-                        CFString::wrap_under_create_rule(CFURLGetString(url_str_ref).cast());
-                    let url_string = url_str.to_string();
-
-                    // Skip system items immediately
-                    if url_string.starts_with("com-apple-sfl://") {
-                        continue;
-                    }
+        Commands::List { section } => {
+            let section = match section.as_deref() {
+                Some("favorites") | None => SidebarSection::Favorites,
+                Some("locations") => SidebarSection::Locations,
+                Some(unknown) => {
+                    println!("Unknown section: {}", unknown);
+                    println!("Available sections: favorites, locations");
+                    return Ok(());
                 }
-                String::from("")
             };
 
-            // Get the URL
-            let url_ref = LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
-            if !url_ref.is_null() {
-                let url = CFURL::wrap_under_create_rule(url_ref);
-                let url_str_ref = url.as_concrete_TypeRef();
-                let url_str = CFString::wrap_under_create_rule(CFURLGetString(url_str_ref).cast());
-                let url_string = url_str.to_string();
+            let sidebar = Sidebar::new(section)?;
 
-                // Check for special URLs
-                if url_string.starts_with("com-apple-sfl://") {
-                    // Skip Remote Disc placeholder
-                    if url_string.contains("IsRemoteDisc") {
-                        continue;
-                    }
-                }
+            match section {
+                SidebarSection::Favorites => println!("\nFavorites:"),
+                SidebarSection::Locations => println!("\nLocations:"),
+            }
 
-                // Check for AirDrop using the URL scheme
-                if url_string.starts_with("nwnode://")
-                    || (name.is_empty() && url_string.contains("AirDrop"))
-                {
-                    println!(" -> nwnode://domain-AirDrop");
-                    continue;
-                }
-
-                if let Some(path) = url.to_path() {
-                    // Add trailing slash for directories
-                    let path_str = path.display().to_string();
-                    let path_with_slash = if path.is_dir() && !path_str.ends_with('/') {
-                        format!("{}/", path_str)
-                    } else {
-                        path_str
-                    };
-
-                    println!("{} -> file://{}", name, path_with_slash);
-                } else {
-                    // For other non-file URLs
-                    println!("{} -> {}", name, url_str);
-                }
-            } else {
-                println!("{} -> NOTFOUND", name);
+            for item in sidebar.list_items()? {
+                println!("{} -> {}", item.name, item.url);
             }
         }
-    }
-    Ok(())
-}
-
-fn add_item(list: LSSharedFileListRef, path: &str) -> Result<()> {
-    let url = CFURL::from_path(path, true)
-        .with_context(|| format!("Failed to create URL from path: {}", path))?;
-
-    unsafe {
-        LSSharedFileListInsertItemURL(
-            list,
-            std::ptr::null_mut(), // Insert at end
-            std::ptr::null_mut(), // No display name (use default)
-            std::ptr::null_mut(), // No icon
-            url.as_concrete_TypeRef(),
-            std::ptr::null(),     // No properties
-            std::ptr::null_mut(), // No properties
-        );
-    }
-
-    println!("Added item: {}", path);
-    Ok(())
-}
-
-fn remove_item(list: LSSharedFileListRef, path: &str) -> Result<()> {
-    unsafe {
-        let mut seed: u32 = 0;
-        let items_ptr = LSSharedFileListCopySnapshot(list, &mut seed);
-        if items_ptr.is_null() {
-            anyhow::bail!("Failed to get items snapshot");
+        Commands::Add { path } => {
+            let sidebar = Sidebar::new(SidebarSection::Favorites)?;
+            sidebar.add_item(&path)?;
+            println!("Added item: {}", path);
         }
-
-        let target_path = std::path::PathBuf::from(path);
-        let items: CFArray<CFType> = CFArray::wrap_under_create_rule(items_ptr.cast());
-        for item in items.iter() {
-            let item_ref = item.as_concrete_TypeRef() as LSSharedFileListItemRef;
-
-            // Get the URL for the item
-            let url_ref = LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
-            if !url_ref.is_null() {
-                let url = CFURL::wrap_under_create_rule(url_ref);
-                if let Some(item_path) = url.to_path() {
-                    if item_path == target_path {
-                        LSSharedFileListItemRemove(list, item_ref);
-                        println!("Removed item: {}", path);
-                        return Ok(());
-                    }
-                }
-            }
+        Commands::Remove { path } => {
+            let sidebar = Sidebar::new(SidebarSection::Favorites)?;
+            sidebar.remove_item(&path)?;
+            println!("Removed item: {}", path);
         }
-        anyhow::bail!("Item not found: {}", path);
     }
+
+    Ok(())
 }
