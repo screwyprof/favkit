@@ -47,10 +47,20 @@ impl SidebarOperations for FinderSidebar {
                 let item_ref =
                     item.as_concrete_TypeRef() as *mut std::ffi::c_void as LSSharedFileListItemRef;
 
-                let name = CFWrapper::get_name(item_ref).unwrap_or_default();
                 let url = CFWrapper::get_url(item_ref)
                     .and_then(|url| UrlHandler::parse_url(&url))
                     .unwrap_or(SidebarUrl::NotFound);
+
+                // Get name, with special handling for AirDrop
+                let name = match url {
+                    SidebarUrl::AirDrop => String::from("AirDrop"),
+                    _ => CFWrapper::get_name(item_ref).unwrap_or_default(),
+                };
+
+                // Skip items with no name (except AirDrop which we just named)
+                if name.is_empty() {
+                    continue;
+                }
 
                 result.push(SidebarItem { name, url });
             }
