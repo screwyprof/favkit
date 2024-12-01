@@ -14,8 +14,9 @@ name = "favkit"
 path = "src/main.rs"
 
 [dependencies]
-core-foundation = "0.10"
-core-services = "1.0"
-clap = { version = "4.4", features = ["derive"] }
+core-foundation = "0.10.0"
+core-services = "1.0.0"
+clap = { version = "4.4.11", features = ["derive"] }
 anyhow = "1.0"
-thiserror = "2.0"
+thiserror = "2.0.3"
+dirs = "5.0.1"

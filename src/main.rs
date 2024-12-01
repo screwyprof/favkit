@@ -38,12 +38,12 @@ fn main() -> Result<()> {
                 None => SidebarSection::Favorites,
             };
 
-            let sidebar = Sidebar::new(section)?;
-
             match section {
                 SidebarSection::Favorites => println!("\nFavorites:"),
                 SidebarSection::Locations => println!("\nLocations:"),
             }
+
+            let sidebar = Sidebar::new(section)?;
 
             for item in sidebar.list_items()? {
                 println!("{} -> {}", item.name, item.url);
