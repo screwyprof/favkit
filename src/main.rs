@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use favkit::sidebar::{Result, Sidebar, SidebarOperations, SidebarSection};
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -33,13 +34,8 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::List { section } => {
             let section = match section.as_deref() {
-                Some("favorites") | None => SidebarSection::Favorites,
-                Some("locations") => SidebarSection::Locations,
-                Some(unknown) => {
-                    println!("Unknown section: {}", unknown);
-                    println!("Available sections: favorites, locations");
-                    return Ok(());
-                }
+                Some(s) => SidebarSection::from_str(s)?,
+                None => SidebarSection::Favorites,
             };
 
             let sidebar = Sidebar::new(section)?;
@@ -54,12 +50,12 @@ fn main() -> Result<()> {
             }
         }
         Commands::Add { path } => {
-            let sidebar = Sidebar::new(SidebarSection::Favorites)?;
+            let sidebar = Sidebar::favorites()?;
             sidebar.add_item(&path)?;
             println!("Added item: {}", path);
         }
         Commands::Remove { path } => {
-            let sidebar = Sidebar::new(SidebarSection::Favorites)?;
+            let sidebar = Sidebar::favorites()?;
             sidebar.remove_item(&path)?;
             println!("Removed item: {}", path);
         }
