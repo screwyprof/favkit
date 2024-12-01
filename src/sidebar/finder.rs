@@ -1,8 +1,7 @@
-use super::traits::SidebarOperations;
-use crate::cf_wrapper::CFWrapper;
-use crate::error::{Result, SidebarError};
-use crate::types::{SidebarItem, SidebarUrl};
-use crate::url_handler::UrlHandler;
+use super::{SidebarItem, SidebarOperations, SidebarUrl};
+use crate::sidebar::cf::CFWrapper;
+use crate::sidebar::error::{Result, SidebarError};
+use crate::sidebar::url::UrlHandler;
 use core_foundation::{
     array::CFArray,
     base::{CFType, TCFType},

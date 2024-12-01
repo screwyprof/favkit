@@ -1,13 +1,5 @@
-mod cf_wrapper;
-mod constants;
-mod error;
-mod sidebar;
-mod types;
-mod url_handler;
-
 use clap::{Parser, Subcommand};
-use error::Result;
-use sidebar::{Sidebar, SidebarOperations, SidebarSection};
+use favkit::sidebar::{Result, Sidebar, SidebarOperations, SidebarSection};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

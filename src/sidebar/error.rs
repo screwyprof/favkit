@@ -13,9 +13,6 @@ pub enum SidebarError {
 
     #[error("Invalid path: {0}")]
     InvalidPath(String),
-
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, SidebarError>;

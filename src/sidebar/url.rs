@@ -1,10 +1,14 @@
-use crate::constants::{REMOTE_DISC_IDENTIFIER, SYSTEM_URL_PREFIX};
-use crate::types::SidebarUrl;
+use super::SidebarUrl;
 use core_foundation::{
     base::TCFType,
     string::CFString,
     url::{CFURLGetString, CFURL},
 };
+
+// Constants moved from constants.rs
+const SYSTEM_URL_PREFIX: &str = "com-apple-sfl://";
+const REMOTE_DISC_IDENTIFIER: &str = "IsRemoteDisc";
+
 pub struct UrlHandler;
 
 impl UrlHandler {

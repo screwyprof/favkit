@@ -6,6 +6,13 @@ description = "A tool to manage macOS Finder sidebar items"
 authors = ["Maksim Shcherbo <max@happygopher.nl>"]
 license = "MIT"
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "favkit"
+path = "src/main.rs"
+
 [dependencies]
 core-foundation = "0.10"
 core-services = "1.0"
