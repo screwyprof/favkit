@@ -59,9 +59,6 @@ impl SidebarOperations for FinderSidebar<'_> {
                 }
             }
         }
-        Err(SidebarError::RemoveItem(format!(
-            "Item not found: {}",
-            path
-        )))
+        Err(SidebarError::NotFound(format!("Item not found: {}", path)))
     }
 }

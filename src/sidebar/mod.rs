@@ -115,7 +115,10 @@ impl FromStr for SidebarSection {
         match s.to_lowercase().as_str() {
             "favorites" => Ok(Self::Favorites),
             "locations" => Ok(Self::Locations),
-            _ => Err(SidebarError::InvalidSection(s.to_string())),
+            _ => Err(SidebarError::InvalidInput(format!(
+                "Invalid section: {}",
+                s
+            ))),
         }
     }
 }
@@ -173,11 +176,9 @@ impl FavoritesSidebar<'_> {
     }
 
     pub fn add_item(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.finder.add_item(
-            path.as_ref()
-                .to_str()
-                .ok_or_else(|| SidebarError::InvalidPath(path.as_ref().to_path_buf()))?,
-        )
+        self.finder.add_item(path.as_ref().to_str().ok_or_else(|| {
+            SidebarError::InvalidInput(format!("Invalid path: {:?}", path.as_ref()))
+        })?)
     }
 
     pub fn add_favorite(&self, item: FavoriteItem) -> Result<()> {
@@ -188,23 +189,21 @@ impl FavoritesSidebar<'_> {
         let items = self.list_items()?;
         if let Some(item) = items.iter().find(|i| i.name == name) {
             if let SidebarUrl::File(path) = &item.url {
-                return self.finder.remove_item(
-                    path.to_str()
-                        .ok_or_else(|| SidebarError::InvalidPath(path.clone()))?,
-                );
+                return self.finder.remove_item(path.to_str().ok_or_else(|| {
+                    SidebarError::InvalidInput(format!("Invalid path: {:?}", path))
+                })?);
             }
         }
-        Err(SidebarError::RemoveItem(format!(
-            "Item not found: {}",
-            name
-        )))
+        Err(SidebarError::NotFound(format!("Item not found: {}", name)))
     }
 
     pub fn add_special_location(&self, location: SpecialLocation) -> Result<()> {
         match location {
             SpecialLocation::AirDrop => self.finder.add_item("nwnode://domain-AirDrop"),
             SpecialLocation::RemoteDisc => self.finder.add_item("com-apple-sfl://IsRemoteDisc"),
-            _ => Err(SidebarError::AddItem("Unsupported special location".into())),
+            _ => Err(SidebarError::Operation(
+                "Unsupported special location".into(),
+            )),
         }
     }
 }

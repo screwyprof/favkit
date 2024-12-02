@@ -75,14 +75,14 @@ pub trait CoreServicesOperations {
     fn create_favorites_list(&self) -> Result<LSSharedFileListRef> {
         unsafe {
             self.create_list(kLSSharedFileListFavoriteItems)
-                .ok_or_else(|| SidebarError::CreateList("Failed to create favorites list".into()))
+                .ok_or_else(|| SidebarError::Operation("Failed to create favorites list".into()))
         }
     }
 
     fn create_volumes_list(&self) -> Result<LSSharedFileListRef> {
         unsafe {
             self.create_list(kLSSharedFileListFavoriteVolumes)
-                .ok_or_else(|| SidebarError::CreateList("Failed to create volumes list".into()))
+                .ok_or_else(|| SidebarError::Operation("Failed to create volumes list".into()))
         }
     }
 }
@@ -151,14 +151,14 @@ impl DefaultCoreServices {
     pub fn create_favorites_list(&self) -> Result<LSSharedFileListRef> {
         unsafe {
             self.create_list(kLSSharedFileListFavoriteItems)
-                .ok_or_else(|| SidebarError::CreateList("Failed to create favorites list".into()))
+                .ok_or_else(|| SidebarError::Operation("Failed to create favorites list".into()))
         }
     }
 
     pub fn create_volumes_list(&self) -> Result<LSSharedFileListRef> {
         unsafe {
             self.create_list(kLSSharedFileListFavoriteVolumes)
-                .ok_or_else(|| SidebarError::CreateList("Failed to create volumes list".into()))
+                .ok_or_else(|| SidebarError::Operation("Failed to create volumes list".into()))
         }
     }
 }
@@ -255,7 +255,7 @@ impl<'a> CFItem<'a> {
     ) -> Result<Vec<Self>> {
         let items = core_services
             .copy_snapshot(list)
-            .ok_or_else(|| SidebarError::Snapshot("Failed to get items snapshot".into()))?;
+            .ok_or_else(|| SidebarError::Operation("Failed to get items snapshot".into()))?;
 
         Ok(items
             .iter()
@@ -353,7 +353,10 @@ impl<'a> CFList<'a> {
     }
 
     pub fn add_url(&self, url: CFURL) -> Result<()> {
-        unsafe { CFItem::add_to_list(self.list, url, self.core_services) }
+        unsafe {
+            CFItem::add_to_list(self.list, url, self.core_services)
+                .map_err(|e| SidebarError::CoreFoundation(e.to_string()))
+        }
     }
 
     pub fn remove_item(&self, item: &CFItem) -> Result<()> {
