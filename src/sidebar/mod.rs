@@ -1,8 +1,6 @@
-mod cf;
+pub mod cf;
 mod error;
 mod finder;
-#[cfg(test)]
-mod tests;
 mod url;
 
 use core_foundation::string::CFStringRef;
@@ -11,7 +9,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use self::cf::CoreServicesOperations;
+pub use self::cf::CoreServicesOperations;
 pub use self::error::{Result, SidebarError};
 use self::finder::FinderSidebar;
 

@@ -25,13 +25,15 @@ impl FinderSidebar {
         list_type: CFStringRef,
         core_services: Box<dyn CoreServicesOperations>,
     ) -> Result<Self> {
-        let list = core_services
-            .create_list(list_type)
-            .ok_or_else(|| SidebarError::CreateList("Failed to create shared file list".into()))?;
+        let list = unsafe {
+            core_services.create_list(list_type).ok_or_else(|| {
+                SidebarError::CreateList("Failed to create shared file list".into())
+            })?
+        };
 
         if list.is_null() {
             return Err(SidebarError::CreateList(
-                "Null list pointer returned".into(),
+                "Shared file list pointer is null".into(),
             ));
         }
 
@@ -42,9 +44,11 @@ impl FinderSidebar {
     }
 
     fn get_items(&self) -> Result<CFArray<CFType>> {
-        self.core_services
-            .copy_snapshot(self.list)
-            .ok_or_else(|| SidebarError::Snapshot("Failed to get items snapshot".into()))
+        unsafe {
+            self.core_services
+                .copy_snapshot(self.list)
+                .ok_or_else(|| SidebarError::Snapshot("Failed to get items snapshot".into()))
+        }
     }
 
     fn parse_item(&self, item: &CFType) -> Option<SidebarItem> {
@@ -85,33 +89,34 @@ impl SidebarOperations for FinderSidebar {
     }
 
     fn add_item(&self, path: &str) -> Result<()> {
-        let path = Path::new(path);
-        if !path.exists() {
-            return Err(SidebarError::invalid_path(path));
-        }
-
-        let url = CFURL::from_path(path, true)
+        let url = CFURL::from_path(Path::new(path), true)
             .ok_or_else(|| SidebarError::AddItem("Failed to create URL from path".into()))?;
 
-        self.core_services.insert_item(self.list, &url);
+        unsafe {
+            self.core_services.insert_item(self.list, &url);
+        }
         Ok(())
     }
 
     fn remove_item(&self, path: &str) -> Result<()> {
         let target_path = Path::new(path);
         if !target_path.exists() {
-            return Err(SidebarError::invalid_path(target_path));
+            return Err(SidebarError::RemoveItem(format!(
+                "Path does not exist: {}",
+                path
+            )));
         }
 
         let items = self.get_items()?;
-        for item in items.iter() {
-            let item_ref = item.as_concrete_TypeRef() as *mut std::ffi::c_void;
-            let cf_item = CFItem::new(item_ref.cast(), self.core_services.as_ref());
 
-            if let Some(url) = cf_item.resolved_url() {
+        for item in items.iter() {
+            let item_ref = item.as_CFTypeRef() as *const _ as *mut _;
+            if let Some(url) = unsafe { self.core_services.copy_resolved_url(item_ref) } {
                 if let Some(item_path) = url.to_path() {
                     if item_path == target_path {
-                        self.core_services.remove_item(self.list, item_ref.cast());
+                        unsafe {
+                            self.core_services.remove_item(self.list, item_ref);
+                        }
                         return Ok(());
                     }
                 }
@@ -119,7 +124,7 @@ impl SidebarOperations for FinderSidebar {
         }
 
         Err(SidebarError::RemoveItem(format!(
-            "Item not found in sidebar: {}",
+            "Item not found: {}",
             path
         )))
     }
