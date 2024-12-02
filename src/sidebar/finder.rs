@@ -48,43 +48,29 @@ impl<'a> FinderSidebar<'a> {
     }
 
     fn parse_item(&self, item: &CFType) -> Option<SidebarItem> {
-        println!("DEBUG: Starting parse_item with: {:?}", item);
         let item_ref = item.as_CFTypeRef() as LSSharedFileListItemRef;
-        println!("DEBUG: Got item_ref: {:?}", item_ref);
-
         let cf_item = CFItem::new(item_ref, self.core_services);
-        println!("DEBUG: Created CFItem: {:?}", cf_item);
 
         // Get URL and parse it
-        println!("DEBUG: Getting resolved URL");
         let url = cf_item
             .resolved_url()
             .and_then(|url| {
-                println!("DEBUG: Got URL: {:?}", url);
                 let handler = UrlHandler::new(url);
-                println!("DEBUG: Created URL handler");
                 handler.parse().ok()
             })
             .unwrap_or(SidebarUrl::NotFound);
-        println!("DEBUG: Parsed URL: {:?}", url);
 
         // Get name with special handling for known items
         let name = match &url {
             SidebarUrl::AirDrop => String::from("AirDrop"),
             SidebarUrl::RemoteDisc => String::from("Remote Disc"),
-            _ => {
-                println!("DEBUG: Getting display name");
-                cf_item.display_name()?
-            }
+            _ => cf_item.display_name()?,
         };
-        println!("DEBUG: Got name: {}", name);
 
         if name.is_empty() {
-            println!("DEBUG: Empty name, returning None");
             return None;
         }
 
-        println!("DEBUG: Creating SidebarItem");
         Some(SidebarItem { name, url })
     }
 }

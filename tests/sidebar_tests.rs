@@ -7,7 +7,7 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{cf::CoreServicesOperations, FavoriteItem, Sidebar, SpecialLocation};
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
