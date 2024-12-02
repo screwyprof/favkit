@@ -3,20 +3,23 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum SidebarError {
-    #[error("Failed to create sidebar list: {0}")]
-    CreateList(String),
+    #[error("Core Foundation error: {0}")]
+    CoreFoundation(String),
 
-    #[error("Failed to get items snapshot: {0}")]
-    Snapshot(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 
-    #[error("Item not found at path: {0}")]
-    ItemNotFound(PathBuf),
+    #[error("Not found: {0}")]
+    NotFound(String),
 
     #[error("Invalid path: {0}")]
     InvalidPath(PathBuf),
 
-    #[error("Failed to resolve URL: {0}")]
-    UrlResolution(String),
+    #[error("Failed to create list: {0}")]
+    CreateList(String),
+
+    #[error("Failed to get snapshot: {0}")]
+    Snapshot(String),
 
     #[error("Failed to add item: {0}")]
     AddItem(String),
@@ -36,6 +39,6 @@ impl SidebarError {
     }
 
     pub fn item_not_found(path: impl Into<PathBuf>) -> Self {
-        Self::ItemNotFound(path.into())
+        Self::NotFound(format!("Item not found: {:?}", path.into()))
     }
 }

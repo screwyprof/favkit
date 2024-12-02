@@ -1,117 +1,68 @@
-use crate::sidebar::cf::{CFItem, CoreServicesOperations};
+use crate::sidebar::cf::{CFList, CoreServicesOperations};
 use crate::sidebar::error::{Result, SidebarError};
-use crate::sidebar::url::UrlHandler;
 use crate::sidebar::{SidebarItem, SidebarOperations, SidebarUrl};
-use core_foundation::{
-    array::CFArray,
-    base::{CFType, TCFType},
-    string::CFStringRef,
-    url::CFURL,
-};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use core_foundation::url::CFURL;
 use std::path::Path;
 
+#[derive(Debug)]
 pub struct FinderSidebar<'a> {
-    list: LSSharedFileListRef,
-    core_services: &'a dyn CoreServicesOperations,
+    list: CFList<'a>,
 }
 
 impl<'a> FinderSidebar<'a> {
-    pub(crate) fn new(
-        list_type: CFStringRef,
-        core_services: &'a dyn CoreServicesOperations,
-    ) -> Result<Self> {
-        let list = unsafe {
-            core_services.create_list(list_type).ok_or_else(|| {
-                SidebarError::CreateList("Failed to create shared file list".into())
-            })?
-        };
-
-        if list.is_null() {
-            return Err(SidebarError::CreateList(
-                "Shared file list pointer is null".into(),
-            ));
-        }
-
+    pub fn new_favorites(core_services: &'a dyn CoreServicesOperations) -> Result<Self> {
         Ok(Self {
-            list,
-            core_services,
+            list: CFList::new_favorites(core_services)?,
         })
     }
 
-    fn get_items(&self) -> Result<CFArray<CFType>> {
-        unsafe {
-            self.core_services
-                .copy_snapshot(self.list)
-                .ok_or_else(|| SidebarError::Snapshot("Failed to get items snapshot".into()))
-        }
-    }
-
-    fn parse_item(&self, item: &CFType) -> Option<SidebarItem> {
-        let item_ref = item.as_CFTypeRef() as LSSharedFileListItemRef;
-        let cf_item = CFItem::new(item_ref, self.core_services);
-
-        // Get URL and parse it
-        let url = cf_item
-            .resolved_url()
-            .and_then(|url| {
-                let handler = UrlHandler::new(url);
-                handler.parse().ok()
-            })
-            .unwrap_or(SidebarUrl::NotFound);
-
-        // Get name with special handling for known items
-        let name = match &url {
-            SidebarUrl::AirDrop => String::from("AirDrop"),
-            SidebarUrl::RemoteDisc => String::from("Remote Disc"),
-            _ => cf_item.display_name()?,
-        };
-
-        if name.is_empty() {
-            return None;
-        }
-
-        Some(SidebarItem { name, url })
+    pub fn new_volumes(core_services: &'a dyn CoreServicesOperations) -> Result<Self> {
+        Ok(Self {
+            list: CFList::new_volumes(core_services)?,
+        })
     }
 }
 
 impl SidebarOperations for FinderSidebar<'_> {
     fn list_items(&self) -> Result<Vec<SidebarItem>> {
-        let items = self.get_items()?;
+        let items = self.list.get_items()?;
         Ok(items
             .iter()
-            .filter_map(|item| self.parse_item(&item))
+            .filter_map(|item| {
+                let url = item.parse_url().ok()?;
+                let name = match &url {
+                    SidebarUrl::AirDrop => String::from("AirDrop"),
+                    SidebarUrl::RemoteDisc => String::from("Remote Disc"),
+                    _ => item.display_name()?,
+                };
+
+                if name.is_empty() {
+                    None
+                } else {
+                    Some(SidebarItem { name, url })
+                }
+            })
             .collect())
     }
 
     fn add_item(&self, path: &str) -> Result<()> {
         let url = CFURL::from_path(Path::new(path), true)
             .ok_or_else(|| SidebarError::AddItem("Failed to create URL from path".into()))?;
-
-        unsafe {
-            self.core_services.insert_item(self.list, &url);
-        }
-        Ok(())
+        self.list.add_url(url)
     }
 
     fn remove_item(&self, path: &str) -> Result<()> {
         let target_path = Path::new(path);
-        let items = self.get_items()?;
-
-        for item in items.iter() {
-            let item_ref = item.as_CFTypeRef() as LSSharedFileListItemRef;
-            if let Some(url) = unsafe { self.core_services.copy_resolved_url(item_ref) } {
+        let items = self.list.get_items()?;
+        for item in items {
+            if let Some(url) = item.resolved_url() {
                 if let Some(item_path) = url.to_path() {
                     if item_path == target_path {
-                        unsafe {
-                            self.core_services.remove_item(self.list, item_ref);
-                        }
-                        return Ok(());
+                        return self.list.remove_item(&item);
                     }
                 }
             }
         }
-
         Err(SidebarError::RemoveItem(format!(
             "Item not found: {}",
             path

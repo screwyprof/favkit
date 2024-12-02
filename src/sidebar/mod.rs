@@ -1,9 +1,7 @@
 pub mod cf;
 mod error;
 mod finder;
-mod url;
 
-use core_services::{kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -150,23 +148,17 @@ impl Sidebar {
         Self { core_services }
     }
 
-    pub fn favorites(&self) -> FavoritesSidebar {
+    pub fn favorites(&self) -> FavoritesSidebar<'_> {
         FavoritesSidebar {
-            finder: FinderSidebar::new(
-                unsafe { kLSSharedFileListFavoriteItems },
-                self.core_services.as_ref(),
-            )
-            .expect("Failed to create favorites sidebar"),
+            finder: FinderSidebar::new_favorites(self.core_services.as_ref())
+                .expect("Failed to create favorites sidebar"),
         }
     }
 
-    pub fn locations(&self) -> LocationsSidebar {
+    pub fn locations(&self) -> LocationsSidebar<'_> {
         LocationsSidebar {
-            finder: FinderSidebar::new(
-                unsafe { kLSSharedFileListFavoriteVolumes },
-                self.core_services.as_ref(),
-            )
-            .expect("Failed to create locations sidebar"),
+            finder: FinderSidebar::new_volumes(self.core_services.as_ref())
+                .expect("Failed to create locations sidebar"),
         }
     }
 }

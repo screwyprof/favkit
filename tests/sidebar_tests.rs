@@ -7,7 +7,6 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{cf::CoreServicesOperations, FavoriteItem, Sidebar, SpecialLocation};
 
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,17 +68,14 @@ impl MockCoreServices {
 impl CoreServicesOperations for MockCoreServices {
     unsafe fn create_list(&self, _list_type: CFStringRef) -> Option<LSSharedFileListRef> {
         self.record_operation(MockOperation::CreateList);
-        Some(1 as *mut _)
+        Some(42 as *mut _)
     }
 
     unsafe fn copy_snapshot(&self, _list: LSSharedFileListRef) -> Option<CFArray<CFType>> {
         self.record_operation(MockOperation::CopySnapshot);
-
         if *self.return_items.lock().unwrap() {
             let mock_item = CFString::from_static_string("mock_id");
-            let cf_type = mock_item.as_CFType();
-            let array = CFArray::from_CFTypes(&[cf_type]);
-            Some(array)
+            Some(CFArray::from_CFTypes(&[mock_item.as_CFType()]))
         } else {
             Some(CFArray::from_CFTypes(&[]))
         }
@@ -92,9 +88,7 @@ impl CoreServicesOperations for MockCoreServices {
 
     unsafe fn copy_resolved_url(&self, _item: LSSharedFileListItemRef) -> Option<CFURL> {
         self.record_operation(MockOperation::CopyResolvedUrl);
-        let path = Path::new("/test/path");
-        let url = CFURL::from_path(path, true)?;
-        Some(url)
+        Some(CFURL::from_path(std::path::Path::new("/test/path"), true).unwrap())
     }
 
     unsafe fn insert_item(&self, _list: LSSharedFileListRef, _url: &CFURL) {
