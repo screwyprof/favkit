@@ -96,13 +96,6 @@ impl SidebarOperations for FinderSidebar<'_> {
 
     fn remove_item(&self, path: &str) -> Result<()> {
         let target_path = Path::new(path);
-        if !target_path.exists() {
-            return Err(SidebarError::RemoveItem(format!(
-                "Path does not exist: {}",
-                path
-            )));
-        }
-
         let items = self.get_items()?;
 
         for item in items.iter() {

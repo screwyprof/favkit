@@ -68,40 +68,32 @@ impl MockCoreServices {
 
 impl CoreServicesOperations for MockCoreServices {
     unsafe fn create_list(&self, _list_type: CFStringRef) -> Option<LSSharedFileListRef> {
-        println!("DEBUG: Creating list");
         self.record_operation(MockOperation::CreateList);
         Some(1 as *mut _)
     }
 
     unsafe fn copy_snapshot(&self, _list: LSSharedFileListRef) -> Option<CFArray<CFType>> {
-        println!("DEBUG: Starting copy_snapshot");
         self.record_operation(MockOperation::CopySnapshot);
 
         if *self.return_items.lock().unwrap() {
-            println!("DEBUG: Creating mock item string");
             let mock_item = CFString::from_static_string("mock_id");
             let cf_type = mock_item.as_CFType();
             let array = CFArray::from_CFTypes(&[cf_type]);
-            println!("DEBUG: Created array: {:?}", array);
             Some(array)
         } else {
-            println!("DEBUG: Returning empty array");
             Some(CFArray::from_CFTypes(&[]))
         }
     }
 
     unsafe fn copy_display_name(&self, _item: LSSharedFileListItemRef) -> Option<CFString> {
-        println!("DEBUG: Starting copy_display_name");
         self.record_operation(MockOperation::CopyDisplayName);
         Some(CFString::from_static_string("Test Item"))
     }
 
     unsafe fn copy_resolved_url(&self, _item: LSSharedFileListItemRef) -> Option<CFURL> {
-        println!("DEBUG: Starting copy_resolved_url");
         self.record_operation(MockOperation::CopyResolvedUrl);
         let path = Path::new("/test/path");
         let url = CFURL::from_path(path, true)?;
-        println!("DEBUG: Created URL: {:?}", url);
         Some(url)
     }
 
@@ -116,18 +108,14 @@ impl CoreServicesOperations for MockCoreServices {
 
 #[test]
 fn test_list_items() {
-    println!("\n=== Starting test_list_items ===");
-    println!("DEBUG: Creating mock and sidebar");
     let mock = MockCoreServices::default();
     mock.clear_operations();
     let sidebar = Sidebar::new_with_core_services(Box::new(mock.clone()));
-    println!("DEBUG: Getting favorites");
+
     let favorites = sidebar.favorites();
     mock.clear_operations();
 
-    println!("DEBUG: Calling list_items");
     let items = favorites.list_items().unwrap();
-    println!("DEBUG: Got items: {:?}", items);
 
     // Assert
     let expected_ops = vec![
@@ -137,7 +125,6 @@ fn test_list_items() {
     ];
     mock.assert_operations_sequence(&expected_ops);
     assert!(!items.is_empty());
-    println!("=== Ending test_list_items ===\n");
 }
 
 #[test]

@@ -166,21 +166,14 @@ impl<'a> CFItem<'a> {
     }
 
     pub fn display_name(&self) -> Option<String> {
-        println!("DEBUG: CFItem::display_name for: {:?}", self);
         unsafe {
             let name = self.core_services.copy_display_name(self.item_ref)?;
-            println!("DEBUG: Got name: {:?}", name);
             Some(name.to_string())
         }
     }
 
     pub fn resolved_url(&self) -> Option<CFURL> {
-        println!("DEBUG: CFItem::resolved_url for: {:?}", self);
-        unsafe {
-            let url = self.core_services.copy_resolved_url(self.item_ref);
-            println!("DEBUG: Got URL: {:?}", url);
-            url
-        }
+        unsafe { self.core_services.copy_resolved_url(self.item_ref) }
     }
 
     pub fn item_ref(&self) -> LSSharedFileListItemRef {
