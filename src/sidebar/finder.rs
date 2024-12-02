@@ -1,4 +1,4 @@
-use crate::sidebar::cf::{CFItem, CoreServicesOperations, DefaultCoreServices};
+use crate::sidebar::cf::{CFItem, CoreServicesOperations};
 use crate::sidebar::error::{Result, SidebarError};
 use crate::sidebar::url::UrlHandler;
 use crate::sidebar::{SidebarItem, SidebarOperations, SidebarUrl};
@@ -8,22 +8,18 @@ use core_foundation::{
     string::CFStringRef,
     url::CFURL,
 };
-use core_services::LSSharedFileListRef;
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use std::path::Path;
 
-pub struct FinderSidebar {
+pub struct FinderSidebar<'a> {
     list: LSSharedFileListRef,
-    core_services: Box<dyn CoreServicesOperations>,
+    core_services: &'a dyn CoreServicesOperations,
 }
 
-impl FinderSidebar {
-    pub fn new(list_type: CFStringRef) -> Result<Self> {
-        Self::with_core_services(list_type, Box::new(DefaultCoreServices))
-    }
-
-    pub(crate) fn with_core_services(
+impl<'a> FinderSidebar<'a> {
+    pub(crate) fn new(
         list_type: CFStringRef,
-        core_services: Box<dyn CoreServicesOperations>,
+        core_services: &'a dyn CoreServicesOperations,
     ) -> Result<Self> {
         let list = unsafe {
             core_services.create_list(list_type).ok_or_else(|| {
@@ -52,34 +48,48 @@ impl FinderSidebar {
     }
 
     fn parse_item(&self, item: &CFType) -> Option<SidebarItem> {
-        let item_ref = item.as_concrete_TypeRef() as *mut std::ffi::c_void;
-        let cf_item = CFItem::new(item_ref.cast(), self.core_services.as_ref());
+        println!("DEBUG: Starting parse_item with: {:?}", item);
+        let item_ref = item.as_CFTypeRef() as LSSharedFileListItemRef;
+        println!("DEBUG: Got item_ref: {:?}", item_ref);
+
+        let cf_item = CFItem::new(item_ref, self.core_services);
+        println!("DEBUG: Created CFItem: {:?}", cf_item);
 
         // Get URL and parse it
+        println!("DEBUG: Getting resolved URL");
         let url = cf_item
             .resolved_url()
             .and_then(|url| {
+                println!("DEBUG: Got URL: {:?}", url);
                 let handler = UrlHandler::new(url);
+                println!("DEBUG: Created URL handler");
                 handler.parse().ok()
             })
             .unwrap_or(SidebarUrl::NotFound);
+        println!("DEBUG: Parsed URL: {:?}", url);
 
         // Get name with special handling for known items
         let name = match &url {
             SidebarUrl::AirDrop => String::from("AirDrop"),
             SidebarUrl::RemoteDisc => String::from("Remote Disc"),
-            _ => cf_item.display_name()?,
+            _ => {
+                println!("DEBUG: Getting display name");
+                cf_item.display_name()?
+            }
         };
+        println!("DEBUG: Got name: {}", name);
 
         if name.is_empty() {
+            println!("DEBUG: Empty name, returning None");
             return None;
         }
 
+        println!("DEBUG: Creating SidebarItem");
         Some(SidebarItem { name, url })
     }
 }
 
-impl SidebarOperations for FinderSidebar {
+impl SidebarOperations for FinderSidebar<'_> {
     fn list_items(&self) -> Result<Vec<SidebarItem>> {
         let items = self.get_items()?;
         Ok(items
@@ -110,7 +120,7 @@ impl SidebarOperations for FinderSidebar {
         let items = self.get_items()?;
 
         for item in items.iter() {
-            let item_ref = item.as_CFTypeRef() as *const _ as *mut _;
+            let item_ref = item.as_CFTypeRef() as LSSharedFileListItemRef;
             if let Some(url) = unsafe { self.core_services.copy_resolved_url(item_ref) } {
                 if let Some(item_path) = url.to_path() {
                     if item_path == target_path {

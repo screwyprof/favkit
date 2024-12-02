@@ -3,13 +3,12 @@ mod error;
 mod finder;
 mod url;
 
-use core_foundation::string::CFStringRef;
 use core_services::{kLSSharedFileListFavoriteItems, kLSSharedFileListFavoriteVolumes};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-pub use self::cf::CoreServicesOperations;
+pub use self::cf::{CoreServicesOperations, DefaultCoreServices};
 pub use self::error::{Result, SidebarError};
 use self::finder::FinderSidebar;
 
@@ -123,74 +122,107 @@ impl FromStr for SidebarSection {
     }
 }
 
-impl SidebarSection {
-    fn list_type(&self) -> CFStringRef {
-        unsafe {
-            match self {
-                Self::Favorites => kLSSharedFileListFavoriteItems,
-                Self::Locations => kLSSharedFileListFavoriteVolumes,
-            }
-        }
-    }
-}
-
 pub trait SidebarOperations {
     fn list_items(&self) -> Result<Vec<SidebarItem>>;
     fn add_item(&self, path: &str) -> Result<()>;
     fn remove_item(&self, path: &str) -> Result<()>;
 }
 
-pub struct Sidebar(FinderSidebar);
+pub struct Sidebar {
+    core_services: Box<dyn CoreServicesOperations>,
+}
 
-impl Sidebar {
-    pub fn new(section: SidebarSection) -> Result<Self> {
-        FinderSidebar::new(section.list_type()).map(Self)
-    }
-
-    pub fn with_core_services(
-        section: SidebarSection,
-        core_services: Box<dyn CoreServicesOperations>,
-    ) -> Result<Self> {
-        FinderSidebar::with_core_services(section.list_type(), core_services).map(Self)
-    }
-
-    pub fn favorites() -> Result<Self> {
-        Self::new(SidebarSection::Favorites)
-    }
-
-    pub fn locations() -> Result<Self> {
-        Self::new(SidebarSection::Locations)
-    }
-
-    /// Add a common favorite item to the sidebar
-    pub fn add_favorite(&self, item: FavoriteItem) -> Result<()> {
-        self.add_item(
-            item.path()
-                .to_str()
-                .ok_or_else(|| SidebarError::InvalidPath(item.path()))?,
-        )
-    }
-
-    /// Add a special location to the sidebar
-    pub fn add_location(&self, _location: SpecialLocation) -> Result<()> {
-        // Special locations are handled differently and may require specific URLs
-        // This is a placeholder for future implementation
-        Err(SidebarError::AddItem(
-            "Special locations cannot be added manually".into(),
-        ))
+impl Default for Sidebar {
+    fn default() -> Self {
+        Self {
+            core_services: Box::new(DefaultCoreServices),
+        }
     }
 }
 
-impl SidebarOperations for Sidebar {
-    fn list_items(&self) -> Result<Vec<SidebarItem>> {
-        self.0.list_items()
+impl Sidebar {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    fn add_item(&self, path: &str) -> Result<()> {
-        self.0.add_item(path)
+    // For testing
+    pub fn new_with_core_services(core_services: Box<dyn CoreServicesOperations>) -> Self {
+        Self { core_services }
     }
 
-    fn remove_item(&self, path: &str) -> Result<()> {
-        self.0.remove_item(path)
+    pub fn favorites(&self) -> FavoritesSidebar {
+        FavoritesSidebar {
+            finder: FinderSidebar::new(
+                unsafe { kLSSharedFileListFavoriteItems },
+                self.core_services.as_ref(),
+            )
+            .expect("Failed to create favorites sidebar"),
+        }
+    }
+
+    pub fn locations(&self) -> LocationsSidebar {
+        LocationsSidebar {
+            finder: FinderSidebar::new(
+                unsafe { kLSSharedFileListFavoriteVolumes },
+                self.core_services.as_ref(),
+            )
+            .expect("Failed to create locations sidebar"),
+        }
+    }
+}
+
+pub struct FavoritesSidebar<'a> {
+    finder: FinderSidebar<'a>,
+}
+
+impl FavoritesSidebar<'_> {
+    pub fn list_items(&self) -> Result<Vec<SidebarItem>> {
+        self.finder.list_items()
+    }
+
+    pub fn add_item(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.finder.add_item(
+            path.as_ref()
+                .to_str()
+                .ok_or_else(|| SidebarError::InvalidPath(path.as_ref().to_path_buf()))?,
+        )
+    }
+
+    pub fn add_favorite(&self, item: FavoriteItem) -> Result<()> {
+        self.add_item(item.path())
+    }
+
+    pub fn remove_item(&self, name: &str) -> Result<()> {
+        let items = self.list_items()?;
+        if let Some(item) = items.iter().find(|i| i.name == name) {
+            if let SidebarUrl::File(path) = &item.url {
+                return self.finder.remove_item(
+                    path.to_str()
+                        .ok_or_else(|| SidebarError::InvalidPath(path.clone()))?,
+                );
+            }
+        }
+        Err(SidebarError::RemoveItem(format!(
+            "Item not found: {}",
+            name
+        )))
+    }
+
+    pub fn add_special_location(&self, location: SpecialLocation) -> Result<()> {
+        match location {
+            SpecialLocation::AirDrop => self.finder.add_item("nwnode://domain-AirDrop"),
+            SpecialLocation::RemoteDisc => self.finder.add_item("com-apple-sfl://IsRemoteDisc"),
+            _ => Err(SidebarError::AddItem("Unsupported special location".into())),
+        }
+    }
+}
+
+pub struct LocationsSidebar<'a> {
+    finder: FinderSidebar<'a>,
+}
+
+impl LocationsSidebar<'_> {
+    pub fn list_items(&self) -> Result<Vec<SidebarItem>> {
+        self.finder.list_items()
     }
 }

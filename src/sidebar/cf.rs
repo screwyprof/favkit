@@ -154,15 +154,36 @@ impl<'a> CFItem<'a> {
         }
     }
 
+    pub fn from_cf_type(
+        item: &CFType,
+        core_services: &'a dyn CoreServicesOperations,
+    ) -> Option<Self> {
+        let item_ref = item.as_CFTypeRef() as *const _ as *mut _;
+        Some(Self {
+            item_ref,
+            core_services,
+        })
+    }
+
     pub fn display_name(&self) -> Option<String> {
+        println!("DEBUG: CFItem::display_name for: {:?}", self);
         unsafe {
-            self.core_services
-                .copy_display_name(self.item_ref)
-                .map(|cf_name| cf_name.to_string())
+            let name = self.core_services.copy_display_name(self.item_ref)?;
+            println!("DEBUG: Got name: {:?}", name);
+            Some(name.to_string())
         }
     }
 
     pub fn resolved_url(&self) -> Option<CFURL> {
-        unsafe { self.core_services.copy_resolved_url(self.item_ref) }
+        println!("DEBUG: CFItem::resolved_url for: {:?}", self);
+        unsafe {
+            let url = self.core_services.copy_resolved_url(self.item_ref);
+            println!("DEBUG: Got URL: {:?}", url);
+            url
+        }
+    }
+
+    pub fn item_ref(&self) -> LSSharedFileListItemRef {
+        self.item_ref
     }
 }

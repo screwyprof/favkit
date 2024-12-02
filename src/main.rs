@@ -1,9 +1,8 @@
 use clap::{Parser, Subcommand};
-use favkit::sidebar::{Result, Sidebar, SidebarOperations, SidebarSection};
-use std::str::FromStr;
+use favkit::sidebar::{Result, Sidebar, SidebarSection};
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -11,53 +10,46 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List all sidebar items
+    /// List items in the sidebar
     List {
+        /// Section to list (favorites or locations)
         #[arg(short, long)]
-        section: Option<String>,
+        section: SidebarSection,
     },
-    /// Add an item to the sidebar
+    /// Add an item to favorites
     Add {
-        /// Path to add to the sidebar
+        /// Path to add
         path: String,
     },
-    /// Remove an item from the sidebar
+    /// Remove an item from favorites
     Remove {
-        /// Path to remove from the sidebar
-        path: String,
+        /// Item name to remove
+        name: String,
     },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let sidebar = Sidebar::new();
 
     match cli.command {
         Commands::List { section } => {
-            let section = match section.as_deref() {
-                Some(s) => SidebarSection::from_str(s)?,
-                None => SidebarSection::Favorites,
+            let items = match section {
+                SidebarSection::Favorites => sidebar.favorites().list_items()?,
+                SidebarSection::Locations => sidebar.locations().list_items()?,
             };
 
-            match section {
-                SidebarSection::Favorites => println!("\nFavorites:"),
-                SidebarSection::Locations => println!("\nLocations:"),
-            }
-
-            let sidebar = Sidebar::new(section)?;
-
-            for item in sidebar.list_items()? {
-                println!("{} -> {}", item.name, item.url);
+            for item in items {
+                println!("{}: {}", item.name, item.url);
             }
         }
         Commands::Add { path } => {
-            let sidebar = Sidebar::favorites()?;
-            sidebar.add_item(&path)?;
-            println!("Added item: {}", path);
+            sidebar.favorites().add_item(path)?;
+            println!("Item added successfully");
         }
-        Commands::Remove { path } => {
-            let sidebar = Sidebar::favorites()?;
-            sidebar.remove_item(&path)?;
-            println!("Removed item: {}", path);
+        Commands::Remove { name } => {
+            sidebar.favorites().remove_item(&name)?;
+            println!("Item removed successfully");
         }
     }
 

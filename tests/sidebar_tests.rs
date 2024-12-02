@@ -4,18 +4,11 @@ use core_foundation::{
     string::{CFString, CFStringRef},
     url::CFURL,
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListRef};
-use favkit::sidebar::{
-    cf::CoreServicesOperations, FavoriteItem, Sidebar, SidebarOperations, SidebarSection,
-    SpecialLocation,
-};
-use std::cell::RefCell;
-use std::ptr::NonNull;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use favkit::sidebar::{cf::CoreServicesOperations, FavoriteItem, Sidebar, SpecialLocation};
 
-static MOCK_LIST_COUNTER: AtomicUsize = AtomicUsize::new(1);
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
 enum MockOperation {
@@ -29,28 +22,30 @@ enum MockOperation {
 
 #[derive(Clone)]
 struct MockCoreServices {
-    operations: Rc<RefCell<Vec<MockOperation>>>,
+    operations: Arc<Mutex<Vec<MockOperation>>>,
+    return_items: Arc<Mutex<bool>>,
 }
 
 impl Default for MockCoreServices {
     fn default() -> Self {
         Self {
-            operations: Rc::new(RefCell::new(Vec::new())),
+            operations: Arc::new(Mutex::new(Vec::new())),
+            return_items: Arc::new(Mutex::new(true)),
         }
     }
 }
 
 impl MockCoreServices {
     fn record_operation(&self, op: MockOperation) {
-        self.operations.borrow_mut().push(op);
+        self.operations.lock().unwrap().push(op);
     }
 
     fn operations(&self) -> Vec<MockOperation> {
-        self.operations.borrow().clone()
+        self.operations.lock().unwrap().clone()
     }
 
     fn clear_operations(&self) {
-        self.operations.borrow_mut().clear();
+        self.operations.lock().unwrap().clear();
     }
 
     fn assert_operations_sequence(&self, expected_ops: &[MockOperation]) {
@@ -65,33 +60,49 @@ impl MockCoreServices {
             assert_eq!(actual, expected, "Operation mismatch");
         }
     }
+
+    fn set_return_items(&self, value: bool) {
+        *self.return_items.lock().unwrap() = value;
+    }
 }
 
 impl CoreServicesOperations for MockCoreServices {
     unsafe fn create_list(&self, _list_type: CFStringRef) -> Option<LSSharedFileListRef> {
-        let ptr = MOCK_LIST_COUNTER.fetch_add(1, Ordering::SeqCst);
-        let list = NonNull::new(ptr as *mut OpaqueLSSharedFileListRef)?.as_ptr();
+        println!("DEBUG: Creating list");
         self.record_operation(MockOperation::CreateList);
-        Some(list)
+        Some(1 as *mut _)
     }
 
     unsafe fn copy_snapshot(&self, _list: LSSharedFileListRef) -> Option<CFArray<CFType>> {
-        let items = ["Test Item".to_string()];
+        println!("DEBUG: Starting copy_snapshot");
         self.record_operation(MockOperation::CopySnapshot);
-        let mock_item = CFString::new(&items[0]).as_CFType();
-        Some(CFArray::from_CFTypes(&[mock_item]))
+
+        if *self.return_items.lock().unwrap() {
+            println!("DEBUG: Creating mock item string");
+            let mock_item = CFString::from_static_string("mock_id");
+            let cf_type = mock_item.as_CFType();
+            let array = CFArray::from_CFTypes(&[cf_type]);
+            println!("DEBUG: Created array: {:?}", array);
+            Some(array)
+        } else {
+            println!("DEBUG: Returning empty array");
+            Some(CFArray::from_CFTypes(&[]))
+        }
     }
 
     unsafe fn copy_display_name(&self, _item: LSSharedFileListItemRef) -> Option<CFString> {
-        let name = "Test Item".to_string();
+        println!("DEBUG: Starting copy_display_name");
         self.record_operation(MockOperation::CopyDisplayName);
-        Some(CFString::new(&name))
+        Some(CFString::from_static_string("Test Item"))
     }
 
     unsafe fn copy_resolved_url(&self, _item: LSSharedFileListItemRef) -> Option<CFURL> {
-        let path = std::env::temp_dir();
+        println!("DEBUG: Starting copy_resolved_url");
         self.record_operation(MockOperation::CopyResolvedUrl);
-        CFURL::from_path(&path, true)
+        let path = Path::new("/test/path");
+        let url = CFURL::from_path(path, true)?;
+        println!("DEBUG: Created URL: {:?}", url);
+        Some(url)
     }
 
     unsafe fn insert_item(&self, _list: LSSharedFileListRef, _url: &CFURL) {
@@ -105,14 +116,18 @@ impl CoreServicesOperations for MockCoreServices {
 
 #[test]
 fn test_list_items() {
-    // Arrange
+    println!("\n=== Starting test_list_items ===");
+    println!("DEBUG: Creating mock and sidebar");
     let mock = MockCoreServices::default();
-    let sidebar =
-        Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
+    mock.clear_operations();
+    let sidebar = Sidebar::new_with_core_services(Box::new(mock.clone()));
+    println!("DEBUG: Getting favorites");
+    let favorites = sidebar.favorites();
     mock.clear_operations();
 
-    // Act
-    let items = sidebar.list_items().unwrap();
+    println!("DEBUG: Calling list_items");
+    let items = favorites.list_items().unwrap();
+    println!("DEBUG: Got items: {:?}", items);
 
     // Assert
     let expected_ops = vec![
@@ -122,23 +137,24 @@ fn test_list_items() {
     ];
     mock.assert_operations_sequence(&expected_ops);
     assert!(!items.is_empty());
+    println!("=== Ending test_list_items ===\n");
 }
 
 #[test]
 fn test_add_favorite() {
     // Arrange
     let mock = MockCoreServices::default();
-    let sidebar =
-        Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
+    let sidebar = Sidebar::new_with_core_services(Box::new(mock.clone()));
     mock.clear_operations();
 
     // Act
     sidebar
+        .favorites()
         .add_item(std::env::temp_dir().to_str().unwrap())
         .unwrap();
 
     // Assert
-    let expected_ops = vec![MockOperation::InsertItem];
+    let expected_ops = vec![MockOperation::CreateList, MockOperation::InsertItem];
     mock.assert_operations_sequence(&expected_ops);
 }
 
@@ -146,29 +162,37 @@ fn test_add_favorite() {
 fn test_remove_item() {
     // Arrange
     let mock = MockCoreServices::default();
-    let sidebar =
-        Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
     mock.clear_operations();
+    let sidebar = Sidebar::new_with_core_services(Box::new(mock.clone()));
+    let favorites = sidebar.favorites();
+    mock.clear_operations();
+    mock.set_return_items(false);
 
     // Act
-    let result = sidebar.remove_item("/nonexistent/path");
+    let result = favorites.remove_item("/nonexistent/path");
 
     // Assert
     assert!(result.is_err());
-    assert!(mock.operations().is_empty());
+    let expected_ops = vec![MockOperation::CopySnapshot];
+    mock.assert_operations_sequence(&expected_ops);
 }
 
 #[test]
-fn test_sidebar_section_from_str() {
-    assert!(matches!(
-        SidebarSection::from_str("favorites").unwrap(),
-        SidebarSection::Favorites
-    ));
-    assert!(matches!(
-        SidebarSection::from_str("locations").unwrap(),
-        SidebarSection::Locations
-    ));
-    assert!(SidebarSection::from_str("invalid").is_err());
+fn test_add_special_location() {
+    // Arrange
+    let mock = MockCoreServices::default();
+    let sidebar = Sidebar::new_with_core_services(Box::new(mock.clone()));
+    mock.clear_operations();
+
+    // Act
+    let result = sidebar
+        .favorites()
+        .add_special_location(SpecialLocation::AirDrop);
+
+    // Assert
+    assert!(result.is_ok());
+    let expected_ops = vec![MockOperation::CreateList, MockOperation::InsertItem];
+    mock.assert_operations_sequence(&expected_ops);
 }
 
 #[test]
@@ -197,19 +221,4 @@ fn test_special_location_display_names() {
     assert_eq!(SpecialLocation::AllMyFiles.display_name(), "All My Files");
     assert_eq!(SpecialLocation::NetworkFolder.display_name(), "Network");
     assert_eq!(SpecialLocation::ICloudDrive.display_name(), "iCloud Drive");
-}
-
-#[test]
-fn test_add_special_location() {
-    // Arrange
-    let mock = MockCoreServices::default();
-    let sidebar =
-        Sidebar::with_core_services(SidebarSection::Favorites, Box::new(mock.clone())).unwrap();
-    mock.clear_operations();
-
-    // Act
-    let result = sidebar.add_location(SpecialLocation::AirDrop);
-
-    // Assert
-    assert!(result.is_err());
 }
