@@ -1,7 +1,6 @@
 use crate::sidebar::cf::{CFList, CoreServicesOperations};
 use crate::sidebar::error::{Result, SidebarError};
 use crate::sidebar::{SidebarItem, SidebarOperations, SidebarUrl};
-use core_foundation::url::CFURL;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -46,8 +45,7 @@ impl SidebarOperations for FinderSidebar<'_> {
     }
 
     fn add_item(&self, path: &str) -> Result<()> {
-        let url = CFURL::from_path(Path::new(path), true)
-            .ok_or_else(|| SidebarError::AddItem("Failed to create URL from path".into()))?;
+        let url = CFList::url_from_path(Path::new(path))?;
         self.list.add_url(url)
     }
 
@@ -55,11 +53,9 @@ impl SidebarOperations for FinderSidebar<'_> {
         let target_path = Path::new(path);
         let items = self.list.get_items()?;
         for item in items {
-            if let Some(url) = item.resolved_url() {
-                if let Some(item_path) = url.to_path() {
-                    if item_path == target_path {
-                        return self.list.remove_item(&item);
-                    }
+            if let Ok(SidebarUrl::File(item_path)) = item.parse_url() {
+                if item_path == target_path {
+                    return self.list.remove_item(&item);
                 }
             }
         }

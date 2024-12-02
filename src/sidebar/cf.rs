@@ -362,4 +362,9 @@ impl<'a> CFList<'a> {
             Ok(())
         }
     }
+
+    pub fn url_from_path(path: &Path) -> Result<CFURL> {
+        CFURL::from_path(path, true)
+            .ok_or_else(|| SidebarError::CoreFoundation("Failed to create URL from path".into()))
+    }
 }
