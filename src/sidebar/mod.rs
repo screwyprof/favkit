@@ -11,9 +11,9 @@ pub struct Sidebar<T: MacOsApi = RealMacOsApi> {
 }
 
 impl<T: MacOsApi> Sidebar<T> {
-    pub fn with_api(raw_api: T) -> Self {
+    pub fn with_api(api: T) -> Self {
         Self {
-            api: SidebarApi::new(raw_api),
+            api: SidebarApi::new(api),
         }
     }
 
