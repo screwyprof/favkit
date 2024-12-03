@@ -1,6 +1,7 @@
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct MacOsPath {
     path: PathBuf,
 }
@@ -11,9 +12,25 @@ impl MacOsPath {
             path: path.as_ref().to_path_buf(),
         }
     }
+}
 
-    pub fn as_path(&self) -> &Path {
+impl Deref for MacOsPath {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
         &self.path
+    }
+}
+
+impl AsRef<Path> for MacOsPath {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl<P: AsRef<Path>> PartialEq<P> for MacOsPath {
+    fn eq(&self, other: &P) -> bool {
+        self.path == other.as_ref()
     }
 }
 

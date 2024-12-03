@@ -47,7 +47,7 @@ fn it_lists_favorite_items() {
 
     assert_eq!(favorites.len(), 2);
     assert_eq!(favorites[0].name, "Applications");
-    assert_eq!(favorites[0].path.as_path(), Path::new("/Applications"));
+    assert_eq!(favorites[0].path, Path::new("/Applications"));
     assert_eq!(favorites[1].name, "Downloads");
-    assert_eq!(favorites[1].path.as_path(), Path::new("~/Downloads"));
+    assert_eq!(favorites[1].path, Path::new("~/Downloads"));
 }
