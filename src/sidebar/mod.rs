@@ -1,6 +1,8 @@
 mod macos_api;
+mod path;
 
 pub use self::macos_api::{MacOsApi, RealMacOsApi};
+pub use self::path::MacOsPath;
 
 pub struct Sidebar<A: MacOsApi> {
     api: A,
@@ -37,12 +39,13 @@ impl<A: MacOsApi> FavoritesSection<'_, A> {
         self.api
             .list_favorite_items()
             .into_iter()
-            .map(|(name, _path)| SidebarItem { name })
+            .map(|(name, path)| SidebarItem { name, path })
             .collect()
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SidebarItem {
     pub name: String,
+    pub path: MacOsPath,
 }

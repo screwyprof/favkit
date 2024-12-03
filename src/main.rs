@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Favorites:");
     for item in favorites {
-        println!("  - {}", item.name);
+        println!("  - {} ({})", item.name, item.path);
     }
 
     Ok(())

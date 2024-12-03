@@ -1,7 +1,8 @@
-use favkit::sidebar::{MacOsApi, Sidebar};
+use favkit::sidebar::{MacOsApi, MacOsPath, Sidebar};
+use std::path::Path;
 
 struct MockMacOsApi {
-    favorites: Vec<(String, String)>,
+    favorites: Vec<(String, MacOsPath)>,
 }
 
 impl MockMacOsApi {
@@ -11,17 +12,17 @@ impl MockMacOsApi {
         }
     }
 
-    fn with_favorites(mut self, favorites: Vec<(&str, &str)>) -> Self {
+    fn with_favorites<P: AsRef<Path>>(mut self, favorites: Vec<(&str, P)>) -> Self {
         self.favorites = favorites
             .into_iter()
-            .map(|(name, path)| (name.to_string(), path.to_string()))
+            .map(|(name, path)| (name.to_string(), MacOsPath::new(path)))
             .collect();
         self
     }
 }
 
 impl MacOsApi for MockMacOsApi {
-    fn list_favorite_items(&self) -> Vec<(String, String)> {
+    fn list_favorite_items(&self) -> Vec<(String, MacOsPath)> {
         self.favorites.clone()
     }
 }
@@ -37,8 +38,8 @@ fn it_returns_empty_favorites_by_default() {
 #[test]
 fn it_lists_favorite_items() {
     let mock_api = MockMacOsApi::new().with_favorites(vec![
-        ("Applications", "/Applications"),
-        ("Downloads", "~/Downloads"),
+        ("Applications", Path::new("/Applications")),
+        ("Downloads", Path::new("~/Downloads")),
     ]);
     let sidebar = Sidebar::with_api(mock_api);
 
@@ -46,5 +47,7 @@ fn it_lists_favorite_items() {
 
     assert_eq!(favorites.len(), 2);
     assert_eq!(favorites[0].name, "Applications");
+    assert_eq!(favorites[0].path.as_path(), Path::new("/Applications"));
     assert_eq!(favorites[1].name, "Downloads");
+    assert_eq!(favorites[1].path.as_path(), Path::new("~/Downloads"));
 }
