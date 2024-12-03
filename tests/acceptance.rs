@@ -1,20 +1,20 @@
 mod common;
 
 use common::MockMacOsApi;
-use favkit::sidebar::{MacOsLocation, MacOsPath, Sidebar, SidebarItem};
+use favkit::sidebar::{Sidebar, SidebarItem};
 
 #[test]
 fn browsing_finder_favorites() {
     // Given a Finder sidebar with both standard and custom locations
     let favorites = vec![
         // Standard locations
-        SidebarItem::from(MacOsLocation::Applications),
-        SidebarItem::from(MacOsLocation::Downloads),
-        SidebarItem::from(MacOsLocation::Documents),
+        SidebarItem::applications(),
+        SidebarItem::downloads(),
+        SidebarItem::documents(),
         // Custom folders
-        ("Work Projects", "/Users/me/Work").into(),
-        ("Photos 2023", "~/Pictures/2023").into(),
-        ("Games", "/Applications/Games").into(),
+        SidebarItem::new("Work Projects", "/Users/me/Work"),
+        SidebarItem::new("Photos 2023", "~/Pictures/2023"),
+        SidebarItem::new("Games", "/Applications/Games"),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
     let sidebar = Sidebar::with_api(&api);
@@ -40,16 +40,12 @@ fn browsing_finder_favorites() {
 fn creating_favorites_with_typed_paths() {
     // Given a Finder sidebar with items created using different API patterns
     let favorites = vec![
-        // Pattern 1: Using MacOsLocation enum directly for well-known locations
-        SidebarItem::from(MacOsLocation::Applications),
-        SidebarItem::from(MacOsLocation::Downloads),
-        // Pattern 2: Using MacOsLocation::Custom for custom paths
-        SidebarItem::new(
-            "Projects",
-            MacOsLocation::Custom("/Users/me/Projects".into()),
-        ),
-        // Pattern 3: Converting string path to MacOsPath first
-        SidebarItem::new("Development", MacOsPath::from("/Users/me/Development")),
+        // Pattern 1: Standard locations
+        SidebarItem::applications(),
+        SidebarItem::downloads(),
+        // Pattern 2: Custom paths
+        SidebarItem::new("Projects", "/Users/me/Projects"),
+        SidebarItem::new("Development", "/Users/me/Development"),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
     let sidebar = Sidebar::with_api(&api);

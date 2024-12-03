@@ -52,8 +52,38 @@ pub struct SidebarItem {
     pub path: MacOsPath,
 }
 
-impl From<MacOsLocation> for SidebarItem {
-    fn from(location: MacOsLocation) -> Self {
+impl SidebarItem {
+    // Standard locations
+    pub fn applications() -> Self {
+        Self::location(MacOsLocation::Applications)
+    }
+
+    pub fn downloads() -> Self {
+        Self::location(MacOsLocation::Downloads)
+    }
+
+    pub fn documents() -> Self {
+        Self::location(MacOsLocation::Documents)
+    }
+
+    pub fn desktop() -> Self {
+        Self::location(MacOsLocation::Desktop)
+    }
+
+    pub fn home() -> Self {
+        Self::location(MacOsLocation::Home)
+    }
+
+    // Custom location
+    pub fn new(name: impl Into<String>, path: impl AsRef<std::path::Path>) -> Self {
+        Self {
+            name: name.into(),
+            path: MacOsPath::from(path.as_ref()),
+        }
+    }
+
+    // Private helper
+    fn location(location: MacOsLocation) -> Self {
         let name = match &location {
             MacOsLocation::Applications => "Applications",
             MacOsLocation::UserApplications => "Applications",
@@ -72,20 +102,9 @@ impl From<MacOsLocation> for SidebarItem {
     }
 }
 
-impl From<(&str, &str)> for SidebarItem {
-    fn from((name, path): (&str, &str)) -> Self {
-        Self {
-            name: name.to_string(),
-            path: path.into(),
-        }
-    }
-}
-
-impl SidebarItem {
-    pub fn new(name: impl Into<String>, path: impl Into<MacOsPath>) -> Self {
-        Self {
-            name: name.into(),
-            path: path.into(),
-        }
+// Keep for backward compatibility
+impl From<MacOsLocation> for SidebarItem {
+    fn from(location: MacOsLocation) -> Self {
+        Self::location(location)
     }
 }
