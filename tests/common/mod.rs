@@ -2,12 +2,12 @@
 
 use core_foundation::{
     array::{CFArray, CFArrayRef},
-    base::TCFType,
+    base::{kCFAllocatorDefault, TCFType},
     string::{CFString, CFStringRef},
-    url::{CFURLRef, CFURL},
+    url::{CFURLCreateWithString, CFURLRef},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::sidebar::RawMacOsApi;
+use favkit::sidebar::{RawMacOsApi, SidebarItem};
 use std::{
     ptr,
     sync::{Arc, Mutex},
@@ -27,7 +27,7 @@ pub enum ApiCall {
 // - LSSharedFileListItemRef (raw pointer) is Send + Sync
 // - ApiCall is Send + Sync (derives Clone which requires Send + Sync)
 struct ApiCallState {
-    items: Vec<(String, String)>,
+    items: Vec<SidebarItem>,
     item_refs: Mutex<Vec<LSSharedFileListItemRef>>,
     next_ref: Mutex<usize>,
     calls: Mutex<Vec<ApiCall>>,
@@ -67,7 +67,7 @@ impl Default for ApiCallRecorder {
 }
 
 impl ApiCallRecorder {
-    pub fn with_items(items: Vec<(String, String)>) -> Self {
+    pub fn with_items(items: Vec<SidebarItem>) -> Self {
         Self {
             state: Arc::new(ApiCallState {
                 items,
@@ -112,20 +112,22 @@ impl RawMacOsApi for ApiCallRecorder {
             .lock()
             .unwrap()
             .push(ApiCall::CopySnapshot(list));
-        let mut item_refs = Vec::with_capacity(self.state.items.len());
-        let mut refs = self.state.item_refs.lock().unwrap();
 
+        let mut refs = self.state.item_refs.lock().unwrap();
+        let mut item_refs = Vec::with_capacity(self.state.items.len());
+
+        // Create and store the refs
         for _ in 0..self.state.items.len() {
             let item_ref = self.get_next_ref();
             refs.push(item_ref);
-            item_refs.push(item_ref as *const std::ffi::c_void);
+            item_refs.push(item_ref as *const _);
         }
 
-        // Create a CFArray that will be retained by the caller
-        let array = CFArray::from_copyable(&item_refs);
-        let array_ref = array.as_concrete_TypeRef();
-        std::mem::forget(array); // Don't release the array since it will be retained by the caller
-        array_ref
+        // Create CFArray from raw pointers and retain it
+        let array = CFArray::<*const std::ffi::c_void>::from_copyable(&item_refs);
+        let result = array.as_concrete_TypeRef();
+        std::mem::forget(array); // Don't drop the array since we're transferring ownership
+        result
     }
 
     unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
@@ -134,13 +136,14 @@ impl RawMacOsApi for ApiCallRecorder {
             .lock()
             .unwrap()
             .push(ApiCall::CopyDisplayName(item));
+
         let refs = self.state.item_refs.lock().unwrap();
         if let Some(index) = refs.iter().position(|&r| r == item) {
             if index < self.state.items.len() {
-                let string = CFString::new(&self.state.items[index].0);
-                let string_ref = string.as_concrete_TypeRef();
-                std::mem::forget(string); // Don't release the string since it will be retained by the caller
-                return string_ref;
+                let string = CFString::new(self.state.items[index].name());
+                let result = string.as_concrete_TypeRef();
+                std::mem::forget(string); // Don't drop the string since we're transferring ownership
+                return result;
             }
         }
         ptr::null()
@@ -152,14 +155,25 @@ impl RawMacOsApi for ApiCallRecorder {
             .lock()
             .unwrap()
             .push(ApiCall::CopyResolvedUrl(item));
+
         let refs = self.state.item_refs.lock().unwrap();
         if let Some(index) = refs.iter().position(|&r| r == item) {
             if index < self.state.items.len() {
-                let url = CFURL::from_path(&self.state.items[index].1, false)
-                    .expect("Failed to create CFURL");
-                let url_ref = url.as_concrete_TypeRef();
-                std::mem::forget(url); // Don't release the URL since it will be retained by the caller
-                return url_ref;
+                let path = self.state.items[index].path();
+                let url_str = if path.to_string() == "nwnode://domain-AirDrop" {
+                    "nwnode://domain-AirDrop".to_string()
+                } else {
+                    format!("file://{}", path)
+                };
+                let cf_str = CFString::new(&url_str);
+                let url = CFURLCreateWithString(
+                    kCFAllocatorDefault,
+                    cf_str.as_concrete_TypeRef(),
+                    std::ptr::null(),
+                );
+                if !url.is_null() {
+                    return url;
+                }
             }
         }
         ptr::null()

@@ -106,10 +106,21 @@ impl<T: RawMacOsApi> MacOsApi<T> {
                         return None;
                     }
                     let url = CFURL::wrap_under_create_rule(url_ref);
-                    let path =
-                        CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
 
-                    Some((name.to_string(), path.to_string()))
+                    // Get the URL string
+                    let url_str =
+                        CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
+                    let url_str = url_str.to_string();
+
+                    // If it's a file URL, convert it to a file system path
+                    if url_str.starts_with("file://") {
+                        if let Some(path) = url.to_path() {
+                            return Some((name.to_string(), path.to_string_lossy().into_owned()));
+                        }
+                    }
+
+                    // For non-file URLs (like AirDrop), use the URL string directly
+                    Some((name.to_string(), url_str))
                 })
                 .collect()
         }

@@ -73,7 +73,7 @@ pub struct SidebarItem {
 }
 
 impl SidebarItem {
-    pub fn new(name: impl Into<String>, path: impl AsRef<std::path::Path>) -> Self {
+    pub fn new(name: impl Into<String>, path: impl AsRef<str>) -> Self {
         Self {
             name: name.into(),
             path: MacOsPath::from(path.as_ref()),
@@ -98,6 +98,10 @@ impl SidebarItem {
 
     pub fn home() -> Self {
         Self::location(MacOsLocation::Home)
+    }
+
+    pub fn airdrop() -> Self {
+        Self::location(MacOsLocation::AirDrop)
     }
 
     fn location(location: MacOsLocation) -> Self {

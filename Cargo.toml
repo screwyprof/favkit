@@ -26,3 +26,5 @@ test-utils = [] # Enable test utilities for external crates
 
 [dev-dependencies]
 favkit = { path = ".", features = ["test-utils"] }
+core-foundation = "0.10.0"
+core-services = "1.0.0"

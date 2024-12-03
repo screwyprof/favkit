@@ -1,31 +1,31 @@
 mod common;
 
-use crate::common::{ApiCall, ApiCallRecorder};
+use common::{ApiCall, ApiCallRecorder};
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::sidebar::Sidebar;
+use favkit::sidebar::{Sidebar, SidebarItem};
 
 #[test]
 fn it_lists_favorite_items() {
     // Given
     let recorder = ApiCallRecorder::with_items(vec![
-        (
-            "Applications".to_string(),
-            "file:///Applications".to_string(),
-        ),
-        (
-            "Downloads".to_string(),
-            "file:///Users/happygopher/Downloads".to_string(),
-        ),
+        SidebarItem::applications(),
+        SidebarItem::downloads(),
+        SidebarItem::new("Projects", "/Users/happygopher/Projects"),
     ]);
     let sidebar = Sidebar::with_api(recorder.clone());
 
     // When
-    let items = sidebar.list_items();
+    let items = sidebar.favorites().list_items();
 
     // Then
-    assert_eq!(items.len(), 2);
-    assert_eq!(items[0].name(), "Applications");
-    assert_eq!(items[1].name(), "Downloads");
+    assert_eq!(
+        items,
+        vec![
+            SidebarItem::applications(),
+            SidebarItem::downloads(),
+            SidebarItem::new("Projects", "/Users/happygopher/Projects"),
+        ]
+    );
 
     // And verify API calls
     recorder.verify_calls(&[
@@ -35,5 +35,7 @@ fn it_lists_favorite_items() {
         ApiCall::CopyResolvedUrl(1 as LSSharedFileListItemRef),
         ApiCall::CopyDisplayName(2 as LSSharedFileListItemRef),
         ApiCall::CopyResolvedUrl(2 as LSSharedFileListItemRef),
+        ApiCall::CopyDisplayName(3 as LSSharedFileListItemRef),
+        ApiCall::CopyResolvedUrl(3 as LSSharedFileListItemRef),
     ]);
 }
