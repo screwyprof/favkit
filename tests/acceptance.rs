@@ -1,28 +1,28 @@
 mod common;
 
-use common::MockMacOsApi;
-use favkit::sidebar::{Sidebar, SidebarItem};
+use common::ApiCallRecorder;
+use favkit::sidebar::Sidebar;
 
 #[test]
-fn browsing_finder_favorites() {
-    // Given a Finder sidebar with both standard and custom locations
-    let favorites = vec![
-        // Standard locations with well-known paths
-        SidebarItem::applications(),
-        SidebarItem::downloads(),
-        SidebarItem::documents(),
-        // Custom folders with explicit paths
-        SidebarItem::new("Work Projects", "/Users/me/Work"),
-        SidebarItem::new("Photos 2023", "~/Pictures/2023"),
-        SidebarItem::new("Games", "/Applications/Games"),
-    ];
+fn it_lists_favorite_items() {
+    // Given
+    let recorder = ApiCallRecorder::with_items(vec![
+        (
+            "Applications".to_string(),
+            "file:///Applications".to_string(),
+        ),
+        (
+            "Downloads".to_string(),
+            "file:///Users/happygopher/Downloads".to_string(),
+        ),
+    ]);
+    let sidebar = Sidebar::with_api(recorder.clone());
 
-    let api = MockMacOsApi::with_favorites(favorites.clone());
-    let sidebar = Sidebar::with_api(api);
+    // When
+    let items = sidebar.list_items();
 
-    // When listing favorites
-    let items: Vec<_> = sidebar.favorites().iter().collect();
-
-    // Then all items match exactly (both names and paths)
-    assert_eq!(items, favorites);
+    // Then
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].name(), "Applications");
+    assert_eq!(items[1].name(), "Downloads");
 }

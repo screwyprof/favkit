@@ -1,31 +1,39 @@
 mod common;
 
-use common::MockMacOsApi;
-use favkit::sidebar::{MacOsLocation, Sidebar, SidebarItem};
+use crate::common::{ApiCall, ApiCallRecorder};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use favkit::sidebar::Sidebar;
 
 #[test]
-fn it_retrieves_favorites_from_macos() {
-    // Arrange
-    let expected_favorites = vec![
-        SidebarItem::from(MacOsLocation::Applications),
-        SidebarItem::from(MacOsLocation::Downloads),
-    ];
-    let api = MockMacOsApi::with_favorites(expected_favorites.clone());
-    let initial_call_count = api.list_favorites_call_count();
-    let sidebar = Sidebar::with_api(api);
+fn it_lists_favorite_items() {
+    // Given
+    let recorder = ApiCallRecorder::with_items(vec![
+        (
+            "Applications".to_string(),
+            "file:///Applications".to_string(),
+        ),
+        (
+            "Downloads".to_string(),
+            "file:///Users/happygopher/Downloads".to_string(),
+        ),
+    ]);
+    let sidebar = Sidebar::with_api(recorder.clone());
 
-    // Assert no API calls during setup
-    assert_eq!(
-        initial_call_count, 0,
-        "No API calls should be made during setup"
-    );
+    // When
+    let items = sidebar.list_items();
 
-    // Act
-    let retrieved_favorites = sidebar.favorites().list_items();
+    // Then
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].name(), "Applications");
+    assert_eq!(items[1].name(), "Downloads");
 
-    // Assert
-    assert_eq!(
-        retrieved_favorites, expected_favorites,
-        "Retrieved favorites should match expected exactly"
-    );
+    // And verify API calls
+    recorder.verify_calls(&[
+        ApiCall::CreateFavoritesList,
+        ApiCall::CopySnapshot(1 as LSSharedFileListRef),
+        ApiCall::CopyDisplayName(1 as LSSharedFileListItemRef),
+        ApiCall::CopyResolvedUrl(1 as LSSharedFileListItemRef),
+        ApiCall::CopyDisplayName(2 as LSSharedFileListItemRef),
+        ApiCall::CopyResolvedUrl(2 as LSSharedFileListItemRef),
+    ]);
 }

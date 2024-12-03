@@ -24,6 +24,18 @@ impl MacOsLocation {
             Self::Custom(path) => path,
         }
     }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Applications => "Applications",
+            Self::UserApplications => "Applications",
+            Self::Desktop => "Desktop",
+            Self::Documents => "Documents",
+            Self::Downloads => "Downloads",
+            Self::Home => "Home",
+            Self::Custom(path) => path.to_str().unwrap_or("Unknown"),
+        }
+    }
 }
 
 impl<P: AsRef<Path>> From<P> for MacOsLocation {

@@ -1,20 +1,26 @@
 mod macos_api;
 mod path;
 
-pub use self::macos_api::{MacOsApi, RealMacOsApi};
+pub use self::macos_api::{MacOsApi, RawMacOsApi, RealMacOsApi};
 pub use self::path::{MacOsLocation, MacOsPath};
 
-pub struct Sidebar<A: MacOsApi = RealMacOsApi> {
-    api: A,
+pub struct Sidebar<T: RawMacOsApi = RealMacOsApi> {
+    api: MacOsApi<T>,
 }
 
-impl<A: MacOsApi> Sidebar<A> {
-    pub fn with_api(api: A) -> Self {
-        Self { api }
+impl<T: RawMacOsApi> Sidebar<T> {
+    pub fn with_api(raw_api: T) -> Self {
+        Self {
+            api: MacOsApi::new(raw_api),
+        }
     }
 
-    pub fn favorites(&self) -> FavoritesSection<'_, A> {
+    pub fn favorites(&self) -> FavoritesSection<'_, T> {
         FavoritesSection { api: &self.api }
+    }
+
+    pub fn list_items(&self) -> Vec<SidebarItem> {
+        self.favorites().list_items()
     }
 }
 
@@ -30,24 +36,28 @@ impl Sidebar<RealMacOsApi> {
     }
 }
 
-pub struct FavoritesSection<'a, A: MacOsApi> {
-    api: &'a A,
+pub struct FavoritesSection<'a, T: RawMacOsApi> {
+    api: &'a MacOsApi<T>,
 }
 
-impl<A: MacOsApi> FavoritesSection<'_, A> {
-    pub fn iter(&self) -> impl Iterator<Item = SidebarItem> {
+impl<T: RawMacOsApi> FavoritesSection<'_, T> {
+    pub fn list_items(&self) -> Vec<SidebarItem> {
         self.api
             .list_favorite_items()
             .into_iter()
-            .map(|(name, path)| SidebarItem { name, path })
+            .map(|(name, path)| SidebarItem::new(name, path))
+            .collect()
     }
 
-    pub fn list_items(&self) -> Vec<SidebarItem> {
-        self.iter().collect()
+    pub fn iter(&self) -> impl Iterator<Item = SidebarItem> + '_ {
+        self.api
+            .list_favorite_items()
+            .into_iter()
+            .map(|(name, path)| SidebarItem::new(name, path))
     }
 }
 
-impl<A: MacOsApi> IntoIterator for &FavoritesSection<'_, A> {
+impl<T: RawMacOsApi> IntoIterator for &FavoritesSection<'_, T> {
     type Item = SidebarItem;
     type IntoIter = std::vec::IntoIter<SidebarItem>;
 
@@ -63,7 +73,13 @@ pub struct SidebarItem {
 }
 
 impl SidebarItem {
-    // Standard locations
+    pub fn new(name: impl Into<String>, path: impl AsRef<std::path::Path>) -> Self {
+        Self {
+            name: name.into(),
+            path: MacOsPath::from(path.as_ref()),
+        }
+    }
+
     pub fn applications() -> Self {
         Self::location(MacOsLocation::Applications)
     }
@@ -84,15 +100,13 @@ impl SidebarItem {
         Self::location(MacOsLocation::Home)
     }
 
-    // Custom location
-    pub fn new(name: impl Into<String>, path: impl AsRef<std::path::Path>) -> Self {
+    fn location(location: MacOsLocation) -> Self {
         Self {
-            name: name.into(),
-            path: MacOsPath::from(path.as_ref()),
+            name: location.name().to_string(),
+            path: location.into(),
         }
     }
 
-    // Getters
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -100,35 +114,10 @@ impl SidebarItem {
     pub fn path(&self) -> &MacOsPath {
         &self.path
     }
-
-    // Private helper
-    fn location(location: MacOsLocation) -> Self {
-        let name = match &location {
-            MacOsLocation::Applications => "Applications",
-            MacOsLocation::UserApplications => "Applications",
-            MacOsLocation::Downloads => "Downloads",
-            MacOsLocation::Documents => "Documents",
-            MacOsLocation::Desktop => "Desktop",
-            MacOsLocation::Home => "Home",
-            MacOsLocation::Custom(path) => path.to_str().unwrap_or("Unknown"),
-        }
-        .to_string();
-
-        Self {
-            name,
-            path: location.into(),
-        }
-    }
 }
 
 impl std::fmt::Display for SidebarItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ({})", self.name, self.path)
-    }
-}
-
-impl From<MacOsLocation> for SidebarItem {
-    fn from(location: MacOsLocation) -> Self {
-        Self::location(location)
     }
 }
