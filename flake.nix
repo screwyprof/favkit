@@ -19,8 +19,7 @@
         };
         
         nativeBuildInputs = with pkgs; [
-          rust-bin.stable.latest.default
-          pkg-config
+          (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           cargo-watch
         ];
 
