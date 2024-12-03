@@ -2,7 +2,7 @@ mod macos_api;
 mod path;
 
 pub use self::macos_api::{MacOsApi, RealMacOsApi};
-pub use self::path::MacOsPath;
+pub use self::path::{MacOsLocation, MacOsPath};
 
 pub struct Sidebar<A: MacOsApi> {
     api: A,
