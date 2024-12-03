@@ -1,7 +1,7 @@
 use core_foundation::{
     base::TCFType,
     string::CFString,
-    url::{kCFURLPOSIXPathStyle, CFURLGetString, CFURL},
+    url::{CFURLCreateWithString, CFURLGetString, CFURL},
 };
 use std::{
     convert::TryFrom,
@@ -52,11 +52,11 @@ pub enum MacOsLocation {
     Downloads,
     Home,
     AirDrop,
-    Custom(PathBuf),
+    Recents,
 }
 
 impl MacOsLocation {
-    fn path(&self) -> PathBuf {
+    pub fn path(&self) -> PathBuf {
         match self {
             Self::Applications => PathBuf::from("/Applications"),
             Self::UserApplications => dirs::home_dir().unwrap_or_default().join("Applications"),
@@ -64,8 +64,8 @@ impl MacOsLocation {
             Self::Documents => dirs::document_dir().unwrap_or_default(),
             Self::Downloads => dirs::download_dir().unwrap_or_default(),
             Self::Home => dirs::home_dir().unwrap_or_default(),
-            Self::AirDrop => PathBuf::from("nwnode://domain-AirDrop"), // Special case
-            Self::Custom(path) => path.clone(),
+            Self::AirDrop => PathBuf::from("nwnode://domain-AirDrop"),
+            Self::Recents => PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch"),
         }
     }
 
@@ -78,26 +78,48 @@ impl MacOsLocation {
             Self::Downloads => "Downloads",
             Self::Home => "Home",
             Self::AirDrop => "AirDrop",
-            Self::Custom(path) => path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("Unknown"),
+            Self::Recents => "Recents",
+        }
+    }
+
+    pub fn url(&self) -> String {
+        match self {
+            Self::AirDrop => "nwnode://domain-AirDrop".to_string(),
+            _ => format!("file://{}", self.path().display()),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct MacOsPath {
-    location: MacOsLocation,
+pub enum MacOsPath {
+    Location(MacOsLocation),
+    Custom(PathBuf),
 }
 
 impl MacOsPath {
-    pub fn location(&self) -> &MacOsLocation {
-        &self.location
+    pub fn path(&self) -> PathBuf {
+        match self {
+            Self::Location(location) => location.path(),
+            Self::Custom(path) => path.clone(),
+        }
     }
 
-    pub fn path(&self) -> PathBuf {
-        self.location.path()
+    pub fn name(&self) -> String {
+        match self {
+            Self::Location(location) => location.name().to_string(),
+            Self::Custom(path) => path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Unknown")
+                .to_string(),
+        }
+    }
+
+    pub fn url(&self) -> String {
+        match self {
+            Self::Location(location) => location.url(),
+            Self::Custom(path) => format!("file://{}", path.display()),
+        }
     }
 }
 
@@ -107,24 +129,25 @@ where
 {
     fn from(path: P) -> Self {
         let path_str = path.as_ref().to_str().unwrap_or("");
-        let location = match path_str {
-            "/Applications" => MacOsLocation::Applications,
-            p if p.ends_with("/Downloads") => MacOsLocation::Downloads,
-            p if p.ends_with("/Desktop") => MacOsLocation::Desktop,
-            p if p.ends_with("/Documents") => MacOsLocation::Documents,
-            p if p.ends_with("/Applications") && p != "/Applications" => {
-                MacOsLocation::UserApplications
-            }
-            "nwnode://domain-AirDrop" => MacOsLocation::AirDrop,
-            _ => MacOsLocation::Custom(path.into()),
-        };
-        Self { location }
+        let home_dir = dirs::home_dir().unwrap_or_default();
+        let home_str = home_dir.to_str().unwrap_or("");
+
+        match path_str {
+            "/Applications" => Self::Location(MacOsLocation::Applications),
+            p if p == format!("{}/Downloads", home_str) => Self::Location(MacOsLocation::Downloads),
+            p if p == format!("{}/Desktop", home_str) => Self::Location(MacOsLocation::Desktop),
+            p if p == format!("{}/Documents", home_str) => Self::Location(MacOsLocation::Documents),
+            p if p == format!("{}/Applications", home_str) => Self::Location(MacOsLocation::UserApplications),
+            p if p == home_str => Self::Location(MacOsLocation::Home),
+            "/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch" => Self::Location(MacOsLocation::Recents),
+            _ => Self::Custom(path.into()),
+        }
     }
 }
 
 impl From<MacOsLocation> for MacOsPath {
     fn from(location: MacOsLocation) -> Self {
-        Self { location }
+        Self::Location(location)
     }
 }
 
@@ -132,26 +155,35 @@ impl TryFrom<CFURLWrapper<'_>> for MacOsPath {
     type Error = Error;
 
     fn try_from(wrapper: CFURLWrapper) -> Result<Self> {
-        // First try to get the filesystem path directly
-        if let Some(path) = wrapper.0.to_path() {
-            return Ok(Self::from(path));
-        }
-
-        // If that fails, try to handle the URL string
         let url_str = wrapper.get_url_string().ok_or(Error::UrlConversion)?;
 
-        // Handle special URLs (like AirDrop)
+        // Handle special URLs
+        let url_str = url_str.as_str();
         if url_str == "nwnode://domain-AirDrop" {
-            return Ok(Self::from(MacOsLocation::AirDrop));
+            return Ok(Self::Location(MacOsLocation::AirDrop));
         }
 
         // Handle file:// URLs
-        if let Some(path) = url_str.strip_prefix("file://") {
-            return Ok(Self::from(path));
-        }
+        let path_str = url_str
+            .strip_prefix("file://")
+            .ok_or(Error::UrlConversion)?;
 
-        // For any other URLs, store them as-is
-        Ok(Self::from(url_str))
+        // Handle special paths
+        let home_dir = dirs::home_dir().unwrap_or_default();
+        let path_buf = PathBuf::from(path_str);
+
+        let path = match &path_buf {
+            p if p == &PathBuf::from("/Applications") => Self::Location(MacOsLocation::Applications),
+            p if p == &home_dir.join("Downloads") => Self::Location(MacOsLocation::Downloads),
+            p if p == &home_dir.join("Desktop") => Self::Location(MacOsLocation::Desktop),
+            p if p == &home_dir.join("Documents") => Self::Location(MacOsLocation::Documents),
+            p if p == &home_dir.join("Applications") => Self::Location(MacOsLocation::UserApplications),
+            p if p == &home_dir => Self::Location(MacOsLocation::Home),
+            p if p == &PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch") => Self::Location(MacOsLocation::Recents),
+            _ => Self::Custom(path_buf),
+        };
+
+        Ok(path)
     }
 }
 
@@ -159,27 +191,18 @@ impl TryFrom<&MacOsPath> for CFURL {
     type Error = Error;
 
     fn try_from(path: &MacOsPath) -> Result<Self> {
-        match path.location() {
-            MacOsLocation::AirDrop => {
-                // For AirDrop, create a URL directly
-                // The CFString is owned and will be released when dropped
-                let url_str = CFString::new("nwnode://domain-AirDrop");
-                Ok(CFURL::from_file_system_path(
-                    url_str,
-                    kCFURLPOSIXPathStyle,
-                    false,
-                ))
+        let url_str = path.url();
+        let cf_str = CFString::new(&url_str);
+        unsafe {
+            let url = CFURLCreateWithString(
+                core_foundation::base::kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            );
+            if url.is_null() {
+                return Err(Error::UrlConversion);
             }
-            _ => {
-                let path = path.path();
-                // Create a new owned CFString that will be released when dropped
-                let path_str = CFString::new(&path.to_string_lossy());
-                Ok(CFURL::from_file_system_path(
-                    path_str,
-                    kCFURLPOSIXPathStyle,
-                    path.is_dir(),
-                ))
-            }
+            Ok(Self::wrap_under_create_rule(url))
         }
     }
 }
@@ -196,25 +219,25 @@ mod tests {
 
     #[test]
     fn test_display_applications() {
-        let path = MacOsPath::from(MacOsLocation::Applications);
+        let path = MacOsPath::Location(MacOsLocation::Applications);
         assert_eq!(path.to_string(), "/Applications");
     }
 
     #[test]
     fn test_display_airdrop() {
-        let path = MacOsPath::from(MacOsLocation::AirDrop);
+        let path = MacOsPath::Location(MacOsLocation::AirDrop);
         assert_eq!(path.to_string(), "nwnode://domain-AirDrop");
     }
 
     #[test]
     fn test_display_custom() {
-        let path = MacOsPath::from("/Users/happygopher/Projects");
+        let path = MacOsPath::Custom(PathBuf::from("/Users/happygopher/Projects"));
         assert_eq!(path.to_string(), "/Users/happygopher/Projects");
     }
 
     #[test]
     fn test_custom_name() {
-        let path = MacOsPath::from("/Users/happygopher/Projects");
-        assert_eq!(path.location().name(), "Projects");
+        let path = MacOsPath::Custom(PathBuf::from("/Users/happygopher/Projects"));
+        assert_eq!(path.name(), "Projects");
     }
 }

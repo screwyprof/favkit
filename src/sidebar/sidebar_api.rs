@@ -4,7 +4,7 @@ use std::{convert::TryFrom, ffi::c_void};
 
 use super::{
     macos_api::MacOsApi,
-    path::{CFURLWrapper, MacOsPath},
+    path::{CFURLWrapper, MacOsLocation, MacOsPath},
     SidebarItem,
 };
 
@@ -43,18 +43,12 @@ impl<T: MacOsApi> SidebarApi<T> {
             let values = items.get_all_values();
 
             // Process each item
-            let mut result = Vec::new();
+            let mut result = Vec::with_capacity(values.len());
             for &item_ref in values.iter() {
                 let item_ref = item_ref as *mut c_void as LSSharedFileListItemRef;
 
                 // Get item name (we own this reference)
                 let name_ref = self.api.copy_display_name(item_ref);
-                if name_ref.is_null() {
-                    continue;
-                }
-
-                // Wrap with create_rule since we own it from Copy*
-                let name = CFString::wrap_under_create_rule(name_ref);
 
                 // Get item URL (we own this reference)
                 let url_ref = self.api.copy_resolved_url(item_ref);
@@ -66,8 +60,43 @@ impl<T: MacOsApi> SidebarApi<T> {
 
                 // Convert URL to MacOsPath using our safe wrapper
                 if let Ok(path) = MacOsPath::try_from(CFURLWrapper::from(&url)) {
-                    // Create a SidebarItem with owned String data
-                    result.push(SidebarItem::new(name.to_string(), path));
+                    let item = if name_ref.is_null() {
+                        // For standard items, use their factory methods
+                        match &path {
+                            MacOsPath::Location(location) => match location {
+                                MacOsLocation::AirDrop => SidebarItem::airdrop(),
+                                MacOsLocation::Applications => SidebarItem::applications(),
+                                MacOsLocation::Desktop => SidebarItem::desktop(),
+                                MacOsLocation::Documents => SidebarItem::documents(),
+                                MacOsLocation::Downloads => SidebarItem::downloads(),
+                                MacOsLocation::Home => SidebarItem::home(),
+                                MacOsLocation::Recents => SidebarItem::recents(),
+                                MacOsLocation::UserApplications => {
+                                    SidebarItem::new("Applications", path)
+                                }
+                            },
+                            MacOsPath::Custom(_) => SidebarItem::new(path.name(), path),
+                        }
+                    } else {
+                        // For custom items, use the display name
+                        let name = CFString::wrap_under_create_rule(name_ref);
+                        match &path {
+                            MacOsPath::Location(location) => match location {
+                                MacOsLocation::AirDrop => SidebarItem::airdrop(),
+                                MacOsLocation::Applications => SidebarItem::applications(),
+                                MacOsLocation::Desktop => SidebarItem::desktop(),
+                                MacOsLocation::Documents => SidebarItem::documents(),
+                                MacOsLocation::Downloads => SidebarItem::downloads(),
+                                MacOsLocation::Home => SidebarItem::home(),
+                                MacOsLocation::Recents => SidebarItem::recents(),
+                                MacOsLocation::UserApplications => {
+                                    SidebarItem::new("Applications", path)
+                                }
+                            },
+                            MacOsPath::Custom(_) => SidebarItem::new(name.to_string(), path),
+                        }
+                    };
+                    result.push(item);
                 }
             }
 

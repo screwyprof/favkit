@@ -46,7 +46,6 @@ impl Clone for ApiCallState {
 #[derive(Clone)]
 pub struct ApiCallRecorder {
     state: Arc<ApiCallState>,
-    values: Vec<i64>,
 }
 
 impl Default for ApiCallRecorder {
@@ -58,14 +57,12 @@ impl Default for ApiCallRecorder {
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
-            values: Vec::new(),
         }
     }
 }
 
 impl ApiCallRecorder {
     pub fn with_items(items: Vec<SidebarItem>) -> Self {
-        let values: Vec<i64> = (1..=items.len()).map(|i| i as i64).collect();
         Self {
             state: Arc::new(ApiCallState {
                 items,
@@ -73,12 +70,11 @@ impl ApiCallRecorder {
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
-            values,
         }
     }
 
     pub fn get_test_item(&self, index: usize) -> LSSharedFileListItemRef {
-        self.values[index] as LSSharedFileListItemRef
+        (index + 1) as LSSharedFileListItemRef
     }
 
     fn get_next_ref(&self) -> LSSharedFileListItemRef {
@@ -97,11 +93,8 @@ impl ApiCallRecorder {
     }
 
     fn get_item_by_ref(&self, item: LSSharedFileListItemRef) -> Option<&SidebarItem> {
-        let index = self
-            .values
-            .iter()
-            .position(|&v| v as LSSharedFileListItemRef == item)?;
-        Some(&self.state.items[index])
+        let index = (item as i64 - 1) as usize;
+        self.state.items.get(index)
     }
 }
 
@@ -127,18 +120,17 @@ impl MacOsApi for ApiCallRecorder {
         let mut refs = self.state.item_refs.lock().unwrap();
         refs.clear();
 
-        // Create item refs for our items
-        let mut values = Vec::with_capacity(self.state.items.len());
-        for _ in 0..self.state.items.len() {
-            let item_ref = self.get_next_ref();
-            refs.push(item_ref);
-            values.push(item_ref);
-        }
+        // Create item refs for our items in the exact order they were provided
+        let values: Vec<*const c_void> = (0..self.state.items.len())
+            .map(|i| self.get_test_item(i) as *const c_void)
+            .collect();
+
+        refs.extend(values.iter().map(|&v| v as LSSharedFileListItemRef));
 
         // Create array directly with Core Foundation
         CFArrayCreate(
             kCFAllocatorDefault,
-            values.as_ptr() as *const *const c_void,
+            values.as_ptr(),
             values.len() as CFIndex,
             ptr::null(),
         )
@@ -166,7 +158,7 @@ impl MacOsApi for ApiCallRecorder {
             .push(ApiCall::CopyResolvedUrl(item));
 
         if let Some(item) = self.get_item_by_ref(item) {
-            let url_str = format!("file://{}", item.path());
+            let url_str = item.path().url();
             let cf_str = CFString::new(&url_str);
             CFURLCreateWithString(
                 kCFAllocatorDefault,

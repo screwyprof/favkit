@@ -7,8 +7,12 @@ use favkit::sidebar::{Sidebar, SidebarItem};
 fn it_lists_favorite_items() {
     // Given
     let items = vec![
+        SidebarItem::airdrop(),
+        SidebarItem::recents(),
         SidebarItem::applications(),
+        SidebarItem::desktop(),
         SidebarItem::downloads(),
+        SidebarItem::home(),
         SidebarItem::new("Projects", "/Users/happygopher/Projects"),
     ];
 

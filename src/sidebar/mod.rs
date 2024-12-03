@@ -101,6 +101,10 @@ impl SidebarItem {
         Self::location(MacOsLocation::AirDrop)
     }
 
+    pub fn recents() -> Self {
+        Self::location(MacOsLocation::Recents)
+    }
+
     fn location(location: MacOsLocation) -> Self {
         Self {
             name: location.name().to_string(),
