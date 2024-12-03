@@ -24,7 +24,6 @@ pub enum ApiCall {
 
 struct ApiCallState {
     items: Vec<SidebarItem>,
-    item_refs: Mutex<Vec<LSSharedFileListItemRef>>,
     next_ref: Mutex<i64>,
     calls: Mutex<Vec<ApiCall>>,
 }
@@ -36,7 +35,6 @@ impl Clone for ApiCallState {
     fn clone(&self) -> Self {
         Self {
             items: self.items.clone(),
-            item_refs: Mutex::new(self.item_refs.lock().unwrap().clone()),
             next_ref: Mutex::new(*self.next_ref.lock().unwrap()),
             calls: Mutex::new(self.calls.lock().unwrap().clone()),
         }
@@ -53,7 +51,6 @@ impl Default for ApiCallRecorder {
         Self {
             state: Arc::new(ApiCallState {
                 items: Vec::new(),
-                item_refs: Mutex::new(Vec::new()),
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
@@ -66,7 +63,6 @@ impl ApiCallRecorder {
         Self {
             state: Arc::new(ApiCallState {
                 items,
-                item_refs: Mutex::new(Vec::new()),
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
@@ -106,7 +102,6 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::CreateFavoritesList);
         *self.state.next_ref.lock().unwrap() = 1;
-        self.state.item_refs.lock().unwrap().clear();
         1 as LSSharedFileListRef
     }
 
@@ -117,15 +112,10 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::CopySnapshot(list));
 
-        let mut refs = self.state.item_refs.lock().unwrap();
-        refs.clear();
-
         // Create item refs for our items in the exact order they were provided
         let values: Vec<*const c_void> = (0..self.state.items.len())
             .map(|i| self.get_test_item(i) as *const c_void)
             .collect();
-
-        refs.extend(values.iter().map(|&v| v as LSSharedFileListItemRef));
 
         // Create array directly with Core Foundation
         CFArrayCreate(
