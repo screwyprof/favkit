@@ -1,14 +1,14 @@
 mod common;
 
 use common::MockMacOsApi;
-use favkit::sidebar::Sidebar;
+use favkit::sidebar::{MacOsLocation, Sidebar, SidebarItem};
 
 #[test]
 fn it_retrieves_favorites_from_macos() {
     // Set up SUT
     let api = MockMacOsApi::with_favorites(vec![
-        ("Applications".to_string(), "/Applications".into()),
-        ("Downloads".to_string(), "~/Downloads".into()),
+        SidebarItem::from(MacOsLocation::Applications),
+        SidebarItem::from(MacOsLocation::Downloads),
     ]);
     let sidebar = Sidebar::with_api(&api);
 

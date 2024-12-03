@@ -51,3 +51,30 @@ pub struct SidebarItem {
     pub name: String,
     pub path: MacOsPath,
 }
+
+impl From<MacOsLocation> for SidebarItem {
+    fn from(location: MacOsLocation) -> Self {
+        let name = match &location {
+            MacOsLocation::Applications => "Applications",
+            MacOsLocation::UserApplications => "Applications",
+            MacOsLocation::Downloads => "Downloads",
+            MacOsLocation::Documents => "Documents",
+            MacOsLocation::Desktop => "Desktop",
+            MacOsLocation::Home => "Home",
+            MacOsLocation::Custom(path) => path.to_str().unwrap_or("Unknown"),
+        }
+        .to_string();
+
+        Self {
+            name,
+            path: location.into(),
+        }
+    }
+}
+
+// For custom items where we want a different name
+impl SidebarItem {
+    pub fn new(name: String, path: MacOsPath) -> Self {
+        Self { name, path }
+    }
+}

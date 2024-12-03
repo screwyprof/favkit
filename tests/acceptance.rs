@@ -1,18 +1,15 @@
 mod common;
 
 use common::MockMacOsApi;
-use favkit::sidebar::{MacOsLocation, Sidebar};
+use favkit::sidebar::{MacOsLocation, Sidebar, SidebarItem};
 
 #[test]
 fn browsing_finder_favorites() {
     // Set up a typical macOS Finder sidebar
     let favorites = vec![
-        (
-            "Applications".to_string(),
-            MacOsLocation::Applications.into(),
-        ),
-        ("Downloads".to_string(), MacOsLocation::Downloads.into()),
-        ("Documents".to_string(), MacOsLocation::Documents.into()),
+        SidebarItem::from(MacOsLocation::Applications),
+        SidebarItem::from(MacOsLocation::Downloads),
+        SidebarItem::from(MacOsLocation::Documents),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
     let sidebar = Sidebar::with_api(&api);
@@ -39,15 +36,15 @@ fn browsing_finder_favorites() {
 fn viewing_custom_favorites() {
     // Given a Finder sidebar with custom folders
     let favorites = vec![
-        (
+        SidebarItem::new(
             "Work Projects".to_string(),
             MacOsLocation::Custom("/Users/me/Work".into()).into(),
         ),
-        (
+        SidebarItem::new(
             "Photos 2023".to_string(),
             MacOsLocation::Custom("~/Pictures/2023".into()).into(),
         ),
-        (
+        SidebarItem::new(
             "Games".to_string(),
             MacOsLocation::Custom("/Applications/Games".into()).into(),
         ),
