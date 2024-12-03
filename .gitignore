@@ -16,4 +16,7 @@ Cargo.lock
 
 # macOS specific files
 .DS_Store
+
+# Dependencies
+/core-foundation/
  
