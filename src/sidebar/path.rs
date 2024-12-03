@@ -10,14 +10,30 @@ use std::{
 
 use crate::error::{Error, Result};
 
-// Newtype wrapper for URL conversion
+/// A wrapper around CFURL that provides safe conversion to our path types.
+/// The lifetime parameter ensures we don't outlive the borrowed CFURL.
+///
+/// # Safety
+/// This wrapper maintains Core Foundation's reference counting rules by:
+/// 1. Never taking ownership of the wrapped CFURL (it's borrowed)
+/// 2. Using wrap_under_get_rule for borrowed CFString references
+/// 3. Creating owned copies of strings before returning them
 pub(crate) struct CFURLWrapper<'a>(&'a CFURL);
 
 impl CFURLWrapper<'_> {
+    /// Gets the URL string from the wrapped CFURL.
+    ///
+    /// # Safety
+    /// This is safe because:
+    /// 1. CFURLGetString returns a borrowed reference that we wrap with wrap_under_get_rule
+    /// 2. wrap_under_get_rule ensures proper reference counting for the borrowed CFString
+    /// 3. to_string() creates an owned copy of the string data
     fn get_url_string(&self) -> Option<String> {
-        let url_str =
-            unsafe { CFString::wrap_under_get_rule(CFURLGetString(self.0.as_concrete_TypeRef())) };
-        Some(url_str.to_string())
+        unsafe {
+            let url_str =
+                CFString::wrap_under_get_rule(CFURLGetString(self.0.as_concrete_TypeRef()));
+            Some(url_str.to_string())
+        }
     }
 }
 
@@ -146,6 +162,7 @@ impl TryFrom<&MacOsPath> for CFURL {
         match path.location() {
             MacOsLocation::AirDrop => {
                 // For AirDrop, create a URL directly
+                // The CFString is owned and will be released when dropped
                 let url_str = CFString::new("nwnode://domain-AirDrop");
                 Ok(CFURL::from_file_system_path(
                     url_str,
@@ -155,6 +172,7 @@ impl TryFrom<&MacOsPath> for CFURL {
             }
             _ => {
                 let path = path.path();
+                // Create a new owned CFString that will be released when dropped
                 let path_str = CFString::new(&path.to_string_lossy());
                 Ok(CFURL::from_file_system_path(
                     path_str,
