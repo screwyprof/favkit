@@ -1,9 +1,4 @@
-use core_foundation::{
-    array::{CFArray, CFArrayRef},
-    base::TCFType,
-    string::{CFString, CFStringRef},
-    url::{CFURLGetString, CFURLRef, CFURL},
-};
+use core_foundation::{array::CFArrayRef, string::CFStringRef, url::CFURLRef};
 use core_services::{
     kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
     LSSharedFileListItemCopyDisplayName, LSSharedFileListItemCopyResolvedURL,
@@ -11,7 +6,7 @@ use core_services::{
 };
 use std::ptr;
 
-pub trait RawMacOsApi {
+pub trait MacOsApi {
     /// Creates a new favorites list.
     ///
     /// # Safety
@@ -50,7 +45,7 @@ pub trait RawMacOsApi {
 #[derive(Default)]
 pub struct RealMacOsApi;
 
-impl RawMacOsApi for RealMacOsApi {
+impl MacOsApi for RealMacOsApi {
     unsafe fn create_favorites_list(&self) -> LSSharedFileListRef {
         LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null())
     }
@@ -65,70 +60,5 @@ impl RawMacOsApi for RealMacOsApi {
 
     unsafe fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
         LSSharedFileListItemCopyResolvedURL(item, 0, ptr::null_mut())
-    }
-}
-
-pub struct MacOsApi<T: RawMacOsApi> {
-    raw: T,
-}
-
-impl<T: RawMacOsApi> MacOsApi<T> {
-    pub fn new(raw: T) -> Self {
-        Self { raw }
-    }
-
-    pub fn list_favorite_items(&self) -> Vec<(String, String)> {
-        unsafe {
-            let favorites_list = self.raw.create_favorites_list();
-            if favorites_list.is_null() {
-                return vec![];
-            }
-
-            let mut seed = 0;
-            let items_ref = self.raw.copy_snapshot(favorites_list, &mut seed);
-            let items = CFArray::<*const std::ffi::c_void>::wrap_under_create_rule(items_ref);
-
-            items
-                .iter()
-                .filter_map(|item_ref| {
-                    let item_ref = *item_ref as LSSharedFileListItemRef;
-
-                    // Get item name
-                    let name_ref = self.raw.copy_display_name(item_ref);
-                    if name_ref.is_null() {
-                        return None;
-                    }
-                    let name = CFString::wrap_under_create_rule(name_ref);
-
-                    // Get item URL
-                    let url_ref = self.raw.copy_resolved_url(item_ref);
-                    if url_ref.is_null() {
-                        return None;
-                    }
-                    let url = CFURL::wrap_under_create_rule(url_ref);
-
-                    // Get the URL string
-                    let url_str =
-                        CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
-                    let url_str = url_str.to_string();
-
-                    // If it's a file URL, convert it to a file system path
-                    if url_str.starts_with("file://") {
-                        if let Some(path) = url.to_path() {
-                            return Some((name.to_string(), path.to_string_lossy().into_owned()));
-                        }
-                    }
-
-                    // For non-file URLs (like AirDrop), use the URL string directly
-                    Some((name.to_string(), url_str))
-                })
-                .collect()
-        }
-    }
-}
-
-impl Default for MacOsApi<RealMacOsApi> {
-    fn default() -> Self {
-        Self::new(RealMacOsApi)
     }
 }

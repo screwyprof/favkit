@@ -7,7 +7,7 @@ use core_foundation::{
     url::{CFURLCreateWithString, CFURLRef},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::sidebar::{RawMacOsApi, SidebarItem};
+use favkit::sidebar::{MacOsApi, SidebarItem};
 use std::{
     ptr,
     sync::{Arc, Mutex},
@@ -94,7 +94,7 @@ impl ApiCallRecorder {
     }
 }
 
-impl RawMacOsApi for ApiCallRecorder {
+impl MacOsApi for ApiCallRecorder {
     unsafe fn create_favorites_list(&self) -> LSSharedFileListRef {
         self.state
             .calls

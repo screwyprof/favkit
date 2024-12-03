@@ -7,25 +7,20 @@ use favkit::sidebar::{Sidebar, SidebarItem};
 #[test]
 fn it_lists_favorite_items() {
     // Given
-    let recorder = ApiCallRecorder::with_items(vec![
+    let expected = vec![
         SidebarItem::applications(),
         SidebarItem::downloads(),
         SidebarItem::new("Projects", "/Users/happygopher/Projects"),
-    ]);
+    ];
+
+    let recorder = ApiCallRecorder::with_items(expected.clone());
     let sidebar = Sidebar::with_api(recorder.clone());
 
     // When
     let items = sidebar.favorites().list_items();
 
     // Then
-    assert_eq!(
-        items,
-        vec![
-            SidebarItem::applications(),
-            SidebarItem::downloads(),
-            SidebarItem::new("Projects", "/Users/happygopher/Projects"),
-        ]
-    );
+    assert_eq!(expected, items);
 
     // And verify API calls
     recorder.verify_calls(&[

@@ -1,17 +1,19 @@
 mod macos_api;
 mod path;
+mod sidebar_api;
 
-pub use self::macos_api::{MacOsApi, RawMacOsApi, RealMacOsApi};
+pub use self::macos_api::{MacOsApi, RealMacOsApi};
 pub use self::path::{MacOsLocation, MacOsPath};
+pub use self::sidebar_api::SidebarApi;
 
-pub struct Sidebar<T: RawMacOsApi = RealMacOsApi> {
-    api: MacOsApi<T>,
+pub struct Sidebar<T: MacOsApi = RealMacOsApi> {
+    api: SidebarApi<T>,
 }
 
-impl<T: RawMacOsApi> Sidebar<T> {
+impl<T: MacOsApi> Sidebar<T> {
     pub fn with_api(raw_api: T) -> Self {
         Self {
-            api: MacOsApi::new(raw_api),
+            api: SidebarApi::new(raw_api),
         }
     }
 
@@ -36,11 +38,11 @@ impl Sidebar<RealMacOsApi> {
     }
 }
 
-pub struct FavoritesSection<'a, T: RawMacOsApi> {
-    api: &'a MacOsApi<T>,
+pub struct FavoritesSection<'a, T: MacOsApi> {
+    api: &'a SidebarApi<T>,
 }
 
-impl<T: RawMacOsApi> FavoritesSection<'_, T> {
+impl<T: MacOsApi> FavoritesSection<'_, T> {
     pub fn list_items(&self) -> Vec<SidebarItem> {
         self.api
             .list_favorite_items()
@@ -57,7 +59,7 @@ impl<T: RawMacOsApi> FavoritesSection<'_, T> {
     }
 }
 
-impl<T: RawMacOsApi> IntoIterator for &FavoritesSection<'_, T> {
+impl<T: MacOsApi> IntoIterator for &FavoritesSection<'_, T> {
     type Item = SidebarItem;
     type IntoIter = std::vec::IntoIter<SidebarItem>;
 
