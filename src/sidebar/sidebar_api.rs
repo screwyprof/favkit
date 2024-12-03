@@ -1,11 +1,11 @@
-use core_foundation::{
-    array::CFArray,
-    base::TCFType,
-    string::CFString,
-    url::{CFURLGetString, CFURL},
-};
+use core_foundation::{array::CFArray, base::TCFType, string::CFString};
+use std::convert::TryFrom;
 
-use super::macos_api::MacOsApi;
+use super::{
+    macos_api::MacOsApi,
+    path::{CFURLWrapper, MacOsPath},
+    SidebarItem,
+};
 
 pub struct SidebarApi<T: MacOsApi> {
     raw: T,
@@ -16,7 +16,7 @@ impl<T: MacOsApi> SidebarApi<T> {
         Self { raw }
     }
 
-    pub fn list_favorite_items(&self) -> Vec<(String, String)> {
+    pub fn list_favorite_items(&self) -> Vec<SidebarItem> {
         unsafe {
             let favorites_list = self.raw.create_favorites_list();
             if favorites_list.is_null() {
@@ -44,22 +44,12 @@ impl<T: MacOsApi> SidebarApi<T> {
                     if url_ref.is_null() {
                         return None;
                     }
-                    let url = CFURL::wrap_under_create_rule(url_ref);
+                    let url = core_foundation::url::CFURL::wrap_under_create_rule(url_ref);
 
-                    // Get the URL string
-                    let url_str =
-                        CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
-                    let url_str = url_str.to_string();
+                    // Convert URL to MacOsPath using the wrapper
+                    let path = MacOsPath::try_from(CFURLWrapper::from(&url)).ok()?;
 
-                    // If it's a file URL, convert it to a file system path
-                    if url_str.starts_with("file://") {
-                        if let Some(path) = url.to_path() {
-                            return Some((name.to_string(), path.to_string_lossy().into_owned()));
-                        }
-                    }
-
-                    // For non-file URLs (like AirDrop), use the URL string directly
-                    Some((name.to_string(), url_str))
+                    Some(SidebarItem::new(name.to_string(), path))
                 })
                 .collect()
         }

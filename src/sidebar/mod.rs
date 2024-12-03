@@ -44,18 +44,11 @@ pub struct FavoritesSection<'a, T: MacOsApi> {
 
 impl<T: MacOsApi> FavoritesSection<'_, T> {
     pub fn list_items(&self) -> Vec<SidebarItem> {
-        self.api
-            .list_favorite_items()
-            .into_iter()
-            .map(|(name, path)| SidebarItem::new(name, path))
-            .collect()
+        self.api.list_favorite_items()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = SidebarItem> + '_ {
-        self.api
-            .list_favorite_items()
-            .into_iter()
-            .map(|(name, path)| SidebarItem::new(name, path))
+        self.api.list_favorite_items().into_iter()
     }
 }
 
@@ -75,10 +68,10 @@ pub struct SidebarItem {
 }
 
 impl SidebarItem {
-    pub fn new(name: impl Into<String>, path: impl AsRef<str>) -> Self {
+    pub fn new(name: impl Into<String>, path: impl Into<MacOsPath>) -> Self {
         Self {
             name: name.into(),
-            path: MacOsPath::from(path.as_ref()),
+            path: path.into(),
         }
     }
 
