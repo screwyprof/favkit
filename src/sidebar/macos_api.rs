@@ -41,26 +41,26 @@ impl MacOsApi for RealMacOsApi {
 
             let result = {
                 let mut seed = 0;
-                let items = LSSharedFileListCopySnapshot(favorites_list, &mut seed);
-                let items = CFArray::<CFType>::wrap_under_create_rule(items);
-
+                let items_ref = LSSharedFileListCopySnapshot(favorites_list, &mut seed);
+                let items = CFArray::<CFType>::wrap_under_create_rule(items_ref);
                 let mut result = Vec::new();
 
                 for item in items.iter() {
                     let item_ref = item.as_concrete_TypeRef() as LSSharedFileListItemRef;
                     let name_ref = LSSharedFileListItemCopyDisplayName(item_ref);
+                    if name_ref.is_null() {
+                        continue;
+                    }
+                    let name = CFString::wrap_under_create_rule(name_ref);
                     let url_ref =
                         LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
-
-                    if !name_ref.is_null() && !url_ref.is_null() {
-                        let name = CFString::wrap_under_create_rule(name_ref);
-                        let url = CFURL::wrap_under_create_rule(url_ref);
-                        let path = CFString::wrap_under_create_rule(CFURLGetString(
-                            url.as_concrete_TypeRef(),
-                        ));
-
-                        result.push((name.to_string(), path.to_string().into()));
+                    if url_ref.is_null() {
+                        continue;
                     }
+                    let url = CFURL::wrap_under_create_rule(url_ref);
+                    let path_str =
+                        CFString::wrap_under_create_rule(CFURLGetString(url.as_concrete_TypeRef()));
+                    result.push((name.to_string(), path_str.to_string().into()));
                 }
 
                 result
