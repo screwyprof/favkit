@@ -20,20 +20,20 @@ fn browsing_finder_favorites() {
     let sidebar = Sidebar::with_api(&api);
 
     // When listing favorites
-    let items = sidebar.favorites().list_items();
+    let items: Vec<_> = sidebar.favorites().iter().collect();
 
     // Then both standard and custom locations are present
     assert_eq!(items.len(), 6);
 
     // Standard locations
-    assert!(items.iter().any(|item| item.name == "Applications"));
-    assert!(items.iter().any(|item| item.name == "Downloads"));
-    assert!(items.iter().any(|item| item.name == "Documents"));
+    assert!(items.iter().any(|item| item.name() == "Applications"));
+    assert!(items.iter().any(|item| item.name() == "Downloads"));
+    assert!(items.iter().any(|item| item.name() == "Documents"));
 
     // Custom folders
-    assert!(items.iter().any(|item| item.name == "Work Projects"));
-    assert!(items.iter().any(|item| item.name == "Photos 2023"));
-    assert!(items.iter().any(|item| item.name == "Games"));
+    assert!(items.iter().any(|item| item.name() == "Work Projects"));
+    assert!(items.iter().any(|item| item.name() == "Photos 2023"));
+    assert!(items.iter().any(|item| item.name() == "Games"));
 }
 
 #[test]
@@ -51,12 +51,12 @@ fn creating_favorites_with_typed_paths() {
     let sidebar = Sidebar::with_api(&api);
 
     // When listing favorites
-    let items = sidebar.favorites().list_items();
+    let items: Vec<_> = sidebar.favorites().iter().collect();
 
     // Then all items are present
     assert_eq!(items.len(), 4);
-    assert!(items.iter().any(|item| item.name == "Applications"));
-    assert!(items.iter().any(|item| item.name == "Downloads"));
-    assert!(items.iter().any(|item| item.name == "Projects"));
-    assert!(items.iter().any(|item| item.name == "Development"));
+    assert!(items.iter().any(|item| item.name() == "Applications"));
+    assert!(items.iter().any(|item| item.name() == "Downloads"));
+    assert!(items.iter().any(|item| item.name() == "Projects"));
+    assert!(items.iter().any(|item| item.name() == "Development"));
 }

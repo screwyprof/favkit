@@ -117,6 +117,16 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
 name = "core-foundation"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e195e091a93c46f7102ec7818a2aa394e1e1771c3ab4825963fa03e45afb8f"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
+name = "core-foundation"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b55271e5c8c478ad3f38ad24ef34923091e0548492a266d19b3c0b4d82574c63"
@@ -137,7 +147,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0aa845ab21b847ee46954be761815f18f16469b29ef3ba250241b1b8bab659a"
 dependencies = [
- "core-foundation",
+ "core-foundation 0.10.0",
 ]
 
 [[package]]
@@ -167,9 +177,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "core-foundation",
+ "core-foundation 0.9.4",
  "core-services",
  "dirs",
+ "favkit",
  "thiserror 2.0.3",
 ]
 

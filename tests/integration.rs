@@ -20,8 +20,8 @@ fn it_retrieves_favorites_from_macos() {
 
     // Verify expected result
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0].name, "Applications");
-    assert_eq!(items[1].name, "Downloads");
+    assert_eq!(items[0].name(), "Applications");
+    assert_eq!(items[1].name(), "Downloads");
 
     // Verify API was called exactly once
     assert_eq!(api.list_favorites_call_count(), 1);

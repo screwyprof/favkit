@@ -1,12 +1,12 @@
 use favkit::sidebar::Sidebar;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::io::Result<()> {
     let sidebar = Sidebar::new();
     let favorites = sidebar.favorites().list_items();
 
     println!("Favorites:");
     for item in favorites {
-        println!("  - {} ({})", item.name, item.path);
+        println!("  - {}", item);
     }
 
     Ok(())

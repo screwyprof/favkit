@@ -37,19 +37,31 @@ pub struct FavoritesSection<'a, A> {
 }
 
 impl<A: MacOsApi> FavoritesSection<'_, A> {
-    pub fn list_items(&self) -> Vec<SidebarItem> {
+    pub fn iter(&self) -> impl Iterator<Item = SidebarItem> {
         self.api
             .list_favorite_items()
             .into_iter()
             .map(|(name, path)| SidebarItem { name, path })
-            .collect()
+    }
+
+    pub fn list_items(&self) -> Vec<SidebarItem> {
+        self.iter().collect()
+    }
+}
+
+impl<A: MacOsApi> IntoIterator for &FavoritesSection<'_, A> {
+    type Item = SidebarItem;
+    type IntoIter = std::vec::IntoIter<SidebarItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.list_items().into_iter()
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SidebarItem {
-    pub name: String,
-    pub path: MacOsPath,
+    name: String,
+    path: MacOsPath,
 }
 
 impl SidebarItem {
@@ -82,6 +94,15 @@ impl SidebarItem {
         }
     }
 
+    // Getters
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn path(&self) -> &MacOsPath {
+        &self.path
+    }
+
     // Private helper
     fn location(location: MacOsLocation) -> Self {
         let name = match &location {
@@ -99,6 +120,18 @@ impl SidebarItem {
             name,
             path: location.into(),
         }
+    }
+
+    // For testing purposes
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn into_parts(self) -> (String, MacOsPath) {
+        (self.name, self.path)
+    }
+}
+
+impl std::fmt::Display for SidebarItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.name, self.path)
     }
 }
 
