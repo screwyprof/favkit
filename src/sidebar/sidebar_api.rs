@@ -40,15 +40,12 @@ impl<T: MacOsApi> SidebarApi<T> {
 
             // Wrap the array with create_rule since we own it
             let items = CFArray::<*const c_void>::wrap_under_create_rule(items_ref);
+            let values = items.get_all_values();
 
             // Process each item
             let mut result = Vec::new();
-            for i in 0..items.len() {
-                let item_ref = items.get(i).map(|item| *item as LSSharedFileListItemRef);
-                let item_ref = match item_ref {
-                    Some(item_ref) => item_ref,
-                    None => continue,
-                };
+            for &item_ref in values.iter() {
+                let item_ref = item_ref as *mut c_void as LSSharedFileListItemRef;
 
                 // Get item name (we own this reference)
                 let name_ref = self.api.copy_display_name(item_ref);

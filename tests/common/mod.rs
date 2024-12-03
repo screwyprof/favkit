@@ -9,6 +9,7 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{MacOsApi, SidebarItem};
 use std::{
+    ffi::c_void,
     ptr,
     sync::{Arc, Mutex},
 };
@@ -131,13 +132,13 @@ impl MacOsApi for ApiCallRecorder {
         for _ in 0..self.state.items.len() {
             let item_ref = self.get_next_ref();
             refs.push(item_ref);
-            values.push(item_ref as *const std::ffi::c_void);
+            values.push(item_ref);
         }
 
         // Create array directly with Core Foundation
         CFArrayCreate(
             kCFAllocatorDefault,
-            values.as_ptr(),
+            values.as_ptr() as *const *const c_void,
             values.len() as CFIndex,
             ptr::null(),
         )

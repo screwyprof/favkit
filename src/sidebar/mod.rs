@@ -2,9 +2,11 @@ mod macos_api;
 mod path;
 mod sidebar_api;
 
-pub use self::macos_api::{MacOsApi, RealMacOsApi};
-pub use self::path::{MacOsLocation, MacOsPath};
-pub use self::sidebar_api::SidebarApi;
+pub use self::{
+    macos_api::{MacOsApi, RealMacOsApi},
+    path::{MacOsLocation, MacOsPath},
+    sidebar_api::SidebarApi,
+};
 
 pub struct Sidebar<T: MacOsApi = RealMacOsApi> {
     api: SidebarApi<T>,
@@ -26,13 +28,13 @@ impl<T: MacOsApi> Sidebar<T> {
     }
 }
 
-impl Default for Sidebar<RealMacOsApi> {
+impl Default for Sidebar {
     fn default() -> Self {
         Self::with_api(RealMacOsApi)
     }
 }
 
-impl Sidebar<RealMacOsApi> {
+impl Sidebar {
     pub fn new() -> Self {
         Self::default()
     }
@@ -48,7 +50,7 @@ impl<T: MacOsApi> FavoritesSection<'_, T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = SidebarItem> + '_ {
-        self.api.list_favorite_items().into_iter()
+        self.list_items().into_iter()
     }
 }
 
