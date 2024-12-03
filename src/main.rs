@@ -1,4 +1,4 @@
-use favkit::Sidebar;
+use favkit::sidebar::Sidebar;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sidebar = Sidebar::new();
