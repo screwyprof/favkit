@@ -17,7 +17,7 @@ fn browsing_finder_favorites() {
         SidebarItem::new("Games", "/Applications/Games"),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
-    let sidebar = Sidebar::with_api(&api);
+    let sidebar = Sidebar::with_api(api);
 
     // When listing favorites
     let items: Vec<_> = sidebar.favorites().iter().collect();
@@ -48,7 +48,7 @@ fn creating_favorites_with_typed_paths() {
         SidebarItem::new("Development", "/Users/me/Development"),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
-    let sidebar = Sidebar::with_api(&api);
+    let sidebar = Sidebar::with_api(api);
 
     // When listing favorites
     let items: Vec<_> = sidebar.favorites().iter().collect();

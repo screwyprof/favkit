@@ -4,35 +4,33 @@ mod path;
 pub use self::macos_api::{MacOsApi, RealMacOsApi};
 pub use self::path::{MacOsLocation, MacOsPath};
 
-pub struct Sidebar<'a, A: MacOsApi> {
-    api: &'a A,
+pub struct Sidebar<A: MacOsApi = RealMacOsApi> {
+    api: A,
 }
 
-impl<'a, A: MacOsApi> Sidebar<'a, A> {
-    pub fn with_api(api: &'a A) -> Self {
+impl<A: MacOsApi> Sidebar<A> {
+    pub fn with_api(api: A) -> Self {
         Self { api }
     }
 
     pub fn favorites(&self) -> FavoritesSection<'_, A> {
-        FavoritesSection { api: self.api }
+        FavoritesSection { api: &self.api }
     }
 }
 
-impl Default for Sidebar<'_, RealMacOsApi> {
+impl Default for Sidebar<RealMacOsApi> {
     fn default() -> Self {
-        Self::new()
+        Self::with_api(RealMacOsApi)
     }
 }
 
-impl Sidebar<'_, RealMacOsApi> {
+impl Sidebar<RealMacOsApi> {
     pub fn new() -> Self {
-        static API: std::sync::OnceLock<RealMacOsApi> = std::sync::OnceLock::new();
-        let api = API.get_or_init(RealMacOsApi::new);
-        Self::with_api(api)
+        Self::default()
     }
 }
 
-pub struct FavoritesSection<'a, A> {
+pub struct FavoritesSection<'a, A: MacOsApi> {
     api: &'a A,
 }
 
@@ -121,12 +119,6 @@ impl SidebarItem {
             path: location.into(),
         }
     }
-
-    // For testing purposes
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn into_parts(self) -> (String, MacOsPath) {
-        (self.name, self.path)
-    }
 }
 
 impl std::fmt::Display for SidebarItem {
@@ -135,7 +127,6 @@ impl std::fmt::Display for SidebarItem {
     }
 }
 
-// Keep for backward compatibility
 impl From<MacOsLocation> for SidebarItem {
     fn from(location: MacOsLocation) -> Self {
         Self::location(location)
