@@ -1,6 +1,6 @@
 use core_foundation::{
     array::CFArray,
-    base::{CFType, TCFType},
+    base::{CFType, ItemRef, TCFType},
     string::CFString,
     url::{CFURLGetString, CFURL},
 };
@@ -23,6 +23,27 @@ impl RealMacOsApi {
     pub fn new() -> Self {
         Self
     }
+
+    unsafe fn convert_list_item(item: ItemRef<'_, CFType>) -> Option<(String, MacOsPath)> {
+        let item_ref = item.as_concrete_TypeRef() as LSSharedFileListItemRef;
+
+        // Get item name
+        let name_ref = LSSharedFileListItemCopyDisplayName(item_ref);
+        if name_ref.is_null() {
+            return None;
+        }
+        let name = CFString::wrap_under_create_rule(name_ref);
+
+        // Get item URL
+        let url_ref = LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
+        if url_ref.is_null() {
+            return None;
+        }
+        let url = CFURL::wrap_under_create_rule(url_ref);
+        let path_str = CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
+
+        Some((name.to_string(), path_str.to_string().into()))
+    }
 }
 
 impl MacOsApi for RealMacOsApi {
@@ -40,28 +61,12 @@ impl MacOsApi for RealMacOsApi {
 
             let mut seed = 0;
             let items_ref = LSSharedFileListCopySnapshot(favorites_list, &mut seed);
-            let items = CFArray::<CFType>::wrap_under_create_rule(items_ref as *const _);
-            let mut result = Vec::new();
+            let items = CFArray::<CFType>::wrap_under_create_rule(items_ref);
 
-            for item in items.iter() {
-                let item_ref = item.as_concrete_TypeRef() as LSSharedFileListItemRef;
-                let name_ref = LSSharedFileListItemCopyDisplayName(item_ref);
-                if name_ref.is_null() {
-                    continue;
-                }
-                let name = CFString::wrap_under_create_rule(name_ref);
-                let url_ref =
-                    LSSharedFileListItemCopyResolvedURL(item_ref, 0, std::ptr::null_mut());
-                if url_ref.is_null() {
-                    continue;
-                }
-                let url = CFURL::wrap_under_create_rule(url_ref);
-                let path_str =
-                    CFString::wrap_under_get_rule(CFURLGetString(url.as_concrete_TypeRef()));
-                result.push((name.to_string(), path_str.to_string().into()));
-            }
-
-            result
+            items
+                .iter()
+                .filter_map(|item| Self::convert_list_item(item))
+                .collect()
         }
     }
 }
