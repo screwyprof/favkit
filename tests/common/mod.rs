@@ -9,7 +9,6 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{MacOsApi, SidebarItem};
 use std::{
-    ffi::c_void,
     ptr,
     sync::{Arc, Mutex},
 };

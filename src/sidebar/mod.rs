@@ -2,13 +2,6 @@ mod macos_api;
 mod path;
 mod sidebar_api;
 
-use core_foundation::{
-    base::TCFType,
-    string::{CFString, CFStringRef},
-    url::{CFURLRef, CFURL},
-};
-use core_services::LSSharedFileListItemRef;
-
 pub use self::macos_api::{MacOsApi, RealMacOsApi};
 pub use self::path::{MacOsLocation, MacOsPath};
 pub use self::sidebar_api::SidebarApi;
@@ -56,21 +49,6 @@ impl<T: MacOsApi> FavoritesSection<'_, T> {
 
     pub fn iter(&self) -> impl Iterator<Item = SidebarItem> + '_ {
         self.api.list_favorite_items().into_iter()
-    }
-
-    fn convert_item(
-        &self,
-        item_ref: LSSharedFileListItemRef,
-        name_ref: CFStringRef,
-        url_ref: CFURLRef,
-    ) -> SidebarItem {
-        unsafe {
-            let name = CFString::wrap_under_create_rule(name_ref);
-            let url = CFURL::wrap_under_create_rule(url_ref);
-            let path = MacOsPath::try_from(path::CFURLWrapper::from(&url))
-                .expect("Failed to convert URL to path");
-            SidebarItem::new(name.to_string(), path)
-        }
     }
 }
 

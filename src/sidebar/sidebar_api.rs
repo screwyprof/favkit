@@ -1,8 +1,4 @@
-use core_foundation::{
-    array::CFArray,
-    base::{CFRelease, TCFType, TCFTypeRef},
-    string::CFString,
-};
+use core_foundation::{array::CFArray, base::TCFType, string::CFString};
 use core_services::LSSharedFileListItemRef;
 use std::{convert::TryFrom, ffi::c_void};
 
@@ -97,8 +93,7 @@ impl<T: MacOsApi> SidebarApi<T> {
                 let name = CFString::wrap_under_create_rule(name_ref);
                 println!(
                     "SidebarApi::list_favorite_items: got name for item {}: {}",
-                    i,
-                    name.to_string()
+                    i, name
                 );
 
                 // Get item URL (we own this reference)
