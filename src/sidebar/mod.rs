@@ -4,29 +4,31 @@ mod path;
 pub use self::macos_api::{MacOsApi, RealMacOsApi};
 pub use self::path::{MacOsLocation, MacOsPath};
 
-pub struct Sidebar<A: MacOsApi> {
-    api: A,
+pub struct Sidebar<'a, A: MacOsApi> {
+    api: &'a A,
 }
 
-impl<A: MacOsApi> Sidebar<A> {
-    pub fn with_api(api: A) -> Self {
+impl<'a, A: MacOsApi> Sidebar<'a, A> {
+    pub fn with_api(api: &'a A) -> Self {
         Self { api }
     }
 
     pub fn favorites(&self) -> FavoritesSection<'_, A> {
-        FavoritesSection { api: &self.api }
+        FavoritesSection { api: self.api }
     }
 }
 
-impl Default for Sidebar<RealMacOsApi> {
+impl Default for Sidebar<'_, RealMacOsApi> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Sidebar<RealMacOsApi> {
+impl Sidebar<'_, RealMacOsApi> {
     pub fn new() -> Self {
-        Self::with_api(RealMacOsApi::new())
+        static API: std::sync::OnceLock<RealMacOsApi> = std::sync::OnceLock::new();
+        let api = API.get_or_init(RealMacOsApi::new);
+        Self::with_api(api)
     }
 }
 
