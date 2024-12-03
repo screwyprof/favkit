@@ -1,76 +1,66 @@
 mod common;
 
 use common::MockMacOsApi;
-use favkit::sidebar::{MacOsLocation, Sidebar, SidebarItem};
+use favkit::sidebar::{MacOsLocation, MacOsPath, Sidebar, SidebarItem};
 
 #[test]
 fn browsing_finder_favorites() {
-    // Set up a typical macOS Finder sidebar
+    // Given a Finder sidebar with both standard and custom locations
     let favorites = vec![
+        // Standard locations
         SidebarItem::from(MacOsLocation::Applications),
         SidebarItem::from(MacOsLocation::Downloads),
         SidebarItem::from(MacOsLocation::Documents),
+        // Custom folders
+        ("Work Projects", "/Users/me/Work").into(),
+        ("Photos 2023", "~/Pictures/2023").into(),
+        ("Games", "/Applications/Games").into(),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
     let sidebar = Sidebar::with_api(&api);
 
-    // When user lists favorites
+    // When listing favorites
     let items = sidebar.favorites().list_items();
 
-    // Then they should see standard macOS locations
-    assert!(
-        items
-            .iter()
-            .any(|item| item.path.location() == &MacOsLocation::Applications),
-        "Applications should be visible in Favorites"
-    );
-    assert!(
-        items
-            .iter()
-            .any(|item| item.path.location() == &MacOsLocation::Downloads),
-        "Downloads should be visible in Favorites"
-    );
+    // Then both standard and custom locations are present
+    assert_eq!(items.len(), 6);
+
+    // Standard locations
+    assert!(items.iter().any(|item| item.name == "Applications"));
+    assert!(items.iter().any(|item| item.name == "Downloads"));
+    assert!(items.iter().any(|item| item.name == "Documents"));
+
+    // Custom folders
+    assert!(items.iter().any(|item| item.name == "Work Projects"));
+    assert!(items.iter().any(|item| item.name == "Photos 2023"));
+    assert!(items.iter().any(|item| item.name == "Games"));
 }
 
 #[test]
-fn viewing_custom_favorites() {
-    // Given a Finder sidebar with custom folders
+fn creating_favorites_with_typed_paths() {
+    // Given a Finder sidebar with items created using different API patterns
     let favorites = vec![
+        // Pattern 1: Using MacOsLocation enum directly for well-known locations
+        SidebarItem::from(MacOsLocation::Applications),
+        SidebarItem::from(MacOsLocation::Downloads),
+        // Pattern 2: Using MacOsLocation::Custom for custom paths
         SidebarItem::new(
-            "Work Projects".to_string(),
-            MacOsLocation::Custom("/Users/me/Work".into()).into(),
+            "Projects",
+            MacOsLocation::Custom("/Users/me/Projects".into()),
         ),
-        SidebarItem::new(
-            "Photos 2023".to_string(),
-            MacOsLocation::Custom("~/Pictures/2023".into()).into(),
-        ),
-        SidebarItem::new(
-            "Games".to_string(),
-            MacOsLocation::Custom("/Applications/Games".into()).into(),
-        ),
+        // Pattern 3: Converting string path to MacOsPath first
+        SidebarItem::new("Development", MacOsPath::from("/Users/me/Development")),
     ];
     let api = MockMacOsApi::with_favorites(favorites);
     let sidebar = Sidebar::with_api(&api);
 
-    // When user lists favorites
+    // When listing favorites
     let items = sidebar.favorites().list_items();
 
-    // Then they should see their custom folders with correct paths
-    let work_project = items
-        .iter()
-        .find(|item| item.name == "Work Projects")
-        .unwrap();
-    assert!(matches!(
-        work_project.path.location(),
-        MacOsLocation::Custom(_)
-    ));
-
-    let photos = items
-        .iter()
-        .find(|item| item.name == "Photos 2023")
-        .unwrap();
-    assert!(matches!(photos.path.location(), MacOsLocation::Custom(_)));
-
-    let games = items.iter().find(|item| item.name == "Games").unwrap();
-    assert!(matches!(games.path.location(), MacOsLocation::Custom(_)));
+    // Then all items are present
+    assert_eq!(items.len(), 4);
+    assert!(items.iter().any(|item| item.name == "Applications"));
+    assert!(items.iter().any(|item| item.name == "Downloads"));
+    assert!(items.iter().any(|item| item.name == "Projects"));
+    assert!(items.iter().any(|item| item.name == "Development"));
 }

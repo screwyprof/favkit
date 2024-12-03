@@ -72,9 +72,20 @@ impl From<MacOsLocation> for SidebarItem {
     }
 }
 
-// For custom items where we want a different name
+impl From<(&str, &str)> for SidebarItem {
+    fn from((name, path): (&str, &str)) -> Self {
+        Self {
+            name: name.to_string(),
+            path: path.into(),
+        }
+    }
+}
+
 impl SidebarItem {
-    pub fn new(name: String, path: MacOsPath) -> Self {
-        Self { name, path }
+    pub fn new(name: impl Into<String>, path: impl Into<MacOsPath>) -> Self {
+        Self {
+            name: name.into(),
+            path: path.into(),
+        }
     }
 }

@@ -34,7 +34,7 @@ impl<P: AsRef<Path>> From<P> for MacOsLocation {
             Some(p) if p.starts_with("~/Desktop") => Self::Desktop,
             Some(p) if p.starts_with("~/Documents") => Self::Documents,
             Some(p) if p.starts_with("~/Downloads") => Self::Downloads,
-            Some(p) if p.starts_with("~/") => Self::Home,
+            Some("~/") => Self::Home,
             _ => Self::Custom(path.as_ref().to_path_buf()),
         }
     }
