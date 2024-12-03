@@ -14,7 +14,7 @@ use std::ffi::c_void;
 use crate::sidebar::MacOsPath;
 
 pub trait MacOsApi {
-    fn list_favorite_items(&self) -> Vec<(String, MacOsPath)>; // (name, path)
+    fn list_favorite_items(&self) -> Vec<(String, MacOsPath)>;
 }
 
 #[derive(Default)]
@@ -59,7 +59,7 @@ impl MacOsApi for RealMacOsApi {
                             url.as_concrete_TypeRef(),
                         ));
 
-                        result.push((name.to_string(), MacOsPath::new(path.to_string())));
+                        result.push((name.to_string(), path.to_string().into()));
                     }
                 }
 
