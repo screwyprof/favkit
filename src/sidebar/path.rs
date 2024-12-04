@@ -142,13 +142,31 @@ impl MacOsPath {
     }
 }
 
-impl<P: AsRef<Path>> From<P> for MacOsPath
-where
-    P: Into<PathBuf>,
-{
+impl<P: AsRef<Path>> From<P> for MacOsPath {
     fn from(path: P) -> Self {
-        let path_str = path.as_ref().to_str().unwrap_or("");
-        Self::from_path_str(path_str)
+        let path = path.as_ref();
+        let home_dir = dirs::home_dir().unwrap_or_default();
+
+        match path {
+            p if p == Path::new("/Applications") => Self::Location(MacOsLocation::Applications),
+            p if p == home_dir.join("Downloads") => Self::Location(MacOsLocation::Downloads),
+            p if p == home_dir.join("Desktop") => Self::Location(MacOsLocation::Desktop),
+            p if p == home_dir.join("Documents") => Self::Location(MacOsLocation::Documents),
+            p if p == home_dir.join("Applications") => {
+                Self::Location(MacOsLocation::UserApplications)
+            }
+            p if p == home_dir => Self::Location(MacOsLocation::Home),
+            p if p.to_str() == Some("nwnode://domain-AirDrop") => {
+                Self::Location(MacOsLocation::AirDrop)
+            }
+            p if p
+                .to_str()
+                .map_or(false, |s| s.contains("myDocuments.cannedSearch")) =>
+            {
+                Self::Location(MacOsLocation::Recents)
+            }
+            _ => Self::Custom(path.to_path_buf()),
+        }
     }
 }
 
@@ -202,26 +220,116 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_display_applications() {
-        let path = MacOsPath::Location(MacOsLocation::Applications);
-        assert_eq!(path.to_string(), "/Applications");
+    fn test_system_applications() {
+        let path = MacOsPath::from("/Applications");
+        assert!(matches!(
+            path,
+            MacOsPath::Location(MacOsLocation::Applications)
+        ));
+        assert_eq!(path.name(), "Applications");
+        assert_eq!(path.path(), PathBuf::from("/Applications"));
     }
 
     #[test]
-    fn test_display_airdrop() {
-        let path = MacOsPath::Location(MacOsLocation::AirDrop);
-        assert_eq!(path.to_string(), "nwnode://domain-AirDrop");
+    fn test_user_applications() {
+        let home = dirs::home_dir().unwrap();
+        let path = MacOsPath::from(home.join("Applications"));
+        assert!(matches!(
+            path,
+            MacOsPath::Location(MacOsLocation::UserApplications)
+        ));
+        assert_eq!(path.name(), "Applications");
+        assert_eq!(path.path(), home.join("Applications"));
     }
 
     #[test]
-    fn test_display_custom() {
-        let path = MacOsPath::Custom(PathBuf::from("/Users/happygopher/Projects"));
-        assert_eq!(path.to_string(), "/Users/happygopher/Projects");
+    fn test_downloads() {
+        let home = dirs::home_dir().unwrap();
+        let path = MacOsPath::from(home.join("Downloads"));
+        assert!(matches!(
+            path,
+            MacOsPath::Location(MacOsLocation::Downloads)
+        ));
+        assert_eq!(path.name(), "Downloads");
+        assert_eq!(path.path(), home.join("Downloads"));
     }
 
     #[test]
-    fn test_custom_name() {
-        let path = MacOsPath::Custom(PathBuf::from("/Users/happygopher/Projects"));
+    fn test_desktop() {
+        let home = dirs::home_dir().unwrap();
+        let path = MacOsPath::from(home.join("Desktop"));
+        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Desktop)));
+        assert_eq!(path.name(), "Desktop");
+        assert_eq!(path.path(), home.join("Desktop"));
+    }
+
+    #[test]
+    fn test_documents() {
+        let home = dirs::home_dir().unwrap();
+        let path = MacOsPath::from(home.join("Documents"));
+        assert!(matches!(
+            path,
+            MacOsPath::Location(MacOsLocation::Documents)
+        ));
+        assert_eq!(path.name(), "Documents");
+        assert_eq!(path.path(), home.join("Documents"));
+    }
+
+    #[test]
+    fn test_home() {
+        let home = dirs::home_dir().unwrap();
+        let path = MacOsPath::from(&home);
+        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Home)));
+        assert_eq!(path.name(), "Home");
+        assert_eq!(path.path(), home);
+    }
+
+    #[test]
+    fn test_airdrop() {
+        let path = MacOsPath::from("nwnode://domain-AirDrop");
+        assert!(matches!(path, MacOsPath::Location(MacOsLocation::AirDrop)));
+        assert_eq!(path.name(), "AirDrop");
+        assert_eq!(path.path(), PathBuf::from("nwnode://domain-AirDrop"));
+    }
+
+    #[test]
+    fn test_recents() {
+        let path = MacOsPath::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch");
+        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Recents)));
+        assert_eq!(path.name(), "Recents");
+        assert_eq!(path.path(), PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch"));
+    }
+
+    #[test]
+    fn test_custom_path() {
+        let path = MacOsPath::from("/Users/happygopher/Projects");
+        assert!(matches!(path, MacOsPath::Custom(_)));
         assert_eq!(path.name(), "Projects");
+        assert_eq!(path.path(), PathBuf::from("/Users/happygopher/Projects"));
+    }
+
+    #[test]
+    fn test_url_conversion() {
+        let url = CFURL::try_from(&MacOsPath::from("/Applications")).unwrap();
+        let wrapper = CFURLWrapper::from(&url);
+        let path = MacOsPath::try_from(wrapper).unwrap();
+        assert!(matches!(
+            path,
+            MacOsPath::Location(MacOsLocation::Applications)
+        ));
+        assert_eq!(path.name(), "Applications");
+        assert_eq!(path.path(), PathBuf::from("/Applications"));
+    }
+
+    #[test]
+    fn test_display() {
+        let path = MacOsPath::from("/Applications");
+        assert_eq!(path.to_string(), "/Applications");
+
+        let path = MacOsPath::from("nwnode://domain-AirDrop");
+        assert_eq!(path.to_string(), "nwnode://domain-AirDrop");
+
+        let path = MacOsPath::from("/Users/happygopher/Projects");
+        assert_eq!(path.to_string(), "/Users/happygopher/Projects");
     }
 }
