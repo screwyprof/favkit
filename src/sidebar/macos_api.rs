@@ -1,4 +1,4 @@
-use core_foundation::{array::CFArrayRef, string::CFStringRef, url::CFURLRef};
+use core_foundation::{array::CFArray, base::TCFType, string::CFStringRef, url::CFURLRef};
 use core_services::{
     kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
     LSSharedFileListItemCopyDisplayName, LSSharedFileListItemCopyResolvedURL,
@@ -20,8 +20,12 @@ pub trait MacOsApi {
     /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that:
     /// - The list parameter is a valid LSSharedFileListRef
-    /// - The returned CFArrayRef is properly released when no longer needed
-    unsafe fn copy_snapshot(&self, list: LSSharedFileListRef, seed: &mut u32) -> CFArrayRef;
+    /// - The returned CFArray is properly released when no longer needed
+    unsafe fn copy_snapshot(
+        &self,
+        list: LSSharedFileListRef,
+        seed: &mut u32,
+    ) -> CFArray<LSSharedFileListItemRef>;
 
     /// Gets the display name of a favorites list item.
     ///
@@ -50,8 +54,13 @@ impl MacOsApi for RealMacOsApi {
         LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null())
     }
 
-    unsafe fn copy_snapshot(&self, list: LSSharedFileListRef, seed: &mut u32) -> CFArrayRef {
-        LSSharedFileListCopySnapshot(list, seed)
+    unsafe fn copy_snapshot(
+        &self,
+        list: LSSharedFileListRef,
+        seed: &mut u32,
+    ) -> CFArray<LSSharedFileListItemRef> {
+        let array_ref = LSSharedFileListCopySnapshot(list, seed);
+        CFArray::wrap_under_create_rule(array_ref)
     }
 
     unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {

@@ -1,8 +1,7 @@
 mod common;
 
 use common::ApiCallRecorder;
-use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURL};
-use core_services::LSSharedFileListItemRef;
+use core_foundation::{base::TCFType, string::CFString, url::CFURL};
 use favkit::{sidebar::SidebarItem, MacOsApi};
 
 #[test]
@@ -17,14 +16,10 @@ fn test_copy_snapshot_in_isolation() {
 
         // Step 2: Get snapshot
         let mut seed = 0;
-        let array_ref = recorder.copy_snapshot(list, &mut seed);
-        assert!(!array_ref.is_null(), "snapshot should not be null");
-
-        // Step 3: Wrap array
-        let array = CFArray::<LSSharedFileListItemRef>::wrap_under_create_rule(array_ref);
+        let array = recorder.copy_snapshot(list, &mut seed);
         assert_eq!(array.len(), 2);
 
-        // Step 4: Let array drop naturally
+        // Step 3: Let array drop naturally
     }
 }
 

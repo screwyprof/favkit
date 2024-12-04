@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
 use core_foundation::{
-    array::{CFArrayCreate, CFArrayRef},
+    array::CFArrayCreate,
     base::{kCFAllocatorDefault, CFIndex, TCFType},
     string::{CFString, CFStringRef},
     url::{CFURLCreateWithString, CFURLRef},
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use core_services::{CFArray, LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{MacOsApi, SidebarItem};
 use std::{
     ffi::c_void,
@@ -105,7 +105,11 @@ impl MacOsApi for ApiCallRecorder {
         1 as LSSharedFileListRef
     }
 
-    unsafe fn copy_snapshot(&self, list: LSSharedFileListRef, _seed: &mut u32) -> CFArrayRef {
+    unsafe fn copy_snapshot(
+        &self,
+        list: LSSharedFileListRef,
+        _seed: &mut u32,
+    ) -> CFArray<LSSharedFileListItemRef> {
         self.state
             .calls
             .lock()
@@ -113,17 +117,18 @@ impl MacOsApi for ApiCallRecorder {
             .push(ApiCall::CopySnapshot(list));
 
         // Create item refs for our items in the exact order they were provided
-        let values: Vec<*const c_void> = (0..self.state.items.len())
-            .map(|i| self.get_test_item(i) as *const c_void)
+        let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
+            .map(|i| self.get_test_item(i))
             .collect();
 
-        // Create array directly with Core Foundation
-        CFArrayCreate(
+        // Create array and wrap it
+        let array_ref = CFArrayCreate(
             kCFAllocatorDefault,
-            values.as_ptr(),
+            values.as_ptr() as *const *const c_void,
             values.len() as CFIndex,
             ptr::null(),
-        )
+        );
+        CFArray::wrap_under_create_rule(array_ref)
     }
 
     unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {

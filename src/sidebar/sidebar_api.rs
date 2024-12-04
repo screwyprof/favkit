@@ -1,6 +1,6 @@
 use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURL};
-use core_services::LSSharedFileListItemRef;
-use std::{convert::TryFrom, ffi::c_void};
+use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
+use std::convert::TryFrom;
 
 use super::{macos_api::MacOsApi, path::CFURLWrapper, SidebarItem};
 
@@ -35,7 +35,9 @@ impl<T: MacOsApi> SidebarApi<T> {
                 .get_all_values()
                 .iter()
                 .filter_map(|&item_ref| {
-                    self.convert_item_ref(item_ref as *mut c_void as LSSharedFileListItemRef)
+                    let item_ref = item_ref as *const OpaqueLSSharedFileListItemRef;
+                    let item_ref = item_ref as LSSharedFileListItemRef;
+                    self.convert_item_ref(item_ref)
                 })
                 .collect()
         }
@@ -45,15 +47,14 @@ impl<T: MacOsApi> SidebarApi<T> {
     ///
     /// # Safety
     /// Caller must ensure proper memory management of returned CFArray.
-    unsafe fn get_favorites_array(&self) -> Option<CFArray<*const c_void>> {
+    unsafe fn get_favorites_array(&self) -> Option<CFArray<LSSharedFileListItemRef>> {
         let favorites_list = self.api.create_favorites_list();
         if favorites_list.is_null() {
             return None;
         }
 
         let mut seed = 0;
-        let items_ref = self.api.copy_snapshot(favorites_list, &mut seed);
-        Some(CFArray::wrap_under_create_rule(items_ref))
+        Some(self.api.copy_snapshot(favorites_list, &mut seed))
     }
 
     /// Converts a single item reference to a SidebarItem.
