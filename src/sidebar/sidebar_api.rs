@@ -9,23 +9,59 @@ use super::{
 use crate::error::{Error, Result};
 
 /// A high-level API for interacting with the macOS Finder sidebar.
-/// Handles Core Foundation memory management internally.
+///
+/// This API provides a safe interface to the low-level Core Foundation operations
+/// required to interact with the Finder sidebar. It handles all memory management
+/// internally through RAII patterns.
+///
+/// # Example
+/// ```no_run
+/// use favkit::{Sidebar, Result};
+///
+/// fn main() -> Result<()> {
+///     let sidebar = Sidebar::new();
+///     let items = sidebar.list_items()?;
+///     
+///     for item in items {
+///         println!("{}: {}", item.name(), item.path());
+///     }
+///     Ok(())
+/// }
+/// ```
 pub struct SidebarApi<T: MacOsApi> {
     api: T,
 }
 
 impl<T: MacOsApi> SidebarApi<T> {
+    /// Creates a new instance of the sidebar API with the given implementation.
     pub fn new(api: T) -> Self {
         Self { api }
     }
 
     /// Lists all favorite items from the Finder sidebar.
     ///
-    /// # Safety
-    /// This method handles Core Foundation memory management by:
-    /// 1. Using wrap_under_create_rule for objects returned by Copy* functions
-    /// 2. Letting Rust's drop semantics handle cleanup through TCFType
-    /// 3. Early returns with null checks to prevent invalid memory access
+    /// This method safely handles all Core Foundation memory management internally:
+    /// - Objects returned by Core Foundation's Copy* functions are wrapped using `wrap_under_create_rule`
+    /// - Memory is automatically freed when objects go out of scope through Rust's drop semantics
+    /// - Null pointers and invalid references are caught early and returned as errors
+    ///
+    /// # Returns
+    /// - A vector of `SidebarItem`s representing the current favorites
+    /// - An error if any Core Foundation operation fails
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use favkit::{SidebarApi, RealMacOsApi};
+    /// let api = SidebarApi::new(RealMacOsApi::default());
+    /// match api.list_favorite_items() {
+    ///     Ok(items) => {
+    ///         for item in items {
+    ///             println!("Found favorite: {}", item);
+    ///         }
+    ///     }
+    ///     Err(e) => eprintln!("Failed to list favorites: {}", e),
+    /// }
+    /// ```
     pub fn list_favorite_items(&self) -> Result<Vec<SidebarItem>> {
         unsafe {
             // Get the list of items
@@ -51,10 +87,14 @@ impl<T: MacOsApi> SidebarApi<T> {
     ///
     /// # Safety
     /// Caller must ensure proper memory management of returned CFArray.
+    /// The array is returned wrapped in `CFArray` which implements `Drop`,
+    /// so it will be automatically freed when it goes out of scope.
     unsafe fn get_favorites_array(&self) -> Result<CFArray<LSSharedFileListItemRef>> {
         let favorites_list = self.api.get_favorites_list();
         if favorites_list.is_null() {
-            return Err(Error::GetFavoritesList);
+            return Err(Error::GetFavoritesList {
+                reason: "system returned null favorites list",
+            });
         }
 
         let mut seed = 0;
@@ -65,14 +105,22 @@ impl<T: MacOsApi> SidebarApi<T> {
     /// Converts a single item reference to a SidebarItem.
     ///
     /// # Safety
-    /// Caller must ensure item_ref is valid and handle memory management of returned objects.
+    /// Caller must ensure:
+    /// - item_ref is a valid LSSharedFileListItemRef
+    /// - Memory management of returned objects is handled properly
+    ///
+    /// # Returns
+    /// - A SidebarItem containing the item's name and path
+    /// - An error if the item's name or URL cannot be retrieved
     unsafe fn convert_item_ref(&self, item_ref: LSSharedFileListItemRef) -> Result<SidebarItem> {
         debug_assert!(!item_ref.is_null(), "item_ref should not be null");
 
         // Get item name
         let name = self.api.get_item_display_name(item_ref);
         let name = if name.is_null() {
-            return Err(Error::GetDisplayName);
+            return Err(Error::GetDisplayName {
+                reason: "system returned null display name",
+            });
         } else {
             Some(CFString::wrap_under_create_rule(name))
         };
@@ -80,7 +128,9 @@ impl<T: MacOsApi> SidebarApi<T> {
         // Get item URL
         let url_ref = self.api.get_item_url(item_ref);
         if url_ref.is_null() {
-            return Err(Error::GetItemUrl);
+            return Err(Error::GetItemUrl {
+                reason: "system returned null URL",
+            });
         }
         let url = CFURL::wrap_under_create_rule(url_ref);
 
