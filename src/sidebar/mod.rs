@@ -2,9 +2,15 @@ mod macos_api;
 mod path;
 mod sidebar_api;
 
+use core_foundation::string::CFString;
+use std::convert::TryFrom;
+
+use crate::error::{Error, Result};
+
+// Re-export all public types
 pub use self::{
     macos_api::{MacOsApi, RealMacOsApi},
-    path::{MacOsLocation, MacOsPath},
+    path::{CFURLWrapper, MacOsLocation, MacOsPath},
     sidebar_api::SidebarApi,
 };
 
@@ -67,6 +73,31 @@ impl<T: MacOsApi> IntoIterator for &FavoritesSection<'_, T> {
 pub struct SidebarItem {
     name: String,
     path: MacOsPath,
+}
+
+impl TryFrom<(CFURLWrapper<'_>, Option<CFString>)> for SidebarItem {
+    type Error = Error;
+
+    fn try_from((url_wrapper, name): (CFURLWrapper<'_>, Option<CFString>)) -> Result<Self> {
+        let path = MacOsPath::try_from(url_wrapper)?;
+
+        Ok(match &path {
+            MacOsPath::Location(location) => match location {
+                MacOsLocation::AirDrop => Self::airdrop(),
+                MacOsLocation::Applications => Self::applications(),
+                MacOsLocation::Desktop => Self::desktop(),
+                MacOsLocation::Documents => Self::documents(),
+                MacOsLocation::Downloads => Self::downloads(),
+                MacOsLocation::Home => Self::home(),
+                MacOsLocation::Recents => Self::recents(),
+                MacOsLocation::UserApplications => Self::new("Applications", path),
+            },
+            MacOsPath::Custom(_) => match name {
+                Some(name) => Self::new(name.to_string(), path),
+                None => Self::new(path.name(), path),
+            },
+        })
+    }
 }
 
 impl SidebarItem {

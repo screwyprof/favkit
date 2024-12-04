@@ -2,11 +2,7 @@ use core_foundation::{array::CFArray, base::TCFType, string::CFString};
 use core_services::LSSharedFileListItemRef;
 use std::{convert::TryFrom, ffi::c_void};
 
-use super::{
-    macos_api::MacOsApi,
-    path::{CFURLWrapper, MacOsLocation, MacOsPath},
-    SidebarItem,
-};
+use super::{macos_api::MacOsApi, path::CFURLWrapper, SidebarItem};
 
 /// A high-level API for interacting with the macOS Finder sidebar.
 /// Handles Core Foundation memory management internally.
@@ -59,43 +55,14 @@ impl<T: MacOsApi> SidebarApi<T> {
                 let url = core_foundation::url::CFURL::wrap_under_create_rule(url_ref);
 
                 // Convert URL to MacOsPath using our safe wrapper
-                if let Ok(path) = MacOsPath::try_from(CFURLWrapper::from(&url)) {
-                    let item = if name_ref.is_null() {
-                        // For standard items, use their factory methods
-                        match &path {
-                            MacOsPath::Location(location) => match location {
-                                MacOsLocation::AirDrop => SidebarItem::airdrop(),
-                                MacOsLocation::Applications => SidebarItem::applications(),
-                                MacOsLocation::Desktop => SidebarItem::desktop(),
-                                MacOsLocation::Documents => SidebarItem::documents(),
-                                MacOsLocation::Downloads => SidebarItem::downloads(),
-                                MacOsLocation::Home => SidebarItem::home(),
-                                MacOsLocation::Recents => SidebarItem::recents(),
-                                MacOsLocation::UserApplications => {
-                                    SidebarItem::new("Applications", path)
-                                }
-                            },
-                            MacOsPath::Custom(_) => SidebarItem::new(path.name(), path),
-                        }
-                    } else {
-                        // For custom items, use the display name
-                        let name = CFString::wrap_under_create_rule(name_ref);
-                        match &path {
-                            MacOsPath::Location(location) => match location {
-                                MacOsLocation::AirDrop => SidebarItem::airdrop(),
-                                MacOsLocation::Applications => SidebarItem::applications(),
-                                MacOsLocation::Desktop => SidebarItem::desktop(),
-                                MacOsLocation::Documents => SidebarItem::documents(),
-                                MacOsLocation::Downloads => SidebarItem::downloads(),
-                                MacOsLocation::Home => SidebarItem::home(),
-                                MacOsLocation::Recents => SidebarItem::recents(),
-                                MacOsLocation::UserApplications => {
-                                    SidebarItem::new("Applications", path)
-                                }
-                            },
-                            MacOsPath::Custom(_) => SidebarItem::new(name.to_string(), path),
-                        }
-                    };
+                let url_wrapper = CFURLWrapper::from(&url);
+                let name = if name_ref.is_null() {
+                    None
+                } else {
+                    Some(CFString::wrap_under_create_rule(name_ref))
+                };
+
+                if let Ok(item) = SidebarItem::try_from((url_wrapper, name)) {
                     result.push(item);
                 }
             }

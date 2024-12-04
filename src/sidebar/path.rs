@@ -18,7 +18,7 @@ use crate::error::{Error, Result};
 /// 1. Never taking ownership of the wrapped CFURL (it's borrowed)
 /// 2. Using wrap_under_get_rule for borrowed CFString references
 /// 3. Creating owned copies of strings before returning them
-pub(crate) struct CFURLWrapper<'a>(&'a CFURL);
+pub struct CFURLWrapper<'a>(&'a CFURL);
 
 impl CFURLWrapper<'_> {
     /// Gets the URL string from the wrapped CFURL.
