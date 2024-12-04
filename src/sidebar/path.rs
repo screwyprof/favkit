@@ -91,12 +91,12 @@ impl MacOsLocation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MacOsPath {
+pub enum SidebarLocation {
     Location(MacOsLocation),
     Custom(PathBuf),
 }
 
-impl MacOsPath {
+impl SidebarLocation {
     fn from_path_str(path_str: &str) -> Self {
         let path = PathBuf::from(path_str);
         let home_dir = dirs::home_dir().unwrap_or_default();
@@ -149,7 +149,7 @@ impl MacOsPath {
     }
 }
 
-impl<P: AsRef<Path>> From<P> for MacOsPath {
+impl<P: AsRef<Path>> From<P> for SidebarLocation {
     fn from(path: P) -> Self {
         let path = path.as_ref();
         let home_dir = dirs::home_dir().unwrap_or_default();
@@ -177,13 +177,13 @@ impl<P: AsRef<Path>> From<P> for MacOsPath {
     }
 }
 
-impl From<MacOsLocation> for MacOsPath {
+impl From<MacOsLocation> for SidebarLocation {
     fn from(location: MacOsLocation) -> Self {
         Self::Location(location)
     }
 }
 
-impl TryFrom<CFURLWrapper<'_>> for MacOsPath {
+impl TryFrom<CFURLWrapper<'_>> for SidebarLocation {
     type Error = Error;
 
     fn try_from(wrapper: CFURLWrapper) -> Result<Self> {
@@ -204,10 +204,10 @@ impl TryFrom<CFURLWrapper<'_>> for MacOsPath {
     }
 }
 
-impl TryFrom<&MacOsPath> for CFURL {
+impl TryFrom<&SidebarLocation> for CFURL {
     type Error = Error;
 
-    fn try_from(path: &MacOsPath) -> Result<Self> {
+    fn try_from(path: &SidebarLocation) -> Result<Self> {
         let url_str = path.url();
         let cf_str = CFString::new(&url_str);
         unsafe {
@@ -224,7 +224,7 @@ impl TryFrom<&MacOsPath> for CFURL {
     }
 }
 
-impl std::fmt::Display for MacOsPath {
+impl std::fmt::Display for SidebarLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Location(location) => write!(f, "{}", location.name()),
@@ -239,10 +239,10 @@ mod tests {
 
     #[test]
     fn test_system_applications() {
-        let path = MacOsPath::from("/Applications");
+        let path = SidebarLocation::from("/Applications");
         assert!(matches!(
             path,
-            MacOsPath::Location(MacOsLocation::Applications)
+            SidebarLocation::Location(MacOsLocation::Applications)
         ));
         assert_eq!(path.name(), "Applications");
         assert_eq!(path.path(), PathBuf::from("/Applications"));
@@ -251,10 +251,10 @@ mod tests {
     #[test]
     fn test_user_applications() {
         let home = dirs::home_dir().unwrap();
-        let path = MacOsPath::from(home.join("Applications"));
+        let path = SidebarLocation::from(home.join("Applications"));
         assert!(matches!(
             path,
-            MacOsPath::Location(MacOsLocation::UserApplications)
+            SidebarLocation::Location(MacOsLocation::UserApplications)
         ));
         assert_eq!(path.name(), "Applications");
         assert_eq!(path.path(), home.join("Applications"));
@@ -263,10 +263,10 @@ mod tests {
     #[test]
     fn test_downloads() {
         let home = dirs::home_dir().unwrap();
-        let path = MacOsPath::from(home.join("Downloads"));
+        let path = SidebarLocation::from(home.join("Downloads"));
         assert!(matches!(
             path,
-            MacOsPath::Location(MacOsLocation::Downloads)
+            SidebarLocation::Location(MacOsLocation::Downloads)
         ));
         assert_eq!(path.name(), "Downloads");
         assert_eq!(path.path(), home.join("Downloads"));
@@ -275,8 +275,11 @@ mod tests {
     #[test]
     fn test_desktop() {
         let home = dirs::home_dir().unwrap();
-        let path = MacOsPath::from(home.join("Desktop"));
-        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Desktop)));
+        let path = SidebarLocation::from(home.join("Desktop"));
+        assert!(matches!(
+            path,
+            SidebarLocation::Location(MacOsLocation::Desktop)
+        ));
         assert_eq!(path.name(), "Desktop");
         assert_eq!(path.path(), home.join("Desktop"));
     }
@@ -284,10 +287,10 @@ mod tests {
     #[test]
     fn test_documents() {
         let home = dirs::home_dir().unwrap();
-        let path = MacOsPath::from(home.join("Documents"));
+        let path = SidebarLocation::from(home.join("Documents"));
         assert!(matches!(
             path,
-            MacOsPath::Location(MacOsLocation::Documents)
+            SidebarLocation::Location(MacOsLocation::Documents)
         ));
         assert_eq!(path.name(), "Documents");
         assert_eq!(path.path(), home.join("Documents"));
@@ -296,44 +299,53 @@ mod tests {
     #[test]
     fn test_home() {
         let home = dirs::home_dir().unwrap();
-        let path = MacOsPath::from(&home);
-        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Home)));
+        let path = SidebarLocation::from(&home);
+        assert!(matches!(
+            path,
+            SidebarLocation::Location(MacOsLocation::Home)
+        ));
         assert_eq!(path.name(), "Home");
         assert_eq!(path.path(), home);
     }
 
     #[test]
     fn test_airdrop() {
-        let path = MacOsPath::from("nwnode://domain-AirDrop");
-        assert!(matches!(path, MacOsPath::Location(MacOsLocation::AirDrop)));
+        let path = SidebarLocation::from("nwnode://domain-AirDrop");
+        assert!(matches!(
+            path,
+            SidebarLocation::Location(MacOsLocation::AirDrop)
+        ));
         assert_eq!(path.name(), "AirDrop");
         assert_eq!(path.path(), PathBuf::from("nwnode://domain-AirDrop"));
     }
 
     #[test]
     fn test_recents() {
-        let path = MacOsPath::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch");
-        assert!(matches!(path, MacOsPath::Location(MacOsLocation::Recents)));
+        let path = SidebarLocation::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch");
+        assert!(matches!(
+            path,
+            SidebarLocation::Location(MacOsLocation::Recents)
+        ));
         assert_eq!(path.name(), "Recents");
         assert_eq!(path.path(), PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch"));
     }
 
     #[test]
     fn test_custom_path() {
-        let path = MacOsPath::from("/Users/happygopher/Projects");
-        assert!(matches!(path, MacOsPath::Custom(_)));
+        let path = SidebarLocation::from("/Users/happygopher/Projects");
+        assert!(matches!(path, SidebarLocation::Custom(_)));
         assert_eq!(path.name(), "Projects");
         assert_eq!(path.path(), PathBuf::from("/Users/happygopher/Projects"));
     }
 
     #[test]
     fn test_url_conversion() {
-        let url = CFURL::try_from(&MacOsPath::from("/Applications")).unwrap();
+        let url = CFURL::try_from(&SidebarLocation::from("/Applications")).unwrap();
         let wrapper = CFURLWrapper::from(&url);
-        let path = MacOsPath::try_from(wrapper).unwrap();
+        let path = SidebarLocation::try_from(wrapper).unwrap();
         assert!(matches!(
             path,
-            MacOsPath::Location(MacOsLocation::Applications)
+            SidebarLocation::Location(MacOsLocation::Applications)
         ));
         assert_eq!(path.name(), "Applications");
         assert_eq!(path.path(), PathBuf::from("/Applications"));
@@ -341,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_airdrop_name() {
-        let path = MacOsPath::Location(MacOsLocation::AirDrop);
+        let path = SidebarLocation::Location(MacOsLocation::AirDrop);
         assert_eq!(path.name(), "AirDrop");
     }
 
@@ -358,12 +370,15 @@ mod tests {
             ))
         };
 
-        // Convert it to MacOsPath
+        // Convert it to SidebarLocation
         let wrapper = CFURLWrapper::from(&url);
-        let path = MacOsPath::try_from(wrapper).expect("Failed to convert URL");
+        let path = SidebarLocation::try_from(wrapper).expect("Failed to convert URL");
 
         // Verify it's recognized as AirDrop
-        assert!(matches!(path, MacOsPath::Location(MacOsLocation::AirDrop)));
+        assert!(matches!(
+            path,
+            SidebarLocation::Location(MacOsLocation::AirDrop)
+        ));
         assert_eq!(path.name(), "AirDrop");
         assert_eq!(path.url(), url_str);
     }
@@ -371,11 +386,11 @@ mod tests {
     #[test]
     fn test_display_format() {
         // Test special location
-        let airdrop = MacOsPath::Location(MacOsLocation::AirDrop);
+        let airdrop = SidebarLocation::Location(MacOsLocation::AirDrop);
         assert_eq!(airdrop.to_string(), "AirDrop");
 
         // Test custom path
-        let custom = MacOsPath::Custom(PathBuf::from("/some/path"));
+        let custom = SidebarLocation::Custom(PathBuf::from("/some/path"));
         assert_eq!(custom.to_string(), "/some/path");
     }
 }

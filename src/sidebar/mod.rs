@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 // Re-export all public types
 pub use self::{
     macos_api::{MacOsApi, RealMacOsApi},
-    path::{CFURLWrapper, MacOsLocation, MacOsPath},
+    path::{CFURLWrapper, MacOsLocation, SidebarLocation},
     sidebar_api::SidebarApi,
 };
 
@@ -55,7 +55,7 @@ impl<T: MacOsApi> FavoritesSection<'_, T> {
         self.api.list_favorite_items()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = SidebarItem> + '_ {
+    pub fn iter(&self) -> std::vec::IntoIter<SidebarItem> {
         self.list_items().unwrap_or_default().into_iter()
     }
 }
@@ -71,12 +71,12 @@ impl<T: MacOsApi> IntoIterator for &FavoritesSection<'_, T> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SidebarItem {
-    path: MacOsPath,
+    path: SidebarLocation,
 }
 
 impl SidebarItem {
     /// Creates a new SidebarItem with the given path.
-    pub fn new(path: impl Into<MacOsPath>) -> Self {
+    pub fn new(path: impl Into<SidebarLocation>) -> Self {
         Self { path: path.into() }
     }
 
@@ -86,7 +86,7 @@ impl SidebarItem {
     }
 
     /// Gets the path of the item.
-    pub fn path(&self) -> &MacOsPath {
+    pub fn path(&self) -> &SidebarLocation {
         &self.path
     }
 
@@ -141,7 +141,22 @@ impl TryFrom<(CFURLWrapper<'_>, Option<CFString>)> for SidebarItem {
     type Error = Error;
 
     fn try_from((url_wrapper, _name): (CFURLWrapper<'_>, Option<CFString>)) -> Result<Self> {
-        let path = MacOsPath::try_from(url_wrapper)?;
+        let path = SidebarLocation::try_from(url_wrapper)?;
         Ok(Self::new(path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_airdrop_display_format() {
+        let item = SidebarItem::airdrop();
+        assert_eq!(
+            item.to_string(),
+            "AirDrop (nwnode://domain-AirDrop)",
+            "AirDrop should display with its name and URL"
+        );
     }
 }

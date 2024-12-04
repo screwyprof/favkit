@@ -12,3 +12,15 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use favkit::SidebarItem;
+
+    #[test]
+    fn test_airdrop_display_format() {
+        let item = SidebarItem::airdrop();
+        let display = format!("  - {} ({})", item.name(), item.path().url());
+        assert_eq!(display, "  - AirDrop (nwnode://domain-AirDrop)");
+    }
+}
