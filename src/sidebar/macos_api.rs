@@ -7,21 +7,21 @@ use core_services::{
 use std::ptr;
 
 pub trait MacOsApi {
-    /// Creates a new favorites list.
+    /// Creates a reference to the system's favorites list.
     ///
     /// # Safety
     /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that the returned LSSharedFileListRef is properly released when no longer needed.
-    unsafe fn create_favorites_list(&self) -> LSSharedFileListRef;
+    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef;
 
-    /// Creates a snapshot of the favorites list.
+    /// Gets a snapshot of the current state of the favorites list.
     ///
     /// # Safety
     /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that:
     /// - The list parameter is a valid LSSharedFileListRef
     /// - The returned CFArray is properly released when no longer needed
-    unsafe fn copy_snapshot(
+    unsafe fn get_favorites_snapshot(
         &self,
         list: LSSharedFileListRef,
         seed: &mut u32,
@@ -34,7 +34,7 @@ pub trait MacOsApi {
     /// The caller must ensure that:
     /// - The item parameter is a valid LSSharedFileListItemRef
     /// - The returned CFStringRef is properly released when no longer needed
-    unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef;
+    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef;
 
     /// Gets the resolved URL of a favorites list item.
     ///
@@ -43,18 +43,18 @@ pub trait MacOsApi {
     /// The caller must ensure that:
     /// - The item parameter is a valid LSSharedFileListItemRef
     /// - The returned CFURLRef is properly released when no longer needed
-    unsafe fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> CFURLRef;
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef;
 }
 
 #[derive(Default)]
 pub struct RealMacOsApi;
 
 impl MacOsApi for RealMacOsApi {
-    unsafe fn create_favorites_list(&self) -> LSSharedFileListRef {
+    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
         LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null())
     }
 
-    unsafe fn copy_snapshot(
+    unsafe fn get_favorites_snapshot(
         &self,
         list: LSSharedFileListRef,
         seed: &mut u32,
@@ -63,11 +63,11 @@ impl MacOsApi for RealMacOsApi {
         CFArray::wrap_under_create_rule(array_ref)
     }
 
-    unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
+    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
         LSSharedFileListItemCopyDisplayName(item)
     }
 
-    unsafe fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
         LSSharedFileListItemCopyResolvedURL(item, 0, ptr::null_mut())
     }
 }

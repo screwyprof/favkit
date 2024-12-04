@@ -1,8 +1,12 @@
 use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURL};
 use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
-use std::convert::TryFrom;
 
-use super::{macos_api::MacOsApi, path::CFURLWrapper, SidebarItem};
+use super::{
+    macos_api::MacOsApi,
+    path::{CFURLWrapper, MacOsPath},
+    SidebarItem,
+};
+use crate::error::{Error, Result};
 
 /// A high-level API for interacting with the macOS Finder sidebar.
 /// Handles Core Foundation memory management internally.
@@ -22,24 +26,24 @@ impl<T: MacOsApi> SidebarApi<T> {
     /// 1. Using wrap_under_create_rule for objects returned by Copy* functions
     /// 2. Letting Rust's drop semantics handle cleanup through TCFType
     /// 3. Early returns with null checks to prevent invalid memory access
-    pub fn list_favorite_items(&self) -> Vec<SidebarItem> {
+    pub fn list_favorite_items(&self) -> Result<Vec<SidebarItem>> {
         unsafe {
             // Get the list of items
-            let items = match self.get_favorites_array() {
-                Some(items) => items,
-                None => return vec![],
-            };
+            let items = self.get_favorites_array()?;
 
             // Convert items to SidebarItems
-            items
+            let items = items
                 .get_all_values()
                 .iter()
                 .filter_map(|&item_ref| {
+                    debug_assert!(!item_ref.is_null(), "item_ref should not be null");
                     let item_ref = item_ref as *const OpaqueLSSharedFileListItemRef;
                     let item_ref = item_ref as LSSharedFileListItemRef;
-                    self.convert_item_ref(item_ref)
+                    self.convert_item_ref(item_ref).ok()
                 })
-                .collect()
+                .collect();
+
+            Ok(items)
         }
     }
 
@@ -47,38 +51,44 @@ impl<T: MacOsApi> SidebarApi<T> {
     ///
     /// # Safety
     /// Caller must ensure proper memory management of returned CFArray.
-    unsafe fn get_favorites_array(&self) -> Option<CFArray<LSSharedFileListItemRef>> {
-        let favorites_list = self.api.create_favorites_list();
+    unsafe fn get_favorites_array(&self) -> Result<CFArray<LSSharedFileListItemRef>> {
+        let favorites_list = self.api.get_favorites_list();
         if favorites_list.is_null() {
-            return None;
+            return Err(Error::GetFavoritesList);
         }
 
         let mut seed = 0;
-        Some(self.api.copy_snapshot(favorites_list, &mut seed))
+        let array = self.api.get_favorites_snapshot(favorites_list, &mut seed);
+        Ok(array)
     }
 
     /// Converts a single item reference to a SidebarItem.
     ///
     /// # Safety
     /// Caller must ensure item_ref is valid and handle memory management of returned objects.
-    unsafe fn convert_item_ref(&self, item_ref: LSSharedFileListItemRef) -> Option<SidebarItem> {
+    unsafe fn convert_item_ref(&self, item_ref: LSSharedFileListItemRef) -> Result<SidebarItem> {
+        debug_assert!(!item_ref.is_null(), "item_ref should not be null");
+
         // Get item name
-        let name = self.api.copy_display_name(item_ref);
+        let name = self.api.get_item_display_name(item_ref);
         let name = if name.is_null() {
-            None
+            return Err(Error::GetDisplayName);
         } else {
             Some(CFString::wrap_under_create_rule(name))
         };
 
         // Get item URL
-        let url_ref = self.api.copy_resolved_url(item_ref);
+        let url_ref = self.api.get_item_url(item_ref);
         if url_ref.is_null() {
-            return None;
+            return Err(Error::GetItemUrl);
         }
         let url = CFURL::wrap_under_create_rule(url_ref);
 
         // Convert to SidebarItem
-        SidebarItem::try_from((CFURLWrapper::from(&url), name)).ok()
+        SidebarItem::builder()
+            .path(MacOsPath::try_from(CFURLWrapper::from(&url))?)
+            .name(name.map(|n| n.to_string()).unwrap_or_else(String::new))
+            .build()
     }
 }
 

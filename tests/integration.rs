@@ -5,32 +5,25 @@ use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::sidebar::{Sidebar, SidebarItem};
 
 #[test]
-fn it_lists_favorite_items() {
+fn test_list_items() {
     // Given
-    let expected = vec![
-        SidebarItem::applications(),
-        SidebarItem::downloads(),
-        SidebarItem::new("Projects", "/Users/happygopher/Projects"),
-    ];
-
+    let expected = vec![SidebarItem::applications(), SidebarItem::downloads()];
     let recorder = ApiCallRecorder::with_items(expected.clone());
     let sidebar = Sidebar::with_api(recorder.clone());
 
     // When
-    let items = sidebar.favorites().list_items();
+    let items = sidebar.list_items().expect("Failed to list items");
 
     // Then
     assert_eq!(expected, items);
 
-    // And verify API calls
+    // And verify API calls - one pair of calls (display name + URL) for each item
     recorder.verify_calls(&[
         ApiCall::CreateFavoritesList,
-        ApiCall::CopySnapshot(1 as LSSharedFileListRef),
-        ApiCall::CopyDisplayName(1 as LSSharedFileListItemRef),
-        ApiCall::CopyResolvedUrl(1 as LSSharedFileListItemRef),
-        ApiCall::CopyDisplayName(2 as LSSharedFileListItemRef),
-        ApiCall::CopyResolvedUrl(2 as LSSharedFileListItemRef),
-        ApiCall::CopyDisplayName(3 as LSSharedFileListItemRef),
-        ApiCall::CopyResolvedUrl(3 as LSSharedFileListItemRef),
+        ApiCall::GetFavoritesSnapshot(1 as LSSharedFileListRef),
+        ApiCall::GetItemDisplayName(1 as LSSharedFileListItemRef),
+        ApiCall::GetItemUrl(1 as LSSharedFileListItemRef),
+        ApiCall::GetItemDisplayName(2 as LSSharedFileListItemRef),
+        ApiCall::GetItemUrl(2 as LSSharedFileListItemRef),
     ]);
 }

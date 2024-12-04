@@ -5,18 +5,18 @@ use core_foundation::{base::TCFType, string::CFString, url::CFURL};
 use favkit::{sidebar::SidebarItem, MacOsApi};
 
 #[test]
-fn test_copy_snapshot_in_isolation() {
+fn test_get_favorites_snapshot_in_isolation() {
     let recorder =
         ApiCallRecorder::with_items(vec![SidebarItem::applications(), SidebarItem::downloads()]);
 
     unsafe {
-        // Step 1: Create list
-        let list = recorder.create_favorites_list();
+        // Step 1: Get list reference
+        let list = recorder.get_favorites_list();
         assert!(!list.is_null(), "favorites list should not be null");
 
         // Step 2: Get snapshot
         let mut seed = 0;
-        let array = recorder.copy_snapshot(list, &mut seed);
+        let array = recorder.get_favorites_snapshot(list, &mut seed);
         assert_eq!(array.len(), 2);
 
         // Step 3: Let array drop naturally
@@ -24,7 +24,7 @@ fn test_copy_snapshot_in_isolation() {
 }
 
 #[test]
-fn test_copy_display_name_in_isolation() {
+fn test_get_item_display_name_in_isolation() {
     let recorder =
         ApiCallRecorder::with_items(vec![SidebarItem::applications(), SidebarItem::downloads()]);
 
@@ -34,7 +34,7 @@ fn test_copy_display_name_in_isolation() {
         assert!(!item.is_null(), "item should not be null");
 
         // Step 2: Get display name
-        let name_ref = recorder.copy_display_name(item);
+        let name_ref = recorder.get_item_display_name(item);
         assert!(!name_ref.is_null(), "display name should not be null");
 
         // Step 3: Convert to string
@@ -47,7 +47,7 @@ fn test_copy_display_name_in_isolation() {
 }
 
 #[test]
-fn test_copy_resolved_url_in_isolation() {
+fn test_get_item_url_in_isolation() {
     let recorder =
         ApiCallRecorder::with_items(vec![SidebarItem::applications(), SidebarItem::downloads()]);
 
@@ -57,7 +57,7 @@ fn test_copy_resolved_url_in_isolation() {
         assert!(!item.is_null(), "item should not be null");
 
         // Step 2: Get resolved URL
-        let url_ref = recorder.copy_resolved_url(item);
+        let url_ref = recorder.get_item_url(item);
         assert!(!url_ref.is_null(), "resolved URL should not be null");
 
         // Step 3: Convert to string

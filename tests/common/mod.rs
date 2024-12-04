@@ -17,9 +17,9 @@ use std::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum ApiCall {
     CreateFavoritesList,
-    CopySnapshot(LSSharedFileListRef),
-    CopyDisplayName(LSSharedFileListItemRef),
-    CopyResolvedUrl(LSSharedFileListItemRef),
+    GetFavoritesSnapshot(LSSharedFileListRef),
+    GetItemDisplayName(LSSharedFileListItemRef),
+    GetItemUrl(LSSharedFileListItemRef),
 }
 
 struct ApiCallState {
@@ -95,17 +95,16 @@ impl ApiCallRecorder {
 }
 
 impl MacOsApi for ApiCallRecorder {
-    unsafe fn create_favorites_list(&self) -> LSSharedFileListRef {
+    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
         self.state
             .calls
             .lock()
             .unwrap()
             .push(ApiCall::CreateFavoritesList);
-        *self.state.next_ref.lock().unwrap() = 1;
         1 as LSSharedFileListRef
     }
 
-    unsafe fn copy_snapshot(
+    unsafe fn get_favorites_snapshot(
         &self,
         list: LSSharedFileListRef,
         _seed: &mut u32,
@@ -114,7 +113,7 @@ impl MacOsApi for ApiCallRecorder {
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::CopySnapshot(list));
+            .push(ApiCall::GetFavoritesSnapshot(list));
 
         // Create item refs for our items in the exact order they were provided
         let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
@@ -131,12 +130,12 @@ impl MacOsApi for ApiCallRecorder {
         CFArray::wrap_under_create_rule(array_ref)
     }
 
-    unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
+    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::CopyDisplayName(item));
+            .push(ApiCall::GetItemDisplayName(item));
 
         if let Some(item) = self.get_item_by_ref(item) {
             CFString::new(item.name()).as_concrete_TypeRef()
@@ -145,12 +144,12 @@ impl MacOsApi for ApiCallRecorder {
         }
     }
 
-    unsafe fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::CopyResolvedUrl(item));
+            .push(ApiCall::GetItemUrl(item));
 
         if let Some(item) = self.get_item_by_ref(item) {
             let url_str = item.path().url();
