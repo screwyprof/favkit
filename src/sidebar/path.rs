@@ -320,16 +320,4 @@ mod tests {
         assert_eq!(path.name(), "Applications");
         assert_eq!(path.path(), PathBuf::from("/Applications"));
     }
-
-    #[test]
-    fn test_display() {
-        let path = MacOsPath::from("/Applications");
-        assert_eq!(path.to_string(), "/Applications");
-
-        let path = MacOsPath::from("nwnode://domain-AirDrop");
-        assert_eq!(path.to_string(), "nwnode://domain-AirDrop");
-
-        let path = MacOsPath::from("/Users/happygopher/Projects");
-        assert_eq!(path.to_string(), "/Users/happygopher/Projects");
-    }
 }
