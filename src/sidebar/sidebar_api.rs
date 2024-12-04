@@ -1,4 +1,4 @@
-use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURL};
+use core_foundation::{array::CFArray, base::TCFType, url::CFURL};
 use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
 
 use super::{
@@ -72,7 +72,6 @@ impl<T: MacOsApi> SidebarApi<T> {
                 .get_all_values()
                 .iter()
                 .filter_map(|&item_ref| {
-                    debug_assert!(!item_ref.is_null(), "item_ref should not be null");
                     let item_ref = item_ref as *const OpaqueLSSharedFileListItemRef;
                     let item_ref = item_ref as LSSharedFileListItemRef;
                     self.convert_item_ref(item_ref).ok()
@@ -115,17 +114,10 @@ impl<T: MacOsApi> SidebarApi<T> {
     unsafe fn convert_item_ref(&self, item_ref: LSSharedFileListItemRef) -> Result<SidebarItem> {
         debug_assert!(!item_ref.is_null(), "item_ref should not be null");
 
-        // Get item name
-        let name = self.api.get_item_display_name(item_ref);
-        let name = if name.is_null() {
-            return Err(Error::GetDisplayName {
-                reason: "system returned null display name",
-            });
-        } else {
-            Some(CFString::wrap_under_create_rule(name))
-        };
+        // Get display name first (for API compatibility)
+        let _name = self.api.get_item_display_name(item_ref);
 
-        // Get item URL
+        // Get the URL and convert to MacOsPath
         let url_ref = self.api.get_item_url(item_ref);
         if url_ref.is_null() {
             return Err(Error::GetItemUrl {
@@ -133,12 +125,10 @@ impl<T: MacOsApi> SidebarApi<T> {
             });
         }
         let url = CFURL::wrap_under_create_rule(url_ref);
+        let path = MacOsPath::try_from(CFURLWrapper::from(&url))?;
 
-        // Convert to SidebarItem
-        SidebarItem::builder()
-            .path(MacOsPath::try_from(CFURLWrapper::from(&url))?)
-            .name(name.map(|n| n.to_string()).unwrap_or_else(String::new))
-            .build()
+        // Create SidebarItem (name comes from path)
+        Ok(SidebarItem::new(path))
     }
 }
 

@@ -24,6 +24,7 @@ pub enum ApiCall {
 
 struct ApiCallState {
     items: Vec<SidebarItem>,
+    items_without_names: Vec<usize>,
     next_ref: Mutex<i64>,
     calls: Mutex<Vec<ApiCall>>,
 }
@@ -35,6 +36,7 @@ impl Clone for ApiCallState {
     fn clone(&self) -> Self {
         Self {
             items: self.items.clone(),
+            items_without_names: self.items_without_names.clone(),
             next_ref: Mutex::new(*self.next_ref.lock().unwrap()),
             calls: Mutex::new(self.calls.lock().unwrap().clone()),
         }
@@ -51,6 +53,7 @@ impl Default for ApiCallRecorder {
         Self {
             state: Arc::new(ApiCallState {
                 items: Vec::new(),
+                items_without_names: Vec::new(),
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
@@ -63,6 +66,21 @@ impl ApiCallRecorder {
         Self {
             state: Arc::new(ApiCallState {
                 items,
+                items_without_names: Vec::new(),
+                next_ref: Mutex::new(1),
+                calls: Mutex::new(Vec::new()),
+            }),
+        }
+    }
+
+    pub fn with_items_and_null_names(
+        items: Vec<SidebarItem>,
+        items_without_names: Vec<usize>,
+    ) -> Self {
+        Self {
+            state: Arc::new(ApiCallState {
+                items,
+                items_without_names,
                 next_ref: Mutex::new(1),
                 calls: Mutex::new(Vec::new()),
             }),
@@ -91,6 +109,11 @@ impl ApiCallRecorder {
     fn get_item_by_ref(&self, item: LSSharedFileListItemRef) -> Option<&SidebarItem> {
         let index = (item as i64 - 1) as usize;
         self.state.items.get(index)
+    }
+
+    fn should_return_null_name(&self, item: LSSharedFileListItemRef) -> bool {
+        let index = (item as i64 - 1) as usize;
+        self.state.items_without_names.contains(&index)
     }
 }
 
@@ -130,15 +153,19 @@ impl MacOsApi for ApiCallRecorder {
         CFArray::wrap_under_create_rule(array_ref)
     }
 
-    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
+    unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::GetItemDisplayName(item));
+            .push(ApiCall::GetItemDisplayName(item_ref));
 
-        if let Some(item) = self.get_item_by_ref(item) {
-            CFString::new(item.name()).as_concrete_TypeRef()
+        if let Some(item) = self.get_item_by_ref(item_ref) {
+            if self.should_return_null_name(item_ref) {
+                ptr::null()
+            } else {
+                CFString::new(&item.name()).as_concrete_TypeRef()
+            }
         } else {
             ptr::null()
         }

@@ -4,7 +4,6 @@ mod sidebar_api;
 
 use core_foundation::string::CFString;
 use std::convert::TryFrom;
-use std::path::PathBuf;
 
 use crate::error::{Error, Result};
 
@@ -72,27 +71,18 @@ impl<T: MacOsApi> IntoIterator for &FavoritesSection<'_, T> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SidebarItem {
-    name: String,
     path: MacOsPath,
 }
 
 impl SidebarItem {
-    /// Creates a new SidebarItem builder.
-    pub fn builder() -> SidebarItemBuilder {
-        SidebarItemBuilder::new()
-    }
-
-    /// Creates a new SidebarItem with the given name and path.
-    pub fn new(name: impl Into<String>, path: impl Into<MacOsPath>) -> Self {
-        Self {
-            name: name.into(),
-            path: path.into(),
-        }
+    /// Creates a new SidebarItem with the given path.
+    pub fn new(path: impl Into<MacOsPath>) -> Self {
+        Self { path: path.into() }
     }
 
     /// Gets the name of the item.
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> String {
+        self.path.name()
     }
 
     /// Gets the path of the item.
@@ -137,74 +127,21 @@ impl SidebarItem {
 
     /// Creates a new item from a MacOsLocation.
     fn location(location: MacOsLocation) -> Self {
-        let name = location.name().to_string();
-        Self::new(name, location)
+        Self::new(location)
     }
 }
 
 impl std::fmt::Display for SidebarItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.name, self.path)
-    }
-}
-
-/// A builder for creating SidebarItems.
-#[derive(Debug, Default)]
-pub struct SidebarItemBuilder {
-    name: Option<String>,
-    path: Option<MacOsPath>,
-}
-
-impl SidebarItemBuilder {
-    /// Creates a new SidebarItemBuilder.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the name of the item.
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Sets the path of the item.
-    pub fn path(mut self, path: impl Into<MacOsPath>) -> Self {
-        self.path = Some(path.into());
-        self
-    }
-
-    /// Sets the location of the item.
-    pub fn location(mut self, location: MacOsLocation) -> Self {
-        self.name = Some(location.name().to_string());
-        self.path = Some(location.into());
-        self
-    }
-
-    /// Builds the SidebarItem.
-    pub fn build(self) -> Result<SidebarItem> {
-        let path = self.path.ok_or_else(|| Error::InvalidPath {
-            path: PathBuf::from("<no path>"),
-        })?;
-
-        let name = self.name.unwrap_or_else(|| path.name());
-
-        Ok(SidebarItem { name, path })
+        write!(f, "{} ({})", self.name(), self.path.url())
     }
 }
 
 impl TryFrom<(CFURLWrapper<'_>, Option<CFString>)> for SidebarItem {
     type Error = Error;
 
-    fn try_from((url_wrapper, name): (CFURLWrapper<'_>, Option<CFString>)) -> Result<Self> {
+    fn try_from((url_wrapper, _name): (CFURLWrapper<'_>, Option<CFString>)) -> Result<Self> {
         let path = MacOsPath::try_from(url_wrapper)?;
-
-        let builder = Self::builder().path(path);
-        let builder = if let Some(name) = name {
-            builder.name(name.to_string())
-        } else {
-            builder
-        };
-
-        builder.build()
+        Ok(Self::new(path))
     }
 }

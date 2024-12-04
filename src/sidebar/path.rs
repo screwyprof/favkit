@@ -193,9 +193,13 @@ impl TryFrom<CFURLWrapper<'_>> for MacOsPath {
                 url: String::from("<unknown>"),
             })?;
 
+        // Special handling for nwnode:// URLs (like AirDrop)
+        if url_str.starts_with("nwnode://") {
+            return Ok(Self::from_path_str(&url_str));
+        }
+
         // Handle file:// URLs
         let path_str = url_str.strip_prefix("file://").unwrap_or(&url_str);
-
         Ok(Self::from_path_str(path_str))
     }
 }
@@ -222,7 +226,10 @@ impl TryFrom<&MacOsPath> for CFURL {
 
 impl std::fmt::Display for MacOsPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.path().display())
+        match self {
+            Self::Location(location) => write!(f, "{}", location.name()),
+            Self::Custom(path) => write!(f, "{}", path.display()),
+        }
     }
 }
 
@@ -330,5 +337,45 @@ mod tests {
         ));
         assert_eq!(path.name(), "Applications");
         assert_eq!(path.path(), PathBuf::from("/Applications"));
+    }
+
+    #[test]
+    fn test_airdrop_name() {
+        let path = MacOsPath::Location(MacOsLocation::AirDrop);
+        assert_eq!(path.name(), "AirDrop");
+    }
+
+    #[test]
+    fn test_airdrop_url_conversion() {
+        // Create a CFURL for AirDrop
+        let url_str = "nwnode://domain-AirDrop";
+        let cf_str = CFString::new(url_str);
+        let url = unsafe {
+            CFURL::wrap_under_create_rule(CFURLCreateWithString(
+                core_foundation::base::kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            ))
+        };
+
+        // Convert it to MacOsPath
+        let wrapper = CFURLWrapper::from(&url);
+        let path = MacOsPath::try_from(wrapper).expect("Failed to convert URL");
+
+        // Verify it's recognized as AirDrop
+        assert!(matches!(path, MacOsPath::Location(MacOsLocation::AirDrop)));
+        assert_eq!(path.name(), "AirDrop");
+        assert_eq!(path.url(), url_str);
+    }
+
+    #[test]
+    fn test_display_format() {
+        // Test special location
+        let airdrop = MacOsPath::Location(MacOsLocation::AirDrop);
+        assert_eq!(airdrop.to_string(), "AirDrop");
+
+        // Test custom path
+        let custom = MacOsPath::Custom(PathBuf::from("/some/path"));
+        assert_eq!(custom.to_string(), "/some/path");
     }
 }

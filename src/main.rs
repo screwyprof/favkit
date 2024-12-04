@@ -7,7 +7,7 @@ fn main() -> Result<()> {
 
     println!("Favorites:");
     for item in favorites {
-        println!("  - {} ({})", item.name(), item.path());
+        println!("  - {} ({})", item.name(), item.path().url());
     }
 
     Ok(())
