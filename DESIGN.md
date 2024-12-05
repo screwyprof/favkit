@@ -16,8 +16,16 @@
 
 3. **SidebarItem**
    - A sidebar entry that points to a specific target
-   - Has a display label
-   - Can point to either special system locations (AirDrop, Recents) or filesystem directories
+   - Has a display label derived from its target
+   - Provides a clean interface for sidebar management
+
+4. **Target**
+   - Represents a location that can be accessed via the sidebar
+   - Handles path management and validation
+   - Supports special system locations:
+     - AirDrop: Network-based file sharing
+     - Home: User's home directory
+   - Ensures type safety through `TryFrom` conversions
 
 ### Domain Model
 
@@ -25,8 +33,24 @@
 finder
   └── Sidebar
        └── Favorites
-            └── [SidebarItems]
+            └── [SidebarItem]
+                 └── Target (AirDrop | Home)
 ```
+
+### Relationships
+
+1. **Finder → Sidebar**
+   - One-to-one: Each Finder has exactly one Sidebar
+   - Sidebar is the main point of interaction
+
+2. **Sidebar → Favorites**
+   - One-to-one: Each Sidebar has one Favorites section
+   - Favorites manages a collection of items
+
+3. **SidebarItem → Target**
+   - One-to-one: Each SidebarItem wraps exactly one Target
+   - Target determines the item's behavior and properties
+   - Provides type-safe construction through various conversions
 
 ## Design Decisions
 
@@ -90,12 +114,22 @@ let item = SidebarItem::airdrop();
 ```
 
 ### 3. Testing Strategy
-1. **Unit Tests**
-   - Each component has its own tests
-   - Focus on behavior verification
-   - Default implementations for easy testing
+1. **Domain-Driven Testing**
+   - Tests mirror the domain hierarchy
+   - Each domain concept is tested in isolation
+   - Focus on behavior verification over implementation details
 
-2. **Acceptance Tests**
-   - Test doubles (TestFinder) to simulate real Finder
-   - Focus on user-facing behavior
-   - Follow Given/When/Then pattern
+2. **Test Boundaries**
+   - Clear separation between domain logic and system interactions
+   - Filesystem operations are abstracted for testing
+   - MacOS-specific functionality is isolated behind interfaces
+
+3. **Test Categories**
+   - Unit tests verify domain model integrity
+   - Integration tests verify component interactions
+   - Acceptance tests validate user scenarios
+
+4. **Test Data**
+   - Use real-world examples from MacOS Finder
+   - Test data reflects actual user scenarios
+   - Special locations (AirDrop, Home) are treated as first-class concepts
