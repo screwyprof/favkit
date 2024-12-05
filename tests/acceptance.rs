@@ -1,6 +1,5 @@
-use favkit::error::Result;
+use favkit::errors::{Result, FinderError};
 use favkit::finder::{Sidebar, SidebarItem};
-use anyhow::{anyhow, Result as AnyhowResult};
 
 mod test_doubles {
     use super::*;
@@ -32,32 +31,27 @@ use test_doubles::TestFinder;
 
 #[test]
 fn lists_empty_favorites() -> Result<()> {
-    // Given: Finder is available
     let finder = TestFinder::with_empty_sidebar();
-    
-    // When: We request favorites from the sidebar
-    let favorites = finder.sidebar().favorites().items();
-    
-    // Then: The favorites section is empty
-    assert!(favorites.is_empty());
-    
+    let sidebar = finder.sidebar();
+
+    assert!(sidebar.favorites().items().is_empty());
     Ok(())
 }
 
 #[test]
-fn shows_home_in_favorites() -> AnyhowResult<()> {
-    // Given: Finder has Home in favorites
+fn shows_home_in_favorites() -> Result<()> {
     let finder = TestFinder::with_home_in_favorites();
+    let sidebar = finder.sidebar();
+    let favorites = sidebar.favorites().items();
     
-    // When: We request favorites from the sidebar
-    let favorites = finder.sidebar().favorites().items();
+    assert_eq!(favorites.len(), 1, "favorites should contain one item");
     
-    // Then: We should see the Home item with its target
-    assert_eq!(favorites.len(), 1);
-    let home_item = &favorites[0];
+    let home = &favorites[0];
+    assert_eq!(home.label(), "Home");
     
-    assert_eq!(home_item.label(), "Home");
-    assert!(home_item.path().ok_or(anyhow!("path not found"))?.ends_with("~/"));
-    
+    let path = home.path()
+        .ok_or_else(|| FinderError::invalid_path("~/"))?;
+    assert!(path.ends_with("~/"));
+
     Ok(())
 }

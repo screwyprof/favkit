@@ -20,18 +20,20 @@ mod tests {
     use super::*;
     
     #[test]
-    fn default_favorites_has_no_items() {
-        let favorites = Favorites::default();
-        assert!(favorites.items().is_empty());
-    }
-
-    #[test]
     fn adds_item_to_favorites() {
         let mut favorites = Favorites::default();
-        favorites.add(SidebarItem::home());
+        let item = SidebarItem::home();
+        
+        favorites.add(item);
         
         let items = favorites.items();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "Home");
+    }
+
+    #[test]
+    fn empty_favorites_has_no_items() {
+        let favorites = Favorites::default();
+        assert!(favorites.items().is_empty());
     }
 }

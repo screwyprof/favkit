@@ -27,3 +27,10 @@ test-utils = [] # Enable test utilities for external crates
 
 [dev-dependencies]
 favkit = { path = ".", features = ["test-utils"] }
+coverage-helper = "0.2"
+cargo-llvm-cov = "0.6.14"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(coverage,coverage_nightly)',
+] }

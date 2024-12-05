@@ -3,7 +3,7 @@
 # Variables for common settings
 CARGO_TEST_FLAGS := --quiet
 COVERAGE_ENV := CARGO_INCREMENTAL=0 RUSTFLAGS='-Cinstrument-coverage' LLVM_PROFILE_FILE='target/coverage/coverage-%p-%m.profraw'
-GRCOV_FLAGS := --binary-path ./target/debug/ -s . --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" --ignore "src/main.rs"
+CARGO_LLVM_COV_FLAGS := --no-cfg-coverage-nightly
 
 # Default target
 all: test
@@ -31,22 +31,18 @@ test:
 ## Run tests and generate HTML coverage report
 coverage: clean-coverage
 	@$(COVERAGE_ENV) cargo test $(CARGO_TEST_FLAGS)
-	@grcov . $(GRCOV_FLAGS) -t html -o target/coverage/html > /dev/null 2>&1
-	@open target/coverage/html/index.html
+	@cargo llvm-cov $(CARGO_LLVM_COV_FLAGS) --html
+	@open target/llvm-cov/html/index.html
 
 ## Run tests and show coverage report in terminal
 coverage-text: clean-coverage
 	@$(COVERAGE_ENV) cargo test $(CARGO_TEST_FLAGS)
-	@grcov . $(GRCOV_FLAGS) -t markdown -o target/coverage/report.md > /dev/null 2>&1
-	@echo "Coverage Report:"
-	@echo
-	@cat target/coverage/report.md | column -t -s'|'
-	@echo
+	@cargo llvm-cov $(CARGO_LLVM_COV_FLAGS)
 
 ## Clean build artifacts and coverage data
 clean: clean-coverage
 	@cargo clean
 
 clean-coverage:
-	@rm -rf target/coverage
-	@mkdir -p target/coverage
+	@rm -rf target/coverage target/llvm-cov
+	@mkdir -p target/coverage target/llvm-cov

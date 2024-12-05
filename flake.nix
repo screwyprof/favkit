@@ -17,42 +17,37 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-
-        nativeBuildInputs = with pkgs; [
-          (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-          (rust-bin.stable.latest.default.override {
-            extensions = [ "llvm-tools-preview" ];
-          })
-          cargo-watch
-          grcov
-        ];
-
-        buildInputs = with pkgs; [
-          # MacOS specific dependencies
-          darwin.apple_sdk.frameworks.CoreServices
-          darwin.apple_sdk.frameworks.CoreFoundation
-        ];
-
+        rust-bin = pkgs.rust-bin;
       in
       {
         devShells.default = pkgs.mkShell {
-          inherit nativeBuildInputs buildInputs;
+          nativeBuildInputs = with pkgs; [
+            (rust-bin.nightly.latest.default.override {
+              extensions = [ "rust-src" "llvm-tools-preview" ];
+            })
+            cargo-watch
+            cargo-binutils
+            grcov
+          ];
 
-          RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          
+          buildInputs = with pkgs; [
+            # MacOS specific dependencies
+            darwin.apple_sdk.frameworks.CoreServices
+            darwin.apple_sdk.frameworks.CoreFoundation
+          ];
+
           # Environment variables for code coverage
           CARGO_INCREMENTAL = "0";
-          RUSTFLAGS = "-Cinstrument-coverage";
+          RUSTFLAGS = "-Cinstrument-coverage --cfg coverage_nightly";
           LLVM_PROFILE_FILE = "target/coverage/coverage-%p-%m.profraw";
-        };
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "favkit";
-          version = "0.1.0";
-          src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
-          inherit nativeBuildInputs buildInputs;
+          shellHook = ''
+            # Install cargo-llvm-cov if not already installed
+            if ! command -v cargo-llvm-cov &> /dev/null; then
+              echo "Installing cargo-llvm-cov..."
+              cargo install cargo-llvm-cov
+            fi
+          '';
         };
-      }
-    );
+      });
 }
