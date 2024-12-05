@@ -17,6 +17,10 @@ impl Finder {
     pub fn sidebar(&self) -> &Sidebar {
         &self.sidebar
     }
+
+    pub fn sidebar_mut(&mut self) -> &mut Sidebar {
+        &mut self.sidebar
+    }
 }
 
 #[cfg(test)]

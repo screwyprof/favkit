@@ -1,48 +1,15 @@
 use favkit::errors::Result;
-use favkit::finder::{Sidebar, SidebarItem, Target};
+use favkit::finder::{Finder, Sidebar, SidebarItem, Target};
 
 mod test_doubles {
     use super::*;
 
-    pub struct TestFinder {
-        sidebar: Sidebar,
-    }
-
-    impl TestFinder {
-        pub fn default() -> Self {
-            Self {
-                sidebar: Sidebar::default(),
-            }
-        }
-
-        pub fn sidebar(&self) -> &Sidebar {
-            &self.sidebar
-        }
-
-        pub fn sidebar_mut(&mut self) -> &mut Sidebar {
-            &mut self.sidebar
-        }
-
-        pub fn with_item(mut self, item: SidebarItem) -> Self {
-            self.sidebar_mut().favorites_mut().add(item);
-            self
-        }
-
-        pub fn with_home(self) -> Self {
-            self.with_item(SidebarItem::home())
-        }
-
-        pub fn with_airdrop(self) -> Self {
-            self.with_item(SidebarItem::airdrop())
-        }
-    }
-
     pub struct FinderAssert<'a> {
-        finder: &'a TestFinder,
+        finder: &'a Finder,
     }
 
     impl<'a> FinderAssert<'a> {
-        pub fn new(finder: &'a TestFinder) -> Self {
+        pub fn new(finder: &'a Finder) -> Self {
             Self { finder }
         }
 
@@ -68,34 +35,38 @@ mod test_doubles {
     }
 }
 
-use test_doubles::{TestFinder, FinderAssert};
+use test_doubles::FinderAssert;
 
 #[test]
 fn shows_airdrop_in_favorites() -> Result<()> {
-    let finder = TestFinder::default().with_airdrop();
+    let mut finder = Finder::default();
+    finder.sidebar_mut().favorites_mut().add(SidebarItem::airdrop());
+    
     FinderAssert::new(&finder).has_favorites(&[Target::airdrop()]);
     Ok(())
 }
 
 #[test]
 fn shows_home_in_favorites() -> Result<()> {
-    let finder = TestFinder::default().with_home();
+    let mut finder = Finder::default();
+    finder.sidebar_mut().favorites_mut().add(SidebarItem::home());
+    
     FinderAssert::new(&finder).has_favorites(&[Target::home()]);
     Ok(())
 }
 
 #[test]
 fn shows_empty_favorites() -> Result<()> {
-    let finder = TestFinder::default();
+    let finder = Finder::default();
     FinderAssert::new(&finder).is_empty();
     Ok(())
 }
 
 #[test]
 fn shows_multiple_items_in_favorites() -> Result<()> {
-    let finder = TestFinder::default()
-        .with_home()
-        .with_airdrop();
+    let mut finder = Finder::default();
+    finder.sidebar_mut().favorites_mut().add(SidebarItem::home());
+    finder.sidebar_mut().favorites_mut().add(SidebarItem::airdrop());
     
     FinderAssert::new(&finder).has_favorites(&[
         Target::home(),
