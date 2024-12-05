@@ -1,4 +1,4 @@
-use crate::sidebar_item::SidebarItem;
+use super::sidebar_item::SidebarItem;
 
 #[derive(Default)]
 pub struct Favorites {

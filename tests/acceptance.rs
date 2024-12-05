@@ -1,5 +1,5 @@
 use favkit::error::Result;
-use favkit::sidebar::Sidebar;
+use favkit::finder::Sidebar;
 
 mod test_doubles {
     use super::*;
