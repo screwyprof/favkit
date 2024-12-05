@@ -18,3 +18,14 @@ impl Finder {
         &self.sidebar
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finder_provides_access_to_sidebar() {
+        let finder = Finder::default();
+        assert!(finder.sidebar().favorites().items().is_empty());
+    }
+}

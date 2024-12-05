@@ -17,10 +17,14 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        
+
         nativeBuildInputs = with pkgs; [
           (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+          (rust-bin.stable.latest.default.override {
+            extensions = [ "llvm-tools-preview" ];
+          })
           cargo-watch
+          grcov
         ];
 
         buildInputs = with pkgs; [
@@ -35,6 +39,11 @@
           inherit nativeBuildInputs buildInputs;
 
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+          
+          # Environment variables for code coverage
+          CARGO_INCREMENTAL = "0";
+          RUSTFLAGS = "-Cinstrument-coverage";
+          LLVM_PROFILE_FILE = "target/coverage/coverage-%p-%m.profraw";
         };
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
@@ -46,4 +55,4 @@
         };
       }
     );
-} 
+}
