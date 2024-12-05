@@ -88,54 +88,77 @@ impl TryFrom<String> for Target {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    use coverage_helper::test;
 
-    #[test]
-    fn airdrop_has_correct_label() {
-        let target = Target::airdrop();
-        assert_eq!(target.label(), "AirDrop");
+    mod constructors {
+        use super::*;
+        use coverage_helper::test;
+
+        #[test]
+        fn creates_airdrop() {
+            let target = Target::airdrop();
+            assert!(matches!(target, Target::AirDrop(_)));
+            assert_eq!(target.label(), "AirDrop");
+            assert_eq!(target.path(), Path::new(AIRDROP_PATH));
+        }
+
+        #[test]
+        fn creates_home() {
+            let target = Target::home();
+            assert!(matches!(target, Target::Home(_)));
+            assert_eq!(target.label(), "Home");
+            assert_eq!(target.path(), Path::new(HOME_PATH));
+        }
     }
 
-    #[test]
-    fn recognizes_home_path() {
-        let target = Target::home();
-        assert!(matches!(target, Target::Home(_)));
-        assert_eq!(target.label(), "Home");
-        assert_eq!(target.path(), Path::new(HOME_PATH));
+    mod conversions {
+        use super::*;
+        use coverage_helper::test;
+
+        #[test]
+        fn converts_airdrop_path() {
+            let target = Target::try_from_path(Path::new(AIRDROP_PATH)).unwrap();
+            assert!(matches!(target, Target::AirDrop(_)));
+            assert_eq!(target.label(), "AirDrop");
+            assert_eq!(target.path(), Path::new(AIRDROP_PATH));
+        }
+
+        #[test]
+        fn converts_home_path() {
+            let target = Target::try_from_path(Path::new(HOME_PATH)).unwrap();
+            assert!(matches!(target, Target::Home(_)));
+            assert_eq!(target.label(), "Home");
+            assert_eq!(target.path(), Path::new(HOME_PATH));
+        }
     }
 
-    #[test]
-    fn recognizes_airdrop_path() {
-        let target = Target::try_from_path(Path::new(AIRDROP_PATH)).unwrap();
-        assert!(matches!(target, Target::AirDrop(_)));
-        assert_eq!(target.label(), "AirDrop");
-        assert_eq!(target.path(), Path::new(AIRDROP_PATH));
-    }
-
-    #[test]
-    fn fails_on_non_utf8_path() {
+    mod errors {
+        use super::*;
+        use coverage_helper::test;
         use std::ffi::OsStr;
         use std::os::unix::ffi::OsStrExt;
 
-        let invalid_utf8 = OsStr::from_bytes(&[0x80]);
-        let path = Path::new(invalid_utf8);
+        #[test]
+        fn rejects_non_utf8_path() {
+            let invalid_utf8 = OsStr::from_bytes(&[0x80]);
+            let path = Path::new(invalid_utf8);
 
-        let result = Target::try_from_path(path);
-        assert!(matches!(
-            result,
-            Err(FinderError::InvalidPath { path: _, source: None })
-        ));
-    }
+            let result = Target::try_from_path(path);
+            assert!(matches!(
+                result,
+                Err(FinderError::InvalidPath { path: _, source: None })
+            ));
+        }
 
-    #[test]
-    fn fails_on_unsupported_path() {
-        let result = Target::try_from("/some/random/path");
-        assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-    }
+        #[test]
+        fn rejects_unsupported_path() {
+            let result = Target::try_from("/some/random/path");
+            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+        }
 
-    #[test]
-    fn fails_on_empty_path() {
-        let result = Target::try_from_path(Path::new(""));
-        assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+        #[test]
+        fn rejects_empty_path() {
+            let result = Target::try_from_path(Path::new(""));
+            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+        }
     }
 }
