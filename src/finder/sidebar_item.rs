@@ -10,6 +10,12 @@ impl SidebarItem {
         }
     }
 
+    pub fn home() -> Self {
+        Self {
+            label: "Home".to_string(),
+        }
+    }
+
     pub fn label(&self) -> &str {
         &self.label
     }
@@ -18,10 +24,16 @@ impl SidebarItem {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    
     #[test]
     fn creates_airdrop_item() {
         let item = SidebarItem::airdrop();
         assert_eq!(item.label(), "AirDrop");
+    }
+
+    #[test]
+    fn creates_home_item() {
+        let item = SidebarItem::home();
+        assert_eq!(item.label(), "Home");
     }
 }
