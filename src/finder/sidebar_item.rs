@@ -77,6 +77,7 @@ impl From<Target> for SidebarItem {
 mod tests {
     use super::*;
     use super::super::target::{AIRDROP_PATH, HOME_PATH};
+    use dirs::home_dir;
 
     mod constructors {
         use super::*;
@@ -95,7 +96,7 @@ mod tests {
             let item = SidebarItem::home();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path(), Some(Path::new(HOME_PATH)));
+            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
         }
     }
 
@@ -115,7 +116,7 @@ mod tests {
             let item = SidebarItem::try_from(HOME_PATH).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path(), Some(Path::new(HOME_PATH)));
+            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
         }
 
         #[test]
@@ -130,7 +131,7 @@ mod tests {
             let item = SidebarItem::try_from(HOME_PATH.to_string()).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path(), Some(Path::new(HOME_PATH)));
+            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
         }
 
         #[test]
@@ -145,7 +146,7 @@ mod tests {
             let item = SidebarItem::try_from(PathBuf::from(HOME_PATH)).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path(), Some(Path::new(HOME_PATH)));
+            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
         }
 
         #[test]
@@ -160,7 +161,7 @@ mod tests {
             let item = SidebarItem::try_from(Path::new(HOME_PATH)).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path(), Some(Path::new(HOME_PATH)));
+            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
         }
     }
 

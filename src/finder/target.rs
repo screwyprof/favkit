@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::convert::TryFrom;
 use crate::errors::FinderError;
+use dirs::home_dir;
 
 pub const AIRDROP_PATH: &str = "nwnode://domain-AirDrop";
 pub const HOME_PATH: &str = "~/";
@@ -17,7 +18,7 @@ impl Target {
     }
 
     pub fn home() -> Self {
-        Self::Home(PathBuf::from(HOME_PATH))
+        Self::Home(home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)))
     }
 
     pub fn label(&self) -> &str {
@@ -37,7 +38,7 @@ impl Target {
     fn try_from_path(path: impl AsRef<Path>) -> Result<Self, FinderError> {
         let path = path.as_ref();
 
-        if path.to_str().map_or(false, |s| s == AIRDROP_PATH) {
+        if path.to_str() == Some(AIRDROP_PATH) {
             return Ok(Self::AirDrop(path.to_path_buf()));
         }
 
@@ -45,7 +46,7 @@ impl Target {
             .ok_or_else(|| FinderError::invalid_path(path))?;
 
         if path_str == HOME_PATH {
-            return Ok(Self::Home(path.to_path_buf()));
+            return Ok(Self::home());
         }
 
         Err(FinderError::UnsupportedTarget(path.to_path_buf()))
@@ -106,7 +107,7 @@ mod tests {
             let target = Target::home();
             assert!(matches!(target, Target::Home(_)));
             assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), Path::new(HOME_PATH));
+            assert_eq!(target.path(), home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)));
         }
     }
 
@@ -127,7 +128,7 @@ mod tests {
             let target = Target::try_from_path(Path::new(HOME_PATH)).unwrap();
             assert!(matches!(target, Target::Home(_)));
             assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), Path::new(HOME_PATH));
+            assert_eq!(target.path(), home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)));
         }
     }
 

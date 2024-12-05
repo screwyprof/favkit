@@ -1,4 +1,4 @@
-use favkit::errors::{Result, FinderError};
+use favkit::errors::Result;
 use favkit::finder::{Sidebar, SidebarItem};
 
 mod test_doubles {
@@ -9,20 +9,18 @@ mod test_doubles {
     }
 
     impl TestFinder {
-        pub fn with_empty_sidebar() -> Self {
+        pub fn default() -> Self {
             Self {
                 sidebar: Sidebar::default(),
             }
         }
 
-        pub fn with_home_in_favorites() -> Self {
-            let mut sidebar = Sidebar::default();
-            sidebar.favorites_mut().add(SidebarItem::home());
-            Self { sidebar }
-        }
-
         pub fn sidebar(&self) -> &Sidebar {
             &self.sidebar
+        }
+
+        pub fn sidebar_mut(&mut self) -> &mut Sidebar {
+            &mut self.sidebar
         }
     }
 }
@@ -30,28 +28,33 @@ mod test_doubles {
 use test_doubles::TestFinder;
 
 #[test]
-fn lists_empty_favorites() -> Result<()> {
-    let finder = TestFinder::with_empty_sidebar();
-    let sidebar = finder.sidebar();
+fn shows_airdrop_in_favorites() -> Result<()> {
+    let mut finder = TestFinder::default();
+    let airdrop = SidebarItem::airdrop();
+    finder.sidebar_mut().favorites_mut().add(airdrop);
+    
+    let favorites = finder.sidebar().favorites();
+    let items = favorites.items();
+    
+    assert_eq!(items.len(), 1);
+    let airdrop_item = &items[0];
+    assert_eq!(airdrop_item.label(), "AirDrop");
 
-    assert!(sidebar.favorites().items().is_empty());
     Ok(())
 }
 
 #[test]
 fn shows_home_in_favorites() -> Result<()> {
-    let finder = TestFinder::with_home_in_favorites();
-    let sidebar = finder.sidebar();
-    let favorites = sidebar.favorites().items();
+    let mut finder = TestFinder::default();
+    let home = SidebarItem::home();
+    finder.sidebar_mut().favorites_mut().add(home);
     
-    assert_eq!(favorites.len(), 1, "favorites should contain one item");
+    let favorites = finder.sidebar().favorites();
+    let items = favorites.items();
     
-    let home = &favorites[0];
-    assert_eq!(home.label(), "Home");
-    
-    let path = home.path()
-        .ok_or_else(|| FinderError::invalid_path("~/"))?;
-    assert!(path.ends_with("~/"));
+    assert_eq!(items.len(), 1);
+    let home_item = &items[0];
+    assert_eq!(home_item.label(), "Home");
 
     Ok(())
 }
