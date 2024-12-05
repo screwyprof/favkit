@@ -1,22 +1,22 @@
 use favkit::error::Result;
-use favkit::item::Item;
+use favkit::sidebar::Sidebar;
 
 mod test_doubles {
     use super::*;
 
     pub struct TestFinder {
-        items_to_return: Vec<Item>,
+        sidebar: Sidebar,
     }
 
     impl TestFinder {
-        pub fn returning_items(items: Vec<Item>) -> Self {
-            Self { 
-                items_to_return: items 
+        pub fn with_empty_sidebar() -> Self {
+            Self {
+                sidebar: Sidebar::default(),
             }
         }
 
-        pub fn inspect(&self) -> Result<Vec<Item>> {
-            Ok(self.items_to_return.clone())
+        pub fn sidebar(&self) -> &Sidebar {
+            &self.sidebar
         }
     }
 }
@@ -24,15 +24,15 @@ mod test_doubles {
 use test_doubles::TestFinder;
 
 #[test]
-fn lists_empty_sidebar() -> Result<()> {
-    // Given: Finder has no items in the sidebar
-    let finder = TestFinder::returning_items(vec![]);
+fn lists_empty_favorites() -> Result<()> {
+    // Given: Finder is available
+    let finder = TestFinder::with_empty_sidebar();
     
-    // When: We request sidebar items
-    let items = finder.inspect()?;
+    // When: We request favorites from the sidebar
+    let favorites = finder.sidebar().favorites().items();
     
-    // Then: We get an empty list
-    assert!(items.is_empty(), "Should return empty list when sidebar has no items");
+    // Then: The favorites section is empty
+    assert!(favorites.is_empty());
     
     Ok(())
 }

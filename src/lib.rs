@@ -1,2 +1,4 @@
 pub mod error;
-pub mod item;
+pub mod favorites;
+pub mod sidebar;
+pub mod sidebar_item;

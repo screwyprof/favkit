@@ -1,9 +1,9 @@
-#[derive(Debug, Clone, PartialEq)]
-pub struct Item {
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SidebarItem {
     label: String,
 }
 
-impl Item {
+impl SidebarItem {
     pub fn airdrop() -> Self {
         Self {
             label: "AirDrop".to_string(),
@@ -21,7 +21,7 @@ mod tests {
 
     #[test]
     fn creates_airdrop_item() {
-        let item = Item::airdrop();
+        let item = SidebarItem::airdrop();
         assert_eq!(item.label(), "AirDrop");
     }
 }
