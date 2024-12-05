@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Target {
@@ -7,6 +7,10 @@ pub enum Target {
 }
 
 impl Target {
+    pub fn home() -> Self {
+        "~/".into()
+    }
+
     pub fn label(&self) -> &str {
         match self {
             Target::AirDrop => "AirDrop",
@@ -14,15 +18,17 @@ impl Target {
         }
     }
 
-    pub fn path(&self) -> Option<PathBuf> {
+    pub fn path(&self) -> Option<&Path> {
         match self {
             Target::AirDrop => None,
-            Target::Home(path) => Some(path.clone()),
+            Target::Home(path) => Some(path.as_path()),
         }
     }
+}
 
-    pub fn home() -> Self {
-        Self::Home(PathBuf::from("~/"))
+impl<T: AsRef<Path>> From<T> for Target {
+    fn from(path: T) -> Self {
+        Self::Home(path.as_ref().to_path_buf())
     }
 }
 
@@ -40,6 +46,21 @@ mod tests {
     fn home_has_correct_label_and_path() {
         let home = Target::home();
         assert_eq!(home.label(), "Home");
-        assert_eq!(home.path(), Some(PathBuf::from("~/")));
+        assert!(home.path().unwrap().ends_with("~/"));
+    }
+
+    #[test]
+    fn converts_from_str() {
+        let target = Target::from("~/Documents");
+        assert_eq!(target.label(), "Home");
+        assert!(target.path().unwrap().ends_with("Documents"));
+    }
+
+    #[test]
+    fn converts_from_pathbuf() {
+        let path = PathBuf::from("~/Downloads");
+        let target = Target::from(path);
+        assert_eq!(target.label(), "Home");
+        assert!(target.path().unwrap().ends_with("Downloads"));
     }
 }

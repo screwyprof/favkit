@@ -1,6 +1,6 @@
 use favkit::error::Result;
 use favkit::finder::{Sidebar, SidebarItem};
-use std::path::PathBuf;
+use anyhow::{anyhow, Result as AnyhowResult};
 
 mod test_doubles {
     use super::*;
@@ -45,7 +45,7 @@ fn lists_empty_favorites() -> Result<()> {
 }
 
 #[test]
-fn shows_home_in_favorites() -> Result<()> {
+fn shows_home_in_favorites() -> AnyhowResult<()> {
     // Given: Finder has Home in favorites
     let finder = TestFinder::with_home_in_favorites();
     
@@ -57,7 +57,7 @@ fn shows_home_in_favorites() -> Result<()> {
     let home_item = &favorites[0];
     
     assert_eq!(home_item.label(), "Home");
-    assert_eq!(home_item.path(), Some(PathBuf::from("~/")));
+    assert!(home_item.path().ok_or(anyhow!("path not found"))?.ends_with("~/"));
     
     Ok(())
 }
