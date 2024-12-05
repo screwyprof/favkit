@@ -1,5 +1,6 @@
 use favkit::error::Result;
 use favkit::finder::{Sidebar, SidebarItem};
+use std::path::PathBuf;
 
 mod test_doubles {
     use super::*;
@@ -51,9 +52,12 @@ fn shows_home_in_favorites() -> Result<()> {
     // When: We request favorites from the sidebar
     let favorites = finder.sidebar().favorites().items();
     
-    // Then: We should see the Home item
+    // Then: We should see the Home item with its target
     assert_eq!(favorites.len(), 1);
-    assert_eq!(favorites[0].label(), "Home");
+    let home_item = &favorites[0];
+    
+    assert_eq!(home_item.label(), "Home");
+    assert_eq!(home_item.path(), Some(PathBuf::from("~/")));
     
     Ok(())
 }
