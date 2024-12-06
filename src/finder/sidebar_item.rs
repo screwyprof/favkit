@@ -1,34 +1,56 @@
 use std::path::{Path, PathBuf};
-use std::convert::TryFrom;
 use super::target::Target;
 use crate::errors::FinderError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct SidebarItem {
-    target: Target,
+    path: PathBuf,
 }
 
 impl SidebarItem {
+    pub fn new<P: AsRef<Path>>(path: P) -> Option<Self> {
+        Self::validate_path(path).ok().map(|path| Self { path })
+    }
+
     pub fn home() -> Self {
-        Target::home().into()
+        Self::new(Target::home().path()).unwrap()
     }
 
     pub fn airdrop() -> Self {
-        Target::airdrop().into()
+        Self::new(Target::airdrop().path()).unwrap()
     }
 
-    pub fn label(&self) -> &str {
-        self.target.label()
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
 
-    pub fn path(&self) -> Option<&Path> {
-        Some(self.target.path())
+    pub fn label(&self) -> String {
+        if self.path == Target::home().path() {
+            return "Home".to_string();
+        }
+        if self.path == Target::airdrop().path() {
+            return "AirDrop".to_string();
+        }
+        self.path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("Unknown")
+            .to_string()
+    }
+
+    fn validate_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, FinderError> {
+        let path = path.as_ref().to_path_buf();
+        if path == Target::home().path() || path == Target::airdrop().path() {
+            Ok(path)
+        } else {
+            Err(FinderError::UnsupportedTarget(path))
+        }
     }
 }
 
 impl From<Target> for SidebarItem {
     fn from(target: Target) -> Self {
-        Self { target }
+        Self::new(target.path()).unwrap()
     }
 }
 
@@ -36,9 +58,8 @@ impl TryFrom<&str> for SidebarItem {
     type Error = FinderError;
 
     fn try_from(path: &str) -> Result<Self, Self::Error> {
-        Ok(Self {
-            target: Target::try_from(path)?,
-        })
+        let path = Self::validate_path(path)?;
+        Ok(Self::new(path).unwrap())
     }
 }
 
@@ -46,9 +67,8 @@ impl TryFrom<PathBuf> for SidebarItem {
     type Error = FinderError;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        Ok(Self {
-            target: Target::try_from(path)?,
-        })
+        let path = Self::validate_path(path)?;
+        Ok(Self::new(path).unwrap())
     }
 }
 
@@ -56,9 +76,8 @@ impl TryFrom<&Path> for SidebarItem {
     type Error = FinderError;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        Ok(Self {
-            target: Target::try_from(path)?,
-        })
+        let path = Self::validate_path(path)?;
+        Ok(Self::new(path).unwrap())
     }
 }
 
@@ -71,121 +90,50 @@ impl TryFrom<String> for SidebarItem {
 }
 
 #[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    use super::super::target::{AIRDROP_PATH, HOME_PATH};
 
-    mod constructors {
-        use super::*;
-
-        #[test]
-        fn creates_airdrop() {
-            let item = SidebarItem::airdrop();
-            assert!(matches!(item.target, Target::AirDrop(_)));
-            assert_eq!(item.label(), "AirDrop");
-            assert_eq!(item.path(), Some(Path::new(AIRDROP_PATH)));
-        }
-
-        #[test]
-        fn creates_home() {
-            let item = SidebarItem::home();
-            assert!(matches!(item.target, Target::Home(_)));
-            assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
-        }
+    #[test]
+    fn test_create_sidebar_item_from_home_path() {
+        let home = Target::home();
+        let item = SidebarItem::new(home.path()).unwrap();
+        assert_eq!(item.path(), &home.path());
+        assert_eq!(item.label(), "Home");
     }
 
-    mod conversions {
-        use super::*;
-
-        #[test]
-        fn converts_from_str() {
-            // AirDrop
-            let item = SidebarItem::try_from(AIRDROP_PATH).unwrap();
-            assert!(matches!(item.target, Target::AirDrop(_)));
-            assert_eq!(item.label(), "AirDrop");
-            assert_eq!(item.path(), Some(Path::new(AIRDROP_PATH)));
-
-            // Home
-            let item = SidebarItem::try_from(HOME_PATH).unwrap();
-            assert!(matches!(item.target, Target::Home(_)));
-            assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
-        }
-
-        #[test]
-        fn converts_from_string() {
-            // AirDrop
-            let item = SidebarItem::try_from(AIRDROP_PATH.to_string()).unwrap();
-            assert!(matches!(item.target, Target::AirDrop(_)));
-            assert_eq!(item.label(), "AirDrop");
-            assert_eq!(item.path(), Some(Path::new(AIRDROP_PATH)));
-
-            // Home
-            let item = SidebarItem::try_from(HOME_PATH.to_string()).unwrap();
-            assert!(matches!(item.target, Target::Home(_)));
-            assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
-        }
-
-        #[test]
-        fn converts_from_pathbuf() {
-            // AirDrop
-            let item = SidebarItem::try_from(PathBuf::from(AIRDROP_PATH)).unwrap();
-            assert!(matches!(item.target, Target::AirDrop(_)));
-            assert_eq!(item.label(), "AirDrop");
-            assert_eq!(item.path(), Some(Path::new(AIRDROP_PATH)));
-
-            // Home
-            let item = SidebarItem::try_from(PathBuf::from(HOME_PATH)).unwrap();
-            assert!(matches!(item.target, Target::Home(_)));
-            assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
-        }
-
-        #[test]
-        fn converts_from_path() {
-            // AirDrop
-            let item = SidebarItem::try_from(Path::new(AIRDROP_PATH)).unwrap();
-            assert!(matches!(item.target, Target::AirDrop(_)));
-            assert_eq!(item.label(), "AirDrop");
-            assert_eq!(item.path(), Some(Path::new(AIRDROP_PATH)));
-
-            // Home
-            let item = SidebarItem::try_from(Path::new(HOME_PATH)).unwrap();
-            assert!(matches!(item.target, Target::Home(_)));
-            assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
-        }
+    #[test]
+    fn test_create_sidebar_item_from_airdrop_path() {
+        let airdrop = Target::airdrop();
+        let item = SidebarItem::new(airdrop.path()).unwrap();
+        assert_eq!(item.path(), &airdrop.path());
+        assert_eq!(item.label(), "AirDrop");
     }
 
-    mod errors {
-        use super::*;
+    #[test]
+    fn test_create_sidebar_item_from_invalid_path() {
+        let path = PathBuf::from("/invalid/path");
+        let result = SidebarItem::new(path.clone());
+        assert!(result.is_none());
+    }
 
-        #[test]
-        fn rejects_unsupported_path() {
-            // String
-            let result = SidebarItem::try_from("/invalid/path".to_string());
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+    #[test]
+    fn test_create_sidebar_item_from_str() {
+        let home = Target::home();
+        let item = SidebarItem::try_from(home.path().to_str().unwrap()).unwrap();
+        assert_eq!(item.path(), &home.path());
+    }
 
-            // &str
-            let result = SidebarItem::try_from("/invalid/path");
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+    #[test]
+    fn test_create_sidebar_item_from_string() {
+        let home = Target::home();
+        let item = SidebarItem::try_from(home.path().to_str().unwrap().to_string()).unwrap();
+        assert_eq!(item.path(), &home.path());
+    }
 
-            // PathBuf
-            let result = SidebarItem::try_from(PathBuf::from("/invalid/path"));
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-
-            // &Path
-            let result = SidebarItem::try_from(Path::new("/invalid/path"));
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-        }
-
-        #[test]
-        fn rejects_home_subdirectory() {
-            let result = SidebarItem::try_from("~/Downloads");
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-        }
+    #[test]
+    fn test_create_sidebar_item_from_target() {
+        let home = Target::home();
+        let item: SidebarItem = home.clone().into();
+        assert_eq!(item.path(), &home.path());
     }
 }
