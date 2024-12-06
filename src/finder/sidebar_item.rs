@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use super::target::Target;
 use crate::errors::FinderError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SidebarItem {
     path: PathBuf,
 }
