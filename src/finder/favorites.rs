@@ -1,6 +1,6 @@
 use super::sidebar_item::SidebarItem;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Favorites {
     items: Vec<SidebarItem>,
 }

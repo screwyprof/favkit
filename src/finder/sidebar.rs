@@ -1,6 +1,6 @@
 use super::favorites::Favorites;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Sidebar {
     favorites: Favorites,
 }
