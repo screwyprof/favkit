@@ -9,7 +9,7 @@ use favkit::{
 use favkit::macos::test_utils::MockMacOsApi;
 
 #[test]
-fn loads_home_and_airdrop() -> Result<()> {
+fn it_shows_favorites() -> Result<()> {
     // Given
     let expected = vec![Target::home(), Target::airdrop()];
     
