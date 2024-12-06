@@ -82,6 +82,26 @@ finder
 - Will expand based on actual error cases encountered
 - Type-safe operations using Result
 
+### 5. Persistence
+- Repository pattern for sidebar state persistence
+- Clear separation between storage and domain logic
+- Interface-based design for testability:
+  ```rust
+  trait SidebarRepository {
+      fn load(&self) -> Result<Sidebar>;
+      fn save(&self, sidebar: &Sidebar) -> Result<()>;
+  }
+  ```
+- Test doubles use in-memory storage:
+  ```rust
+  struct TestSidebarRepository {
+      sidebar: Rc<RefCell<Option<Sidebar>>>
+  }
+  ```
+- Explicit state management:
+  - Finder loads state on start
+  - State changes are saved explicitly
+
 ## Implementation Details
 
 ### 1. Core Domain Types
