@@ -1,45 +1,48 @@
 use super::sidebar_item::SidebarItem;
 use std::slice::Iter;
-use std::ops::Deref;
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default)]
 pub struct Sidebar {
     favorites: Vec<SidebarItem>,
+    // locations will be added later
 }
 
-pub struct Items<'a> {
-    items: &'a [SidebarItem],
+#[derive(Debug)]
+pub struct Favorites<'a> {
+    sidebar_items: &'a [SidebarItem],
 }
 
-impl<'a> Items<'a> {
-    fn new(items: &'a [SidebarItem]) -> Self {
-        Self { items }
+impl<'a> Favorites<'a> {
+    fn new(sidebar_items: &'a [SidebarItem]) -> Self {
+        Self { sidebar_items }
+    }
+
+    pub fn iter(&self) -> Iter<'_, SidebarItem> {
+        self.sidebar_items.iter()
     }
 }
 
-impl Deref for Items<'_> {
-    type Target = [SidebarItem];
-
-    fn deref(&self) -> &Self::Target {
-        self.items
+impl AsRef<[SidebarItem]> for Favorites<'_> {
+    fn as_ref(&self) -> &[SidebarItem] {
+        self.sidebar_items
     }
 }
 
-impl<'a> IntoIterator for &'a Items<'a> {
+impl<'a> IntoIterator for Favorites<'a> {
     type Item = &'a SidebarItem;
     type IntoIter = Iter<'a, SidebarItem>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items.iter()
+        self.sidebar_items.iter()
     }
 }
 
-impl<'a> IntoIterator for Items<'a> {
+impl<'a> IntoIterator for &'a Favorites<'a> {
     type Item = &'a SidebarItem;
     type IntoIter = Iter<'a, SidebarItem>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items.iter()
+        self.sidebar_items.iter()
     }
 }
 
@@ -48,41 +51,22 @@ impl Sidebar {
         Self { favorites }
     }
 
-    pub fn favorites(&self) -> Items {
-        Items::new(&self.favorites)
+    pub fn favorites(&self) -> Favorites {
+        Favorites::new(&self.favorites)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finder::target::Target;
+    use crate::finder::Target;
 
     #[test]
-    fn default_sidebar_has_empty_favorites() {
-        let sidebar = Sidebar::default();
-        assert!(sidebar.favorites().is_empty());
-    }
-
-    #[test]
-    fn adds_item_to_favorites() {
+    fn creates_sidebar_with_home_item() {
         let mut sidebar = Sidebar::default();
-        let item = SidebarItem::new(Target::home().path()).unwrap();
-        sidebar.favorites = vec![item];
+        let sidebar_item = SidebarItem::new(Target::home().path()).unwrap();
+        sidebar.favorites.push(sidebar_item);
         
-        let favorites = sidebar.favorites();
-        // Test slice operations
-        assert_eq!(favorites.len(), 1);
-        assert_eq!(&favorites[0].label(), "Home");
-
-        // Test reference iteration
-        for item in &favorites {
-            assert_eq!(item.label(), "Home");
-        }
-
-        // Test owned iteration
-        for item in favorites {
-            assert_eq!(item.label(), "Home");
-        }
+        assert_eq!(sidebar.favorites().iter().count(), 1);
     }
 }

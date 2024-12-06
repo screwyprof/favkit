@@ -48,9 +48,9 @@ impl<T: MacOsApi> SidebarRepository<T> {
                     // Handle special URLs first
                     if url_str == "~/" {
                         println!("Found home URL");
-                        if let Some(item) = SidebarItem::new("~/") {
+                        if let Some(sidebar_item) = SidebarItem::new("~/") {
                             println!("Created home sidebar item");
-                            favorites.push(item);
+                            favorites.push(sidebar_item);
                             continue;
                         } else {
                             println!("Failed to create home sidebar item");
@@ -63,9 +63,9 @@ impl<T: MacOsApi> SidebarRepository<T> {
                     
                     if normalized_url == "nwnode://domain-AirDrop" {
                         println!("Found AirDrop URL");
-                        if let Some(item) = SidebarItem::new("nwnode://domain-AirDrop") {
+                        if let Some(sidebar_item) = SidebarItem::new("nwnode://domain-AirDrop") {
                             println!("Created AirDrop sidebar item");
-                            favorites.push(item);
+                            favorites.push(sidebar_item);
                             continue;
                         } else {
                             println!("Failed to create AirDrop sidebar item");
@@ -78,15 +78,15 @@ impl<T: MacOsApi> SidebarRepository<T> {
                         // Convert real paths to our special paths
                         if let Some(home_dir) = dirs::home_dir() {
                             if path == home_dir {
-                                if let Some(item) = SidebarItem::new("~/") {
-                                    favorites.push(item);
+                                if let Some(sidebar_item) = SidebarItem::new("~/") {
+                                    favorites.push(sidebar_item);
                                     continue;
                                 }
                             }
                         }
                         // Try the path as-is as fallback
-                        if let Some(item) = SidebarItem::new(path) {
-                            favorites.push(item);
+                        if let Some(sidebar_item) = SidebarItem::new(path) {
+                            favorites.push(sidebar_item);
                         }
                     } else {
                         println!("failed to get path from url");
