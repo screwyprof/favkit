@@ -62,8 +62,8 @@ fn loads_empty_favorites() {
 #[test]
 fn loads_home_and_airdrop() {
     // Given
-    let home_url = CFURL::from_path(&Target::home().path(), true).unwrap();
-    let airdrop_url = CFURL::from_path(&Target::airdrop().path(), true).unwrap();
+    let home_url = CFURL::from_path(Target::home().path(), true).unwrap();
+    let airdrop_url = CFURL::from_path(Target::airdrop().path(), true).unwrap();
 
     let api = MockMacOsApi::new()
         .with_favorites_list(1 as LSSharedFileListRef)

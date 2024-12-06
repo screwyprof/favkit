@@ -9,6 +9,8 @@ use core_foundation::{
 
 use core_services::LSSharedFileListItemRef;
 
+use dirs;
+
 pub struct SidebarRepository<T: MacOsApi> {
     api: T,
 }
@@ -21,27 +23,78 @@ impl<T: MacOsApi> SidebarRepository<T> {
     pub fn load(&self) -> Option<Sidebar> {
         unsafe {
             let favorites_list = self.api.get_favorites_list();
+            println!("favorites_list is null: {}", favorites_list.is_null());
             if favorites_list.is_null() {
                 return None;
             }
 
             let mut seed = 0;
             let favorites_snapshot = self.api.get_favorites_snapshot(favorites_list, &mut seed);
+            let values = favorites_snapshot.get_all_values();
+            println!("snapshot values count: {}", values.len());
 
             let mut favorites = Vec::new();
-            let values = favorites_snapshot.get_all_values();
             for item_ref in values.iter().map(|&x| x as LSSharedFileListItemRef) {
+                println!("processing item_ref: {:?}", item_ref);
                 let url_ref = self.api.get_item_url(item_ref);
+                println!("url_ref is null: {}", url_ref.is_null());
                 if !url_ref.is_null() {
                     let url = CFURL::wrap_under_get_rule(url_ref);
+                    println!("got url: {:?}", url);
+                    
+                    let url_str = url.get_string().to_string();
+                    println!("url string: {}", url_str);
+                    
+                    // Handle special URLs first
+                    if url_str == "~/" {
+                        println!("Found home URL");
+                        if let Some(item) = SidebarItem::new("~/") {
+                            println!("Created home sidebar item");
+                            favorites.push(item);
+                            continue;
+                        } else {
+                            println!("Failed to create home sidebar item");
+                        }
+                    }
+                    
+                    // Special handling for AirDrop URL (trim trailing slash)
+                    let normalized_url = url_str.trim_end_matches('/');
+                    println!("normalized url: {}", normalized_url);
+                    
+                    if normalized_url == "nwnode://domain-AirDrop" {
+                        println!("Found AirDrop URL");
+                        if let Some(item) = SidebarItem::new("nwnode://domain-AirDrop") {
+                            println!("Created AirDrop sidebar item");
+                            favorites.push(item);
+                            continue;
+                        } else {
+                            println!("Failed to create AirDrop sidebar item");
+                        }
+                    }
+                    
+                    // Handle regular file paths
                     if let Some(path) = url.to_path() {
+                        println!("got path: {:?}", path);
+                        // Convert real paths to our special paths
+                        if let Some(home_dir) = dirs::home_dir() {
+                            if path == home_dir {
+                                if let Some(item) = SidebarItem::new("~/") {
+                                    favorites.push(item);
+                                    continue;
+                                }
+                            }
+                        }
+                        // Try the path as-is as fallback
                         if let Some(item) = SidebarItem::new(path) {
                             favorites.push(item);
                         }
+                    } else {
+                        println!("failed to get path from url");
                     }
                 }
             }
 
+            println!("final favorites count: {}", favorites.len());
             Some(Sidebar::new(favorites))
         }
     }
@@ -78,9 +131,12 @@ mod tests {
     #[test]
     fn loads_single_favorite() {
         // Given
-        let home = std::path::Path::new("/Users");
-        let test_path = home;
-        let url = CFURL::from_path(&test_path, true).unwrap();
+        let airdrop = "nwnode://domain-AirDrop";
+        // Create URL with a trailing slash to match macOS behavior
+        let url = CFURL::from_path(format!("{}/", airdrop), false).expect("Failed to create URL");
+        println!("Test URL: {:?}", url);
+        println!("Test URL string: {:?}", url.get_string().to_string());
+        
         let item_ref = 1 as LSSharedFileListItemRef;
         
         let favorites_snapshot = CFArray::from_copyable(&[item_ref]);
@@ -97,6 +153,6 @@ mod tests {
         // Then
         let favorites = sidebar.favorites();
         assert_eq!(favorites.iter().count(), 1);
-        assert_eq!(favorites.iter().next().unwrap().path(), test_path);
+        assert_eq!(favorites.iter().next().unwrap().path().to_str().unwrap(), airdrop);
     }
 }

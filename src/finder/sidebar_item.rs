@@ -40,9 +40,14 @@ impl SidebarItem {
 
     fn validate_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, FinderError> {
         let path = path.as_ref().to_path_buf();
+        println!("Validating path: {:?}", path);
+        println!("Target home path: {:?}", Target::home().path());
+        println!("Target airdrop path: {:?}", Target::airdrop().path());
         if path == Target::home().path() || path == Target::airdrop().path() {
+            println!("Path is valid");
             Ok(path)
         } else {
+            println!("Path is invalid");
             Err(FinderError::UnsupportedTarget(path))
         }
     }

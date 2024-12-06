@@ -62,6 +62,12 @@ pub mod test_utils {
         item_urls: RefCell<HashMap<LSSharedFileListItemRef, CFURLRef>>,
     }
 
+    impl Default for MockMacOsApi {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl MockMacOsApi {
         pub fn new() -> Self {
             Self {
@@ -97,6 +103,7 @@ pub mod test_utils {
             _list: LSSharedFileListRef,
             _seed: &mut u32,
         ) -> CFArray<LSSharedFileListItemRef> {
+            println!("Mock: get_favorites_snapshot called");
             match self.favorites_snapshot.borrow().as_ref() {
                 Some(array) => {
                     let values: Vec<LSSharedFileListItemRef> = array
@@ -104,9 +111,13 @@ pub mod test_utils {
                         .into_iter()
                         .map(|ptr| ptr as LSSharedFileListItemRef)
                         .collect();
+                    println!("Mock: returning snapshot with {} values", values.len());
                     CFArray::from_copyable(&values)
                 }
-                None => CFArray::from_copyable(&[])
+                None => {
+                    println!("Mock: returning empty snapshot");
+                    CFArray::from_copyable(&[])
+                }
             }
         }
 
@@ -115,7 +126,10 @@ pub mod test_utils {
         }
 
         unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-            self.item_urls.borrow().get(&item).copied().unwrap_or(std::ptr::null_mut())
+            println!("Mock: get_item_url called for item {:?}", item);
+            let url = self.item_urls.borrow().get(&item).copied().unwrap_or(std::ptr::null_mut());
+            println!("Mock: returning url {:?}", url);
+            url
         }
     }
 }

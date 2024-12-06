@@ -1,6 +1,11 @@
 use super::sidebar_item::SidebarItem;
 use std::slice::Iter;
 
+#[derive(Default, Clone)]
+pub struct Sidebar {
+    favorites: Vec<SidebarItem>,
+}
+
 pub struct Items<'a> {
     items: &'a [SidebarItem],
 }
@@ -19,18 +24,9 @@ impl<'a> Items<'a> {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct Sidebar {
-    favorites: Vec<SidebarItem>,
-}
-
 impl Sidebar {
     pub fn new(favorites: Vec<SidebarItem>) -> Self {
         Self { favorites }
-    }
-
-    pub fn default() -> Self {
-        Self { favorites: Vec::new() }
     }
 
     pub fn favorites(&self) -> Items {
@@ -41,22 +37,22 @@ impl Sidebar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finder::sidebar_item::SidebarItem;
+    use crate::finder::target::Target;
 
     #[test]
     fn default_sidebar_has_empty_favorites() {
         let sidebar = Sidebar::default();
-        assert!(sidebar.favorites().iter().next().is_none());
+        assert!(sidebar.favorites().items().is_empty());
     }
 
     #[test]
     fn adds_item_to_favorites() {
         let mut sidebar = Sidebar::default();
-        let item = SidebarItem::home();
+        let item = SidebarItem::new(Target::home().path()).unwrap();
         sidebar.favorites = vec![item];
         
         let favorites = sidebar.favorites();
-        assert_eq!(favorites.iter().count(), 1);
-        assert_eq!(favorites.iter().next().unwrap().label(), "Home");
+        assert_eq!(favorites.items().len(), 1);
+        assert_eq!(favorites.items()[0].label(), "Home");
     }
 }
