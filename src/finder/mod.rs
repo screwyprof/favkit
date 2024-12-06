@@ -1,7 +1,7 @@
 mod macos_impl;
 pub mod macos;
 
-mod repository;
+pub mod repository;
 mod sidebar;
 mod sidebar_item;
 mod target;

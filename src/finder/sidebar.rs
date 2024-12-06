@@ -1,5 +1,6 @@
 use super::sidebar_item::SidebarItem;
 use std::slice::Iter;
+use std::ops::Deref;
 
 #[derive(Default, Clone)]
 pub struct Sidebar {
@@ -14,12 +15,30 @@ impl<'a> Items<'a> {
     fn new(items: &'a [SidebarItem]) -> Self {
         Self { items }
     }
+}
 
-    pub fn items(&self) -> &[SidebarItem] {
+impl Deref for Items<'_> {
+    type Target = [SidebarItem];
+
+    fn deref(&self) -> &Self::Target {
         self.items
     }
+}
 
-    pub fn iter(&self) -> Iter<'_, SidebarItem> {
+impl<'a> IntoIterator for &'a Items<'a> {
+    type Item = &'a SidebarItem;
+    type IntoIter = Iter<'a, SidebarItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
+impl<'a> IntoIterator for Items<'a> {
+    type Item = &'a SidebarItem;
+    type IntoIter = Iter<'a, SidebarItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.items.iter()
     }
 }
@@ -42,7 +61,7 @@ mod tests {
     #[test]
     fn default_sidebar_has_empty_favorites() {
         let sidebar = Sidebar::default();
-        assert!(sidebar.favorites().items().is_empty());
+        assert!(sidebar.favorites().is_empty());
     }
 
     #[test]
@@ -52,7 +71,18 @@ mod tests {
         sidebar.favorites = vec![item];
         
         let favorites = sidebar.favorites();
-        assert_eq!(favorites.items().len(), 1);
-        assert_eq!(favorites.items()[0].label(), "Home");
+        // Test slice operations
+        assert_eq!(favorites.len(), 1);
+        assert_eq!(&favorites[0].label(), "Home");
+
+        // Test reference iteration
+        for item in &favorites {
+            assert_eq!(item.label(), "Home");
+        }
+
+        // Test owned iteration
+        for item in favorites {
+            assert_eq!(item.label(), "Home");
+        }
     }
 }
