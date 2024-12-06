@@ -1,9 +1,11 @@
 use core_foundation::{
     array::CFArray,
     string::CFStringRef,
-    url::CFURLRef,
+    url::{CFURLRef, CFURL},
+    base::TCFType,
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use crate::finder::Target;
 
 /// MacOS API for interacting with the Finder sidebar.
 ///
@@ -60,6 +62,7 @@ pub mod test_utils {
         favorites_list: Option<LSSharedFileListRef>,
         favorites_snapshot: RefCell<Option<CFArray<LSSharedFileListItemRef>>>,
         item_urls: RefCell<HashMap<LSSharedFileListItemRef, CFURLRef>>,
+        _retained_urls: RefCell<Vec<CFURL>>, // Keep URLs alive for the lifetime of the mock
     }
 
     impl Default for MockMacOsApi {
@@ -74,7 +77,33 @@ pub mod test_utils {
                 favorites_list: None,
                 favorites_snapshot: RefCell::new(None),
                 item_urls: RefCell::new(HashMap::new()),
+                _retained_urls: RefCell::new(Vec::new()),
             }
+        }
+
+        pub fn with_favorites(targets: Vec<Target>) -> Self {
+            let mut mock = Self::new().with_favorites_list(1 as LSSharedFileListRef);
+            
+            // Create item refs (starting from 1)
+            let items: Vec<LSSharedFileListItemRef> = (1..=targets.len())
+                .map(|i| i as LSSharedFileListItemRef)
+                .collect();
+            
+            // Create CFArray from items
+            let items_array = CFArray::from_copyable(&items);
+            mock = mock.with_favorites_snapshot(items_array);
+            
+            // Add URLs for each target
+            for (idx, target) in targets.iter().enumerate() {
+                if let Some(url) = CFURL::from_path(target.path(), true) {
+                    let url_ref = url.as_concrete_TypeRef();
+                    mock.item_urls.borrow_mut().insert(items[idx], url_ref);
+                    // Retain the URL to keep it alive
+                    mock._retained_urls.borrow_mut().push(url);
+                }
+            }
+            
+            mock
         }
 
         pub fn with_favorites_list(mut self, list: LSSharedFileListRef) -> Self {
@@ -103,7 +132,6 @@ pub mod test_utils {
             _list: LSSharedFileListRef,
             _seed: &mut u32,
         ) -> CFArray<LSSharedFileListItemRef> {
-            println!("Mock: get_favorites_snapshot called");
             match self.favorites_snapshot.borrow().as_ref() {
                 Some(array) => {
                     let values: Vec<LSSharedFileListItemRef> = array
@@ -111,11 +139,9 @@ pub mod test_utils {
                         .into_iter()
                         .map(|ptr| ptr as LSSharedFileListItemRef)
                         .collect();
-                    println!("Mock: returning snapshot with {} values", values.len());
                     CFArray::from_copyable(&values)
                 }
                 None => {
-                    println!("Mock: returning empty snapshot");
                     CFArray::from_copyable(&[])
                 }
             }
@@ -126,10 +152,7 @@ pub mod test_utils {
         }
 
         unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-            println!("Mock: get_item_url called for item {:?}", item);
-            let url = self.item_urls.borrow().get(&item).copied().unwrap_or(std::ptr::null_mut());
-            println!("Mock: returning url {:?}", url);
-            url
+            *self.item_urls.borrow().get(&item).unwrap()
         }
     }
 }
