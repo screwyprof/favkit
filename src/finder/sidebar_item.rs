@@ -94,6 +94,18 @@ impl TryFrom<String> for SidebarItem {
     }
 }
 
+impl From<&SidebarItem> for Target {
+    fn from(item: &SidebarItem) -> Self {
+        if item.path == Target::home().path() {
+            Target::home()
+        } else if item.path == Target::airdrop().path() {
+            Target::airdrop()
+        } else {
+            panic!("Invalid target path")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

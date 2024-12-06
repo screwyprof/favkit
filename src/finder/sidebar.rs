@@ -1,4 +1,5 @@
 use super::sidebar_item::SidebarItem;
+use super::Target;
 use std::slice::Iter;
 
 #[derive(Debug, Default)]
@@ -43,6 +44,29 @@ impl<'a> IntoIterator for &'a Favorites<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.sidebar_items.iter()
+    }
+}
+
+impl PartialEq for Favorites<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.sidebar_items == other.sidebar_items
+    }
+}
+
+impl PartialEq<Vec<Target>> for Favorites<'_> {
+    fn eq(&self, other: &Vec<Target>) -> bool {
+        if self.sidebar_items.len() != other.len() {
+            return false;
+        }
+        
+        self.sidebar_items.iter()
+            .all(|item| other.contains(&Target::from(item)))
+    }
+}
+
+impl PartialEq<Favorites<'_>> for Vec<Target> {
+    fn eq(&self, other: &Favorites) -> bool {
+        other == self
     }
 }
 

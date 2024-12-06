@@ -1,8 +1,8 @@
 use core_foundation::{
     array::CFArray,
-    base::TCFType,
     string::CFStringRef,
     url::CFURLRef,
+    base::TCFType,
 };
 use core_services::{
     kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
@@ -13,13 +13,6 @@ use std::ptr;
 
 #[derive(Default)]
 pub struct SystemMacOsApi;
-
-impl SystemMacOsApi {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self
-    }
-}
 
 impl super::macos::MacOsApi for SystemMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
@@ -32,7 +25,7 @@ impl super::macos::MacOsApi for SystemMacOsApi {
         seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
         let array_ref = LSSharedFileListCopySnapshot(list, seed);
-        CFArray::wrap_under_create_rule(array_ref)
+        CFArray::wrap_under_get_rule(array_ref)
     }
 
     unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
@@ -41,15 +34,5 @@ impl super::macos::MacOsApi for SystemMacOsApi {
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
         LSSharedFileListItemCopyResolvedURL(item, 0, ptr::null_mut())
-    }     
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn system_api_can_be_created() {
-        let _api = SystemMacOsApi::new();
     }
 }
