@@ -26,20 +26,16 @@ impl SidebarItem {
     }
 }
 
+impl From<Target> for SidebarItem {
+    fn from(target: Target) -> Self {
+        Self { target }
+    }
+}
+
 impl TryFrom<&str> for SidebarItem {
     type Error = FinderError;
 
     fn try_from(path: &str) -> Result<Self, Self::Error> {
-        Ok(Self {
-            target: Target::try_from(path)?,
-        })
-    }
-}
-
-impl TryFrom<String> for SidebarItem {
-    type Error = FinderError;
-
-    fn try_from(path: String) -> Result<Self, Self::Error> {
         Ok(Self {
             target: Target::try_from(path)?,
         })
@@ -66,9 +62,11 @@ impl TryFrom<&Path> for SidebarItem {
     }
 }
 
-impl From<Target> for SidebarItem {
-    fn from(target: Target) -> Self {
-        Self { target }
+impl TryFrom<String> for SidebarItem {
+    type Error = FinderError;
+
+    fn try_from(path: String) -> Result<Self, Self::Error> {
+        Self::try_from(path.as_str())
     }
 }
 
@@ -77,11 +75,9 @@ impl From<Target> for SidebarItem {
 mod tests {
     use super::*;
     use super::super::target::{AIRDROP_PATH, HOME_PATH};
-    use dirs::home_dir;
 
     mod constructors {
         use super::*;
-        use coverage_helper::test;
 
         #[test]
         fn creates_airdrop() {
@@ -96,13 +92,12 @@ mod tests {
             let item = SidebarItem::home();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
+            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
         }
     }
 
     mod conversions {
         use super::*;
-        use coverage_helper::test;
 
         #[test]
         fn converts_from_str() {
@@ -116,7 +111,7 @@ mod tests {
             let item = SidebarItem::try_from(HOME_PATH).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
+            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
         }
 
         #[test]
@@ -131,7 +126,7 @@ mod tests {
             let item = SidebarItem::try_from(HOME_PATH.to_string()).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
+            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
         }
 
         #[test]
@@ -146,7 +141,7 @@ mod tests {
             let item = SidebarItem::try_from(PathBuf::from(HOME_PATH)).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
+            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
         }
 
         #[test]
@@ -161,13 +156,12 @@ mod tests {
             let item = SidebarItem::try_from(Path::new(HOME_PATH)).unwrap();
             assert!(matches!(item.target, Target::Home(_)));
             assert_eq!(item.label(), "Home");
-            assert_eq!(item.path().map(|p| p.to_path_buf()), home_dir());
+            assert_eq!(item.path().map(|p| p.to_path_buf()), Some(PathBuf::from(HOME_PATH)));
         }
     }
 
     mod errors {
         use super::*;
-        use coverage_helper::test;
 
         #[test]
         fn rejects_unsupported_path() {

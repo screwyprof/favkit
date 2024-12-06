@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::convert::TryFrom;
 use crate::errors::FinderError;
-use dirs::home_dir;
 
 pub const AIRDROP_PATH: &str = "nwnode://domain-AirDrop";
 pub const HOME_PATH: &str = "~/";
@@ -18,7 +17,7 @@ impl Target {
     }
 
     pub fn home() -> Self {
-        Self::Home(home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)))
+        Self::Home(PathBuf::from(HOME_PATH))
     }
 
     pub fn label(&self) -> &str {
@@ -46,7 +45,7 @@ impl Target {
             .ok_or_else(|| FinderError::invalid_path(path))?;
 
         if path_str == HOME_PATH {
-            return Ok(Self::home());
+            return Ok(Self::Home(PathBuf::from(HOME_PATH)));
         }
 
         Err(FinderError::UnsupportedTarget(path.to_path_buf()))
@@ -77,14 +76,6 @@ impl TryFrom<&Path> for Target {
     }
 }
 
-impl TryFrom<String> for Target {
-    type Error = FinderError;
-
-    fn try_from(path: String) -> Result<Self, Self::Error> {
-        Self::try_from_path(path)
-    }
-}
-
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -92,7 +83,6 @@ mod tests {
 
     mod constructors {
         use super::*;
-        use coverage_helper::test;
 
         #[test]
         fn creates_airdrop() {
@@ -107,13 +97,12 @@ mod tests {
             let target = Target::home();
             assert!(matches!(target, Target::Home(_)));
             assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)));
+            assert_eq!(target.path(), Path::new(HOME_PATH));
         }
     }
 
     mod conversions {
         use super::*;
-        use coverage_helper::test;
 
         #[test]
         fn converts_airdrop_path() {
@@ -128,13 +117,12 @@ mod tests {
             let target = Target::try_from_path(Path::new(HOME_PATH)).unwrap();
             assert!(matches!(target, Target::Home(_)));
             assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), home_dir().unwrap_or_else(|| PathBuf::from(HOME_PATH)));
+            assert_eq!(target.path(), Path::new(HOME_PATH));
         }
     }
 
     mod errors {
         use super::*;
-        use coverage_helper::test;
         use std::ffi::OsStr;
         use std::os::unix::ffi::OsStrExt;
 
