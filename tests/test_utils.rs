@@ -1,11 +1,8 @@
-use core_foundation::{
-    array::CFArray,
-    string::CFStringRef,
-    url::CFURLRef,
-};
+use std::{cell::RefCell, ptr, rc::Rc};
+
+use core_foundation::{array::CFArray, string::CFStringRef, url::CFURLRef};
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::finder::{macos::MacOsApi, target::Target};
-use std::{cell::RefCell, path::PathBuf, ptr, rc::Rc};
+use favkit::{finder::macos::MacOsApi, Target};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MacOsApiCall {
@@ -18,35 +15,13 @@ pub enum MacOsApiCall {
 #[derive(Clone)]
 pub struct MockMacOsApi {
     favorites: Vec<Target>,
-    items: Vec<LSSharedFileListItemRef>,
     calls: Rc<RefCell<Vec<MacOsApiCall>>>,
 }
 
-impl Default for MockMacOsApi {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl MockMacOsApi {
-    pub fn new() -> Self {
-        Self { 
-            favorites: Vec::new(),
-            items: Vec::new(),
-            calls: Rc::new(RefCell::new(Vec::new())),
-        }
-    }
-
-    pub fn with_favorites(favorites: Vec<Target>, _home_dir: PathBuf) -> Self {
-        // Create mock LSSharedFileListItemRef for each favorite
-        // Start indices from 1 to match the expected order
-        let items: Vec<LSSharedFileListItemRef> = (1..=favorites.len())
-            .map(|i| (i as *mut std::ffi::c_void) as LSSharedFileListItemRef)
-            .collect();
-        
-        Self { 
-            favorites, 
-            items,
+    pub fn with_favorites(favorites: Vec<Target>) -> Self {
+        Self {
+            favorites,
             calls: Rc::new(RefCell::new(Vec::new())),
         }
     }
@@ -54,12 +29,45 @@ impl MockMacOsApi {
     pub fn calls(&self) -> Vec<MacOsApiCall> {
         self.calls.borrow().clone()
     }
+
+    pub fn verify_expected_calls(&self) {
+        let calls = self.calls();
+        
+        // Verify initial calls
+        assert_eq!(calls[0], MacOsApiCall::GetFavoritesList, "First call should be GetFavoritesList");
+        assert_eq!(calls[1], MacOsApiCall::GetFavoritesSnapshot, "Second call should be GetFavoritesSnapshot");
+        
+        // For each favorite, verify the pair of GetItemUrl and UrlToTarget calls
+        let mut expected_calls = Vec::new();
+        for i in 1..=self.favorites.len() {
+            let item_ref = (i as *mut std::ffi::c_void) as LSSharedFileListItemRef;
+            let url_ref = item_ref as CFURLRef;
+            
+            expected_calls.push(MacOsApiCall::GetItemUrl(item_ref));
+            expected_calls.push(MacOsApiCall::UrlToTarget(url_ref));
+        }
+
+        // Verify all expected calls are present
+        for expected_call in expected_calls {
+            assert!(
+                calls.contains(&expected_call),
+                "Missing expected call: {:?}",
+                expected_call
+            );
+        }
+
+        // Verify no unexpected calls
+        assert_eq!(
+            calls.len(),
+            2 + self.favorites.len() * 2,
+            "Unexpected number of calls"
+        );
+    }
 }
 
 impl MacOsApi for MockMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
         self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesList);
-        // Return a non-null pointer to indicate a valid list
         1 as LSSharedFileListRef
     }
 
@@ -69,7 +77,9 @@ impl MacOsApi for MockMacOsApi {
         _seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
         self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesSnapshot);
-        CFArray::from_copyable(&self.items)
+        CFArray::from_copyable(&(1..=self.favorites.len())
+            .map(|i| i as *mut std::ffi::c_void as LSSharedFileListItemRef)
+            .collect::<Vec<_>>())
     }
 
     unsafe fn get_item_display_name(&self, _item: LSSharedFileListItemRef) -> CFStringRef {
@@ -78,23 +88,12 @@ impl MacOsApi for MockMacOsApi {
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
         self.calls.borrow_mut().push(MacOsApiCall::GetItemUrl(item));
-        item as *const _ as CFURLRef
+        item as CFURLRef
     }
 
     unsafe fn url_to_target(&self, url: CFURLRef) -> Target {
         self.calls.borrow_mut().push(MacOsApiCall::UrlToTarget(url));
-        
-        if url.is_null() {
-            return Target::Home(dirs::home_dir().unwrap_or_default());
-        }
-
-        // Find the item in our items vector
-        let item = url as LSSharedFileListItemRef;
-        let index = self.items.iter().position(|&i| i == item).unwrap_or(0);
-        
-        // Return the corresponding favorite
-        self.favorites.get(index).cloned().unwrap_or_else(|| {
-            Target::CustomPath(PathBuf::from("/unknown"))
-        })
+        let index = (url as usize) - 1;
+        self.favorites[index].clone()
     }
 }
