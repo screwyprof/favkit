@@ -33,34 +33,67 @@ impl MockMacOsApi {
     pub fn verify_expected_calls(&self) {
         let calls = self.calls();
         
-        // Verify initial calls
-        assert_eq!(calls[0], MacOsApiCall::GetFavoritesList, "First call should be GetFavoritesList");
-        assert_eq!(calls[1], MacOsApiCall::GetFavoritesSnapshot, "Second call should be GetFavoritesSnapshot");
-        
-        // For each favorite, verify the pair of GetItemUrl and UrlToTarget calls
-        let mut expected_calls = Vec::new();
+        // First call should be GetFavoritesList
+        assert_eq!(
+            calls.first(),
+            Some(&MacOsApiCall::GetFavoritesList),
+            "First call must be GetFavoritesList"
+        );
+
+        // Second call should be GetFavoritesSnapshot
+        assert_eq!(
+            calls.get(1),
+            Some(&MacOsApiCall::GetFavoritesSnapshot),
+            "Second call must be GetFavoritesSnapshot"
+        );
+
+        // After that, for each favorite we should have GetItemUrl followed by UrlToTarget
+        let mut expected_pairs = Vec::new();
         for i in 1..=self.favorites.len() {
             let item_ref = (i as *mut std::ffi::c_void) as LSSharedFileListItemRef;
             let url_ref = item_ref as CFURLRef;
-            
-            expected_calls.push(MacOsApiCall::GetItemUrl(item_ref));
-            expected_calls.push(MacOsApiCall::UrlToTarget(url_ref));
+            expected_pairs.push((
+                MacOsApiCall::GetItemUrl(item_ref),
+                MacOsApiCall::UrlToTarget(url_ref),
+            ));
         }
 
-        // Verify all expected calls are present
-        for expected_call in expected_calls {
+        // Check that each pair exists in order
+        let mut current_pos = 2; // Start after the first two initialization calls
+        for (idx, (get_url, to_target)) in expected_pairs.iter().enumerate() {
+            let get_url_pos = calls[current_pos..].iter().position(|c| c == get_url).map(|p| p + current_pos);
+            let to_target_pos = calls[current_pos..].iter().position(|c| c == to_target).map(|p| p + current_pos);
+
             assert!(
-                calls.contains(&expected_call),
-                "Missing expected call: {:?}",
-                expected_call
+                get_url_pos.is_some(),
+                "Missing GetItemUrl call for item {}",
+                idx + 1
             );
+            assert!(
+                to_target_pos.is_some(),
+                "Missing UrlToTarget call for item {}",
+                idx + 1
+            );
+
+            let get_url_pos = get_url_pos.unwrap();
+            let to_target_pos = to_target_pos.unwrap();
+
+            assert!(
+                get_url_pos < to_target_pos,
+                "GetItemUrl must come before UrlToTarget for item {}",
+                idx + 1
+            );
+
+            current_pos = to_target_pos + 1;
         }
 
-        // Verify no unexpected calls
+        // Verify we didn't get any extra calls
         assert_eq!(
             calls.len(),
             2 + self.favorites.len() * 2,
-            "Unexpected number of calls"
+            "Got {} calls, expected {} (2 initialization calls + 2 calls per favorite)",
+            calls.len(),
+            2 + self.favorites.len() * 2
         );
     }
 }

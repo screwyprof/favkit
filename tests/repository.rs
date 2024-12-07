@@ -10,6 +10,9 @@ fn test_repository_loads_favorites_from_macos_api() {
     let expected_favorites = vec![
         Target::Home(home_dir.clone()),
         Target::Desktop(home_dir.join("Desktop")),
+        Target::AirDrop("nwnode://domain-AirDrop".to_string()),
+        Target::CustomPath(home_dir.join("Projects")),
+        Target::Documents(home_dir.join("Documents")),
     ];
 
     let mock_api = MockMacOsApi::with_favorites(expected_favorites.clone());
