@@ -1,158 +1,136 @@
-use crate::finder::macos::MacOsApi;
-use crate::finder::sidebar::Sidebar;
-use crate::finder::sidebar_item::SidebarItem;
-
-use core_foundation::{
-    url::CFURL,
-    base::TCFType,
+use super::{
+    sidebar::Sidebar,
+    sidebar_item::SidebarItem,
+    macos::MacOsApi,
 };
-
+use core_foundation::base::TCFType;
 use core_services::LSSharedFileListItemRef;
 
-use dirs;
-
-pub struct SidebarRepository<T: MacOsApi> {
-    api: T,
+pub struct Repository {
+    api: Box<dyn MacOsApi>,
 }
 
-impl<T: MacOsApi> SidebarRepository<T> {
-    pub fn new(api: T) -> Self {
+impl Repository {
+    pub fn new(api: Box<dyn MacOsApi>) -> Self {
         Self { api }
     }
 
-    pub fn load(&self) -> Option<Sidebar> {
-        unsafe {
-            let favorites_list = self.api.get_favorites_list();
-            println!("favorites_list is null: {}", favorites_list.is_null());
-            if favorites_list.is_null() {
-                return None;
-            }
-
-            let mut seed = 0;
-            let favorites_snapshot = self.api.get_favorites_snapshot(favorites_list, &mut seed);
-            let values = favorites_snapshot.get_all_values();
-            println!("snapshot values count: {}", values.len());
-
-            let mut favorites = Vec::new();
-            for item_ref in values.iter().map(|&x| x as LSSharedFileListItemRef) {
-                println!("processing item_ref: {:?}", item_ref);
-                let url_ref = self.api.get_item_url(item_ref);
-                println!("url_ref is null: {}", url_ref.is_null());
-                if !url_ref.is_null() {
-                    let url = CFURL::wrap_under_get_rule(url_ref);
-                    println!("got url: {:?}", url);
-                    
-                    let url_str = url.get_string().to_string();
-                    println!("url string: {}", url_str);
-                    
-                    // Handle special URLs first
-                    if url_str == "~/" {
-                        println!("Found home URL");
-                        if let Some(sidebar_item) = SidebarItem::new("~/") {
-                            println!("Created home sidebar item");
-                            favorites.push(sidebar_item);
-                            continue;
-                        } else {
-                            println!("Failed to create home sidebar item");
-                        }
-                    }
-                    
-                    // Special handling for AirDrop URL (trim trailing slash)
-                    let normalized_url = url_str.trim_end_matches('/');
-                    println!("normalized url: {}", normalized_url);
-                    
-                    if normalized_url == "nwnode://domain-AirDrop" {
-                        println!("Found AirDrop URL");
-                        if let Some(sidebar_item) = SidebarItem::new("nwnode://domain-AirDrop") {
-                            println!("Created AirDrop sidebar item");
-                            favorites.push(sidebar_item);
-                            continue;
-                        } else {
-                            println!("Failed to create AirDrop sidebar item");
-                        }
-                    }
-                    
-                    // Handle regular file paths
-                    if let Some(path) = url.to_path() {
-                        println!("got path: {:?}", path);
-                        // Convert real paths to our special paths
-                        if let Some(home_dir) = dirs::home_dir() {
-                            if path == home_dir {
-                                if let Some(sidebar_item) = SidebarItem::new("~/") {
-                                    favorites.push(sidebar_item);
-                                    continue;
-                                }
-                            }
-                        }
-                        // Try the path as-is as fallback
-                        if let Some(sidebar_item) = SidebarItem::new(path) {
-                            favorites.push(sidebar_item);
-                        }
-                    } else {
-                        println!("failed to get path from url");
-                    }
+    pub fn load(&self) -> Sidebar {
+        let mut seed = 0u32;
+        let items = unsafe {
+            // Get the favorites list
+            let list = self.api.get_favorites_list();
+            
+            // Get a snapshot of the current state
+            let snapshot = self.api.get_favorites_snapshot(list, &mut seed);
+            
+            // Convert each item in the snapshot to a SidebarItem
+            let mut items = Vec::new();
+            let len = snapshot.len();
+            
+            // Use as_concrete_TypeRef() to get the underlying array pointer
+            let array_ref = snapshot.as_concrete_TypeRef();
+            
+            for i in 0..len {
+                // Use core_foundation array functions directly
+                let item_ref = core_foundation::array::CFArrayGetValueAtIndex(array_ref, i) as LSSharedFileListItemRef;
+                
+                // Get the URL for this item
+                let url = self.api.get_item_url(item_ref);
+                
+                // Convert the URL to a Target and create a SidebarItem
+                if !url.is_null() {
+                    let target = self.api.url_to_target(url);
+                    items.push(SidebarItem::new(target));
                 }
             }
 
-            println!("final favorites count: {}", favorites.len());
-            Some(Sidebar::new(favorites))
-        }
-    }
+            items
+        };
 
-    pub fn save(&self, _sidebar: &Sidebar) -> Option<()> {
-        // TODO: Implement save functionality when needed
-        Some(())
+        Sidebar::new(items)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finder::macos::test_utils::MockMacOsApi;
+    use crate::finder::target::Target;
+    use std::path::PathBuf;
+    use crate::finder::macos::MacOsApi;
+    use core_foundation::{
+        array::CFArray,
+        string::CFStringRef,
+        url::CFURLRef,
+    };
     use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-    use core_foundation::array::CFArray;
+    use std::ptr;
+
+    struct TestMacOsApi {
+        favorites: Vec<Target>,
+    }
+
+    impl TestMacOsApi {
+        fn new(favorites: Vec<Target>) -> Self {
+            Self { favorites }
+        }
+    }
+
+    impl MacOsApi for TestMacOsApi {
+        unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
+            ptr::null_mut()
+        }
+
+        unsafe fn get_favorites_snapshot(
+            &self,
+            _list: LSSharedFileListRef,
+            _seed: &mut u32,
+        ) -> CFArray<LSSharedFileListItemRef> {
+            let items: Vec<LSSharedFileListItemRef> = (1..=self.favorites.len())
+                .map(|i| (i as *mut std::ffi::c_void) as LSSharedFileListItemRef)
+                .collect();
+            CFArray::from_copyable(&items)
+        }
+
+        unsafe fn get_item_display_name(&self, _item: LSSharedFileListItemRef) -> CFStringRef {
+            ptr::null_mut()
+        }
+
+        unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
+            item as *const _ as CFURLRef
+        }
+
+        unsafe fn url_to_target(&self, url: CFURLRef) -> Target {
+            if url.is_null() {
+                return Target::Home(dirs::home_dir().unwrap_or_default());
+            }
+            let item = url as LSSharedFileListItemRef;
+            let index = item as usize - 1;
+            self.favorites.get(index).cloned().unwrap_or_else(|| {
+                Target::CustomPath(PathBuf::from("/unknown"))
+            })
+        }
+    }
 
     #[test]
-    fn loads_empty_favorites() {
+    fn test_repository_loads_favorites() {
         // Given
-        let api = MockMacOsApi::new()
-            .with_favorites_list(std::ptr::null_mut())
-            .with_favorites_snapshot(CFArray::from_copyable(&[]));
-
-        let repository = SidebarRepository::new(api);
+        let favorites = vec![
+            Target::Home(PathBuf::from("/Users/test")),
+            Target::Desktop(PathBuf::from("/Users/test/Desktop")),
+        ];
+        let api = TestMacOsApi::new(favorites.clone());
+        let repository = Repository::new(Box::new(api));
 
         // When
         let sidebar = repository.load();
 
         // Then
-        assert!(sidebar.is_none());
-    }
-
-    #[test]
-    fn loads_single_favorite() {
-        // Given
-        let airdrop = "nwnode://domain-AirDrop";
-        // Create URL with a trailing slash to match macOS behavior
-        let url = CFURL::from_path(format!("{}/", airdrop), false).expect("Failed to create URL");
-        println!("Test URL: {:?}", url);
-        println!("Test URL string: {:?}", url.get_string().to_string());
-        
-        let item_ref = 1 as LSSharedFileListItemRef;
-        
-        let favorites_snapshot = CFArray::from_copyable(&[item_ref]);
-        let api = MockMacOsApi::new()
-            .with_favorites_list(1 as LSSharedFileListRef)
-            .with_favorites_snapshot(favorites_snapshot)
-            .with_item_url(url.as_concrete_TypeRef(), item_ref);
-
-        let repository = SidebarRepository::new(api);
-
-        // When
-        let sidebar = repository.load().unwrap();
-
-        // Then
-        let favorites = sidebar.favorites();
-        assert_eq!(favorites.iter().count(), 1);
-        assert_eq!(favorites.iter().next().unwrap().path().to_str().unwrap(), airdrop);
+        let loaded_favorites: Vec<Target> = sidebar
+            .favorites()
+            .iter()
+            .map(|item| item.target().clone())
+            .collect();
+        assert_eq!(loaded_favorites, favorites);
     }
 }

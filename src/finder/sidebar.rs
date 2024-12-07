@@ -1,73 +1,8 @@
 use super::sidebar_item::SidebarItem;
-use super::Target;
-use std::slice::Iter;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Sidebar {
     favorites: Vec<SidebarItem>,
-    // locations will be added later
-}
-
-#[derive(Debug)]
-pub struct Favorites<'a> {
-    sidebar_items: &'a [SidebarItem],
-}
-
-impl<'a> Favorites<'a> {
-    fn new(sidebar_items: &'a [SidebarItem]) -> Self {
-        Self { sidebar_items }
-    }
-
-    pub fn iter(&self) -> Iter<'_, SidebarItem> {
-        self.sidebar_items.iter()
-    }
-}
-
-impl AsRef<[SidebarItem]> for Favorites<'_> {
-    fn as_ref(&self) -> &[SidebarItem] {
-        self.sidebar_items
-    }
-}
-
-impl<'a> IntoIterator for Favorites<'a> {
-    type Item = &'a SidebarItem;
-    type IntoIter = Iter<'a, SidebarItem>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.sidebar_items.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a Favorites<'a> {
-    type Item = &'a SidebarItem;
-    type IntoIter = Iter<'a, SidebarItem>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.sidebar_items.iter()
-    }
-}
-
-impl PartialEq for Favorites<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.sidebar_items == other.sidebar_items
-    }
-}
-
-impl PartialEq<Vec<Target>> for Favorites<'_> {
-    fn eq(&self, other: &Vec<Target>) -> bool {
-        if self.sidebar_items.len() != other.len() {
-            return false;
-        }
-        
-        self.sidebar_items.iter()
-            .all(|item| other.contains(&Target::from(item)))
-    }
-}
-
-impl PartialEq<Favorites<'_>> for Vec<Target> {
-    fn eq(&self, other: &Favorites) -> bool {
-        other == self
-    }
 }
 
 impl Sidebar {
@@ -75,22 +10,25 @@ impl Sidebar {
         Self { favorites }
     }
 
-    pub fn favorites(&self) -> Favorites {
-        Favorites::new(&self.favorites)
+    pub fn favorites(&self) -> &[SidebarItem] {
+        &self.favorites
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finder::Target;
+    use super::super::target::Target;
+    use std::path::PathBuf;
 
     #[test]
-    fn creates_sidebar_with_home_item() {
-        let mut sidebar = Sidebar::default();
-        let sidebar_item = SidebarItem::new(Target::home().path()).unwrap();
-        sidebar.favorites.push(sidebar_item);
+    fn test_sidebar_returns_favorites() {
+        let favorites = vec![SidebarItem::new(Target::Home(PathBuf::from("/Users/happygopher")))];
+        let sidebar = Sidebar::new(favorites);
         
-        assert_eq!(sidebar.favorites().iter().count(), 1);
+        assert_eq!(
+            sidebar.favorites()[0].target(),
+            &Target::Home(PathBuf::from("/Users/happygopher"))
+        );
     }
 }

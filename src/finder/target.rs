@@ -1,153 +1,79 @@
-use std::path::{Path, PathBuf};
-use std::convert::TryFrom;
-use crate::errors::FinderError;
-
-pub const AIRDROP_PATH: &str = "nwnode://domain-AirDrop";
-pub const HOME_PATH: &str = "~/";
+use std::path::PathBuf;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Target {
-    AirDrop(PathBuf),
+    AirDrop(String),
+    Applications(PathBuf),
+    Desktop(PathBuf),
+    Documents(PathBuf),
+    Downloads(PathBuf),
     Home(PathBuf),
+    Recents(PathBuf),
+    CustomPath(PathBuf),
 }
 
 impl Target {
-    pub fn airdrop() -> Self {
-        Self::AirDrop(PathBuf::from(AIRDROP_PATH))
-    }
-
-    pub fn home() -> Self {
-        Self::Home(PathBuf::from(HOME_PATH))
-    }
-
+    /// Returns a human-readable label for the target.
     pub fn label(&self) -> &str {
         match self {
-            Self::AirDrop(_) => "AirDrop",
             Self::Home(_) => "Home",
+            Self::Desktop(_) => "Desktop",
+            Self::Documents(_) => "Documents",
+            Self::Downloads(_) => "Downloads",
+            Self::Applications(_) => "Applications",
+            Self::AirDrop(_) => "AirDrop",
+            Self::Recents(_) => "Recents",
+            Self::CustomPath(_) => "Custom Path",
         }
     }
 
-    pub fn path(&self) -> &Path {
+    pub fn from_path(path_str: &str) -> Self {
+        if path_str.starts_with("nwnode://domain-AirDrop") {
+            return Self::AirDrop(path_str.to_string());
+        }
+
+        let path = PathBuf::from(path_str);
+        
+        // Check against home directory paths
+        if let Some(home_dir) = dirs::home_dir() {
+            if path == home_dir {
+                return Self::Home(path);
+            }
+            if path == home_dir.join("Desktop") {
+                return Self::Desktop(path);
+            }
+            if path == home_dir.join("Documents") {
+                return Self::Documents(path);
+            }
+            if path == home_dir.join("Downloads") {
+                return Self::Downloads(path);
+            }
+        }
+
+        // Check for special paths
+        if path == PathBuf::from("/Applications") {
+            return Self::Applications(path);
+        }
+        if path == PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch") {
+            return Self::Recents(path);
+        }
+
+        Self::CustomPath(path)
+    }
+}
+
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::AirDrop(path) => path,
-            Self::Home(path) => path,
-        }
-    }
-
-    fn try_from_path(path: impl AsRef<Path>) -> Result<Self, FinderError> {
-        let path = path.as_ref();
-
-        if path.to_str() == Some(AIRDROP_PATH) {
-            return Ok(Self::AirDrop(path.to_path_buf()));
-        }
-
-        let path_str = path.to_str()
-            .ok_or_else(|| FinderError::invalid_path(path))?;
-
-        if path_str == HOME_PATH {
-            return Ok(Self::Home(PathBuf::from(HOME_PATH)));
-        }
-
-        Err(FinderError::UnsupportedTarget(path.to_path_buf()))
-    }
-}
-
-impl TryFrom<&str> for Target {
-    type Error = FinderError;
-
-    fn try_from(path: &str) -> Result<Self, Self::Error> {
-        Self::try_from_path(path)
-    }
-}
-
-impl TryFrom<PathBuf> for Target {
-    type Error = FinderError;
-
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        Self::try_from_path(path)
-    }
-}
-
-impl TryFrom<&Path> for Target {
-    type Error = FinderError;
-
-    fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        Self::try_from_path(path)
-    }
-}
-
-#[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
-mod tests {
-    use super::*;
-
-    mod constructors {
-        use super::*;
-
-        #[test]
-        fn creates_airdrop() {
-            let target = Target::airdrop();
-            assert!(matches!(target, Target::AirDrop(_)));
-            assert_eq!(target.label(), "AirDrop");
-            assert_eq!(target.path(), Path::new(AIRDROP_PATH));
-        }
-
-        #[test]
-        fn creates_home() {
-            let target = Target::home();
-            assert!(matches!(target, Target::Home(_)));
-            assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), Path::new(HOME_PATH));
-        }
-    }
-
-    mod conversions {
-        use super::*;
-
-        #[test]
-        fn converts_airdrop_path() {
-            let target = Target::try_from_path(Path::new(AIRDROP_PATH)).unwrap();
-            assert!(matches!(target, Target::AirDrop(_)));
-            assert_eq!(target.label(), "AirDrop");
-            assert_eq!(target.path(), Path::new(AIRDROP_PATH));
-        }
-
-        #[test]
-        fn converts_home_path() {
-            let target = Target::try_from_path(Path::new(HOME_PATH)).unwrap();
-            assert!(matches!(target, Target::Home(_)));
-            assert_eq!(target.label(), "Home");
-            assert_eq!(target.path(), Path::new(HOME_PATH));
-        }
-    }
-
-    mod errors {
-        use super::*;
-        use std::ffi::OsStr;
-        use std::os::unix::ffi::OsStrExt;
-
-        #[test]
-        fn rejects_non_utf8_path() {
-            let invalid_utf8 = OsStr::from_bytes(&[0x80]);
-            let path = Path::new(invalid_utf8);
-
-            let result = Target::try_from_path(path);
-            assert!(matches!(
-                result,
-                Err(FinderError::InvalidPath { path: _, source: None })
-            ));
-        }
-
-        #[test]
-        fn rejects_unsupported_path() {
-            let result = Target::try_from("/some/random/path");
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-        }
-
-        #[test]
-        fn rejects_empty_path() {
-            let result = Target::try_from_path(Path::new(""));
-            assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
+            Self::Home(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::Desktop(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::Documents(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::Downloads(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::Applications(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::AirDrop(url) => write!(f, "{} ({})", self.label(), url),
+            Self::Recents(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::CustomPath(path) => write!(f, "{} ({})", self.label(), path.display()),
         }
     }
 }
