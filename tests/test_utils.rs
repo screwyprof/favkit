@@ -2,89 +2,13 @@ use std::{cell::RefCell, ptr, rc::Rc};
 
 use core_foundation::{array::CFArray, string::CFStringRef, url::CFURLRef};
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{finder::macos::MacOsApi, Target};
+use favkit::{finder::{macos::MacOsApi, macos_url}, Target};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MacOsApiCall {
-    GetFavoritesList,
-    GetFavoritesSnapshot,
-    GetItemUrl(LSSharedFileListItemRef),
-    UrlToTarget(CFURLRef),
-}
-
-struct CallVerifier<'a> {
-    calls: &'a [MacOsApiCall],
-    favorites_count: usize,
-    current_pos: usize,
-}
-
-impl<'a> CallVerifier<'a> {
-    fn new(calls: &'a [MacOsApiCall], favorites_count: usize) -> Self {
-        Self { 
-            calls, 
-            favorites_count,
-            current_pos: 0,
-        }
-    }
-
-    fn verify(&mut self) {
-        self.verify_init_sequence();
-        self.verify_favorite_sequences();
-        self.verify_no_extra_calls();
-    }
-
-    fn verify_init_sequence(&mut self) {
-        self.verify_next_is(MacOsApiCall::GetFavoritesList, "GetFavoritesList must be called first");
-        self.verify_next_is(MacOsApiCall::GetFavoritesSnapshot, "GetFavoritesSnapshot must be called second");
-    }
-
-    fn verify_favorite_sequences(&mut self) {
-        for favorite_idx in 0..self.favorites_count {
-            let item_ref = self.make_item_ref(favorite_idx);
-            let url_ref = item_ref as CFURLRef;
-            
-            self.verify_next_is(
-                MacOsApiCall::GetItemUrl(item_ref), 
-                &format!("GetItemUrl must be called for favorite {}", favorite_idx + 1)
-            );
-            self.verify_next_is(
-                MacOsApiCall::UrlToTarget(url_ref), 
-                &format!("UrlToTarget must be called for favorite {}", favorite_idx + 1)
-            );
-        }
-    }
-
-    fn verify_no_extra_calls(&self) {
-        assert_eq!(
-            self.current_pos,
-            self.calls.len(),
-            "Expected {} calls, but got {} extra calls",
-            self.current_pos,
-            self.calls.len() - self.current_pos
-        );
-    }
-
-    fn verify_next_is(&mut self, expected: MacOsApiCall, message: &str) {
-        assert!(
-            self.current_pos < self.calls.len(),
-            "Expected {}, but no more calls were made",
-            message
-        );
-        
-        assert_eq!(
-            self.calls[self.current_pos],
-            expected,
-            "{} at position {}",
-            message,
-            self.current_pos
-        );
-        
-        self.current_pos += 1;
-    }
-
-    fn make_item_ref(&self, favorite_idx: usize) -> LSSharedFileListItemRef {
-        ((favorite_idx + 1) as *mut std::ffi::c_void) as LSSharedFileListItemRef
-    }
+    FavoritesList,
+    FavoritesSnapshot,
+    ItemUrl(LSSharedFileListItemRef),
 }
 
 #[derive(Clone)]
@@ -110,11 +34,15 @@ impl MockMacOsApi {
         let mut verifier = CallVerifier::new(&calls, self.favorites.len());
         verifier.verify();
     }
+
+    fn make_item_ref(&self, index: usize) -> LSSharedFileListItemRef {
+        (index + 1) as LSSharedFileListItemRef
+    }
 }
 
 impl MacOsApi for MockMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
-        self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesList);
+        self.calls.borrow_mut().push(MacOsApiCall::FavoritesList);
         1 as LSSharedFileListRef
     }
 
@@ -123,10 +51,12 @@ impl MacOsApi for MockMacOsApi {
         _list: LSSharedFileListRef,
         _seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
-        self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesSnapshot);
-        CFArray::from_copyable(&(1..=self.favorites.len())
-            .map(|i| i as *mut std::ffi::c_void as LSSharedFileListItemRef)
-            .collect::<Vec<_>>())
+        self.calls.borrow_mut().push(MacOsApiCall::FavoritesSnapshot);
+        // Create item refs for our items in the exact order they were provided
+        let values: Vec<LSSharedFileListItemRef> = (0..self.favorites.len())
+            .map(|i| self.make_item_ref(i))
+            .collect();
+        CFArray::from_copyable(&values)
     }
 
     unsafe fn get_item_display_name(&self, _item: LSSharedFileListItemRef) -> CFStringRef {
@@ -134,13 +64,68 @@ impl MacOsApi for MockMacOsApi {
     }
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-        self.calls.borrow_mut().push(MacOsApiCall::GetItemUrl(item));
-        item as CFURLRef
+        self.calls.borrow_mut().push(MacOsApiCall::ItemUrl(item));
+        let index = item as usize - 1;
+        if let Some(target) = self.favorites.get(index) {
+            macos_url::target_to_url(target)
+        } else {
+            ptr::null()
+        }
+    }
+}
+
+struct CallVerifier<'a> {
+    calls: &'a [MacOsApiCall],
+    favorites_count: usize,
+    current_pos: usize,
+}
+
+impl<'a> CallVerifier<'a> {
+    fn new(calls: &'a [MacOsApiCall], favorites_count: usize) -> Self {
+        Self {
+            calls,
+            favorites_count,
+            current_pos: 0,
+        }
     }
 
-    unsafe fn url_to_target(&self, url: CFURLRef) -> Target {
-        self.calls.borrow_mut().push(MacOsApiCall::UrlToTarget(url));
-        let index = (url as usize) - 1;
-        self.favorites[index].clone()
+    fn verify(&mut self) {
+        // First, verify the initialization sequence
+        self.verify_next_is(MacOsApiCall::FavoritesList, "FavoritesList must be called first");
+        self.verify_next_is(MacOsApiCall::FavoritesSnapshot, "FavoritesSnapshot must be called second");
+
+        // Then verify that get_item_url is called for each favorite in order
+        for i in 0..self.favorites_count {
+            let expected_item_ref = ((i + 1) as *mut std::ffi::c_void) as LSSharedFileListItemRef;
+            self.verify_next_is(
+                MacOsApiCall::ItemUrl(expected_item_ref),
+                &format!("ItemUrl must be called for favorite {} with correct item ref", i + 1)
+            );
+        }
+
+        // Verify no extra calls were made
+        assert_eq!(
+            self.current_pos,
+            self.calls.len(),
+            "Expected {} calls but got {}",
+            self.current_pos,
+            self.calls.len()
+        );
+    }
+
+    fn verify_next_is(&mut self, expected: MacOsApiCall, message: &str) {
+        assert!(
+            self.current_pos < self.calls.len(),
+            "Expected more calls but got none: {}",
+            message
+        );
+        
+        assert_eq!(
+            self.calls[self.current_pos], expected,
+            "Unexpected call sequence: {}",
+            message
+        );
+        
+        self.current_pos += 1;
     }
 }

@@ -1,7 +1,8 @@
 use super::{
+    macos::MacOsApi,
+    macos_url,
     sidebar::Sidebar,
     sidebar_item::SidebarItem,
-    macos::MacOsApi,
 };
 use core_services::LSSharedFileListItemRef;
 
@@ -35,7 +36,7 @@ impl Repository {
                         return None;
                     }
 
-                    let target = self.api.url_to_target(url_ref);
+                    let target = macos_url::url_to_target(url_ref);
                     Some(SidebarItem::new(target))
                 })
                 .collect();

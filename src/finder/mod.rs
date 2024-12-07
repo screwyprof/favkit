@@ -1,5 +1,6 @@
 pub mod macos;
 pub mod macos_impl;
+pub mod macos_url;
 pub mod repository;
 pub mod sidebar;
 pub mod sidebar_item;
