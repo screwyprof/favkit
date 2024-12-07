@@ -1,37 +1,21 @@
 use std::path::PathBuf;
-use std::fmt;
-use std::error::Error;
+use thiserror::Error;
+use crate::finder::macos_url::UrlError;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum FinderError {
-    InvalidPath { path: PathBuf, source: Option<std::io::Error> },
+    #[error("Invalid path: {path}")]
+    InvalidPath {
+        path: PathBuf,
+        #[source]
+        source: Option<std::io::Error>,
+    },
+    #[error("Unsupported target: {0}")]
     UnsupportedTarget(String),
+    #[error("System error: {0}")]
     SystemError(String),
-}
-
-impl fmt::Display for FinderError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            FinderError::InvalidPath { path, source } => {
-                write!(f, "Invalid path: {}", path.display())?;
-                if let Some(err) = source {
-                    write!(f, " ({})", err)?;
-                }
-                Ok(())
-            }
-            FinderError::UnsupportedTarget(msg) => write!(f, "Unsupported target: {}", msg),
-            FinderError::SystemError(msg) => write!(f, "System error: {}", msg),
-        }
-    }
-}
-
-impl Error for FinderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            FinderError::InvalidPath { source, .. } => source.as_ref().map(|e| e as &(dyn Error + 'static)),
-            _ => None,
-        }
-    }
+    #[error(transparent)]
+    Url(#[from] UrlError),
 }
 
 impl FinderError {
@@ -40,6 +24,13 @@ impl FinderError {
             path: path.into(),
             source: None,
         }
+    }
+
+    pub fn with_source(mut self, source: std::io::Error) -> Self {
+        if let FinderError::InvalidPath { source: ref mut err, .. } = self {
+            *err = Some(source);
+        }
+        self
     }
 }
 

@@ -34,12 +34,12 @@ impl SidebarItem {
         }
     }
 
-    pub fn display_name(&self) -> String {
-        self.display_name.clone().unwrap_or_else(|| self.target.to_string())
-    }
-
     pub fn target(&self) -> &Target {
         &self.target
+    }
+
+    pub fn display_name(&self) -> String {
+        self.display_name.clone().unwrap_or_else(|| self.target.to_string())
     }
 }
 

@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub mod macos;
 pub mod macos_impl;
 pub mod macos_url;
@@ -6,20 +8,36 @@ pub mod sidebar;
 pub mod sidebar_item;
 pub mod target;
 
+use sidebar::Sidebar;
+use target::TargetLocation;
 
-/// The Finder represents a macOS Finder window.
-/// It provides access to the sidebar items and allows modifying them.
+pub use macos_impl::SystemMacOsApi;
+
 pub struct Finder {
-    sidebar: sidebar::Sidebar,
+    sidebar: Sidebar,
 }
 
 impl Finder {
-    pub fn new(sidebar: sidebar::Sidebar) -> Self {
+    pub fn new(sidebar: Sidebar) -> Self {
         Self { sidebar }
     }
 
-    pub fn sidebar(&self) -> &sidebar::Sidebar {
+    pub fn sidebar(&self) -> &Sidebar {
         &self.sidebar
+    }
+}
+
+impl fmt::Display for Finder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Favorites:")?;
+        for item in self.sidebar().favorites() {
+            let target_location = match item.target().location() {
+                TargetLocation::Path(p) => p.display().to_string(),
+                TargetLocation::Url(u) => u.to_string(),
+            };
+            writeln!(f, "- {} ({})", item, target_location)?;
+        }
+        Ok(())
     }
 }
 

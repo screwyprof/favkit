@@ -1,131 +1,216 @@
-use std::{cell::RefCell, ptr, rc::Rc};
+#![allow(dead_code)]
 
-use core_foundation::{array::CFArray, string::CFStringRef, url::CFURLRef};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{finder::{macos::MacOsApi, macos_url}, Target};
+use core_foundation::{
+    array::CFArrayCreate,
+    base::{kCFAllocatorDefault, CFIndex, TCFType},
+    string::{CFString, CFStringRef},
+    url::{CFURLCreateWithString, CFURLRef},
+};
+use core_services::{CFArray, LSSharedFileListItemRef, LSSharedFileListRef};
+use favkit::finder::{macos::MacOsApi, sidebar_item::SidebarItem, target::{Target, TargetLocation}};
+use std::{
+    ffi::c_void,
+    ptr,
+    sync::{Arc, Mutex},
+};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum MacOsApiCall {
-    FavoritesList,
-    FavoritesSnapshot,
-    ItemUrl(LSSharedFileListItemRef),
+#[derive(Debug, PartialEq, Clone)]
+pub enum ApiCall {
+    CreateFavoritesList,
+    GetFavoritesSnapshot(LSSharedFileListRef),
+    GetItemDisplayName(LSSharedFileListItemRef),
+    GetItemUrl(LSSharedFileListItemRef),
+}
+
+struct ApiCallState {
+    items: Vec<SidebarItem>,
+    items_without_names: Vec<usize>,
+    next_ref: Mutex<i64>,
+    calls: Mutex<Vec<ApiCall>>,
+}
+
+unsafe impl Send for ApiCallState {}
+unsafe impl Sync for ApiCallState {}
+
+impl Clone for ApiCallState {
+    fn clone(&self) -> Self {
+        Self {
+            items: self.items.clone(),
+            items_without_names: self.items_without_names.clone(),
+            next_ref: Mutex::new(*self.next_ref.lock().unwrap()),
+            calls: Mutex::new(self.calls.lock().unwrap().clone()),
+        }
+    }
 }
 
 #[derive(Clone)]
-pub struct MockMacOsApi {
-    favorites: Vec<Target>,
-    calls: Rc<RefCell<Vec<MacOsApiCall>>>,
+pub struct ApiCallRecorder {
+    state: Arc<ApiCallState>,
 }
 
-impl MockMacOsApi {
-    pub fn with_favorites(favorites: Vec<Target>) -> Self {
+impl Default for ApiCallRecorder {
+    fn default() -> Self {
         Self {
-            favorites,
-            calls: Rc::new(RefCell::new(Vec::new())),
+            state: Arc::new(ApiCallState {
+                items: Vec::new(),
+                items_without_names: Vec::new(),
+                next_ref: Mutex::new(1),
+                calls: Mutex::new(Vec::new()),
+            }),
+        }
+    }
+}
+
+impl ApiCallRecorder {
+    pub fn with_items(items: Vec<SidebarItem>) -> Self {
+        Self {
+            state: Arc::new(ApiCallState {
+                items,
+                items_without_names: Vec::new(),
+                next_ref: Mutex::new(1),
+                calls: Mutex::new(Vec::new()),
+            }),
         }
     }
 
-    pub fn calls(&self) -> Vec<MacOsApiCall> {
-        self.calls.borrow().clone()
+    pub fn with_items_and_null_names(
+        items: Vec<SidebarItem>,
+        items_without_names: Vec<usize>,
+    ) -> Self {
+        Self {
+            state: Arc::new(ApiCallState {
+                items,
+                items_without_names,
+                next_ref: Mutex::new(1),
+                calls: Mutex::new(Vec::new()),
+            }),
+        }
     }
 
-    pub fn verify_expected_calls(&self) {
-        let calls = self.calls();
-        let mut verifier = CallVerifier::new(&calls, self.favorites.len());
-        verifier.verify();
-    }
-
-    fn make_item_ref(&self, index: usize) -> LSSharedFileListItemRef {
+    pub fn get_test_item(&self, index: usize) -> LSSharedFileListItemRef {
         (index + 1) as LSSharedFileListItemRef
+    }
+
+    fn get_next_ref(&self) -> LSSharedFileListItemRef {
+        let mut next_ref = self.state.next_ref.lock().unwrap();
+        let current = *next_ref;
+        *next_ref += 1;
+        current as LSSharedFileListItemRef
+    }
+
+    pub fn verify_calls(&self, expected_calls: &[ApiCall]) {
+        let calls = self.state.calls.lock().unwrap();
+        assert_eq!(
+            &*calls, expected_calls,
+            "API calls don't match expected calls"
+        );
+    }
+
+    fn get_item_by_ref(&self, item: LSSharedFileListItemRef) -> Option<&SidebarItem> {
+        let index = (item as i64 - 1) as usize;
+        self.state.items.get(index)
+    }
+
+    fn should_return_null_name(&self, item: LSSharedFileListItemRef) -> bool {
+        let index = (item as i64 - 1) as usize;
+        self.state.items_without_names.contains(&index)
     }
 }
 
-impl MacOsApi for MockMacOsApi {
+impl MacOsApi for ApiCallRecorder {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
-        self.calls.borrow_mut().push(MacOsApiCall::FavoritesList);
+        self.state
+            .calls
+            .lock()
+            .unwrap()
+            .push(ApiCall::CreateFavoritesList);
         1 as LSSharedFileListRef
     }
 
     unsafe fn get_favorites_snapshot(
         &self,
-        _list: LSSharedFileListRef,
+        list: LSSharedFileListRef,
         _seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
-        self.calls.borrow_mut().push(MacOsApiCall::FavoritesSnapshot);
+        self.state
+            .calls
+            .lock()
+            .unwrap()
+            .push(ApiCall::GetFavoritesSnapshot(list));
+
         // Create item refs for our items in the exact order they were provided
-        let values: Vec<LSSharedFileListItemRef> = (0..self.favorites.len())
-            .map(|i| self.make_item_ref(i))
+        let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
+            .map(|i| self.get_test_item(i))
             .collect();
-        CFArray::from_copyable(&values)
+
+        // Create array and wrap it
+        let array_ref = CFArrayCreate(
+            kCFAllocatorDefault,
+            values.as_ptr() as *const *const c_void,
+            values.len() as CFIndex,
+            ptr::null(),
+        );
+        CFArray::wrap_under_create_rule(array_ref)
     }
 
-    unsafe fn get_item_display_name(&self, _item: LSSharedFileListItemRef) -> CFStringRef {
-        ptr::null_mut()
-    }
+    unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
+        self.state
+            .calls
+            .lock()
+            .unwrap()
+            .push(ApiCall::GetItemDisplayName(item_ref));
 
-    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-        self.calls.borrow_mut().push(MacOsApiCall::ItemUrl(item));
-        let index = item as usize - 1;
-        if let Some(target) = self.favorites.get(index) {
-            macos_url::target_to_url(target)
+        if let Some(item) = self.get_item_by_ref(item_ref) {
+            if self.should_return_null_name(item_ref) {
+                ptr::null()
+            } else {
+                match item.target() {
+                    Target::AirDrop(_) => CFString::new("AirDrop").as_concrete_TypeRef(),
+                    _ => CFString::new(&item.display_name()).as_concrete_TypeRef()
+                }
+            }
         } else {
             ptr::null()
         }
     }
-}
 
-struct CallVerifier<'a> {
-    calls: &'a [MacOsApiCall],
-    favorites_count: usize,
-    current_pos: usize,
-}
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
+        self.state
+            .calls
+            .lock()
+            .unwrap()
+            .push(ApiCall::GetItemUrl(item));
 
-impl<'a> CallVerifier<'a> {
-    fn new(calls: &'a [MacOsApiCall], favorites_count: usize) -> Self {
-        Self {
-            calls,
-            favorites_count,
-            current_pos: 0,
+        if let Some(item) = self.get_item_by_ref(item) {
+            match item.target().location() {
+                TargetLocation::Url(url) if url.starts_with("unsupported://") => {
+                    let cf_str = CFString::new(url);
+                    CFURLCreateWithString(
+                        kCFAllocatorDefault,
+                        cf_str.as_concrete_TypeRef(),
+                        ptr::null(),
+                    )
+                }
+                TargetLocation::Path(path) => {
+                    let path = format!("file://{}", path.display());
+                    let cf_str = CFString::new(&path);
+                    CFURLCreateWithString(
+                        kCFAllocatorDefault,
+                        cf_str.as_concrete_TypeRef(),
+                        ptr::null(),
+                    )
+                }
+                TargetLocation::Url(url) => {
+                    let cf_str = CFString::new(url);
+                    CFURLCreateWithString(
+                        kCFAllocatorDefault,
+                        cf_str.as_concrete_TypeRef(),
+                        ptr::null(),
+                    )
+                }
+            }
+        } else {
+            ptr::null()
         }
-    }
-
-    fn verify(&mut self) {
-        // First, verify the initialization sequence
-        self.verify_next_is(MacOsApiCall::FavoritesList, "FavoritesList must be called first");
-        self.verify_next_is(MacOsApiCall::FavoritesSnapshot, "FavoritesSnapshot must be called second");
-
-        // Then verify that get_item_url is called for each favorite in order
-        for i in 0..self.favorites_count {
-            let expected_item_ref = ((i + 1) as *mut std::ffi::c_void) as LSSharedFileListItemRef;
-            self.verify_next_is(
-                MacOsApiCall::ItemUrl(expected_item_ref),
-                &format!("ItemUrl must be called for favorite {} with correct item ref", i + 1)
-            );
-        }
-
-        // Verify no extra calls were made
-        assert_eq!(
-            self.current_pos,
-            self.calls.len(),
-            "Expected {} calls but got {}",
-            self.current_pos,
-            self.calls.len()
-        );
-    }
-
-    fn verify_next_is(&mut self, expected: MacOsApiCall, message: &str) {
-        assert!(
-            self.current_pos < self.calls.len(),
-            "Expected more calls but got none: {}",
-            message
-        );
-        
-        assert_eq!(
-            self.calls[self.current_pos], expected,
-            "Unexpected call sequence: {}",
-            message
-        );
-        
-        self.current_pos += 1;
     }
 }

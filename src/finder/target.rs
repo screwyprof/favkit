@@ -105,13 +105,16 @@ impl fmt::Display for Target {
             Self::Downloads(_) => "Downloads",
             Self::Applications(_) => "Applications",
             Self::AirDrop(_) => "AirDrop",
-            Self::CustomPath(loc) => return match loc {
-                TargetLocation::Path(p) => write!(f, "{}", p.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("Unknown")),
-                TargetLocation::Url(u) => write!(f, "{}", u),
-            },
+            Self::CustomPath(loc) => {
+                match loc {
+                    TargetLocation::Path(p) => p.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("Unknown"),
+                    TargetLocation::Url(u) => u,
+                }
+            }
         };
+
         write!(f, "{}", name)
     }
 }

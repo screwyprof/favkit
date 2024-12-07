@@ -1,6 +1,7 @@
 use super::sidebar_item::SidebarItem;
 
-#[derive(Debug, Clone)]
+/// Represents the MacOS Finder sidebar
+#[derive(Debug)]
 pub struct Sidebar {
     favorites: Vec<SidebarItem>,
 }

@@ -1,20 +1,22 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use favkit::{
-    Finder,
-    Repository,
-};
+use favkit::{finder::repository::Repository, SystemMacOsApi};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn main() {
-    let api = Box::new(favkit::finder::macos_impl::SystemMacOsApi::new());
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api = Box::new(SystemMacOsApi::new());
     let repository = Repository::new(api);
-    let sidebar = repository.load();
-    let finder = Finder::new(sidebar);
-
-    println!("Finder Sidebar Items:");
-    println!("--------------------");
-    for item in finder.sidebar().favorites() {
-        println!("{}", item);
+    match repository.load() {
+        Ok(sidebar) => {
+            println!("Favorites:");
+            for favorite in sidebar.favorites() {
+                println!("- {} ({})", favorite.display_name(), favorite.target());
+            }
+            Ok(())
+        }
+        Err(err) => {
+            eprintln!("Error loading favorites: {}", err);
+            Err(Box::new(err))
+        }
     }
 }
