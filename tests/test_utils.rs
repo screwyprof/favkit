@@ -5,11 +5,21 @@ use core_foundation::{
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::finder::{macos::MacOsApi, target::Target};
-use std::{path::PathBuf, ptr};
+use std::{cell::RefCell, path::PathBuf, ptr, rc::Rc};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum MacOsApiCall {
+    GetFavoritesList,
+    GetFavoritesSnapshot,
+    GetItemUrl(LSSharedFileListItemRef),
+    UrlToTarget(CFURLRef),
+}
+
+#[derive(Clone)]
 pub struct MockMacOsApi {
     favorites: Vec<Target>,
     items: Vec<LSSharedFileListItemRef>,
+    calls: Rc<RefCell<Vec<MacOsApiCall>>>,
 }
 
 impl Default for MockMacOsApi {
@@ -23,6 +33,7 @@ impl MockMacOsApi {
         Self { 
             favorites: Vec::new(),
             items: Vec::new(),
+            calls: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
@@ -33,12 +44,21 @@ impl MockMacOsApi {
             .map(|i| (i as *mut std::ffi::c_void) as LSSharedFileListItemRef)
             .collect();
         
-        Self { favorites, items }
+        Self { 
+            favorites, 
+            items,
+            calls: Rc::new(RefCell::new(Vec::new())),
+        }
+    }
+
+    pub fn calls(&self) -> Vec<MacOsApiCall> {
+        self.calls.borrow().clone()
     }
 }
 
 impl MacOsApi for MockMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
+        self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesList);
         // Return a non-null pointer to indicate a valid list
         1 as LSSharedFileListRef
     }
@@ -48,6 +68,7 @@ impl MacOsApi for MockMacOsApi {
         _list: LSSharedFileListRef,
         _seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
+        self.calls.borrow_mut().push(MacOsApiCall::GetFavoritesSnapshot);
         CFArray::from_copyable(&self.items)
     }
 
@@ -56,11 +77,13 @@ impl MacOsApi for MockMacOsApi {
     }
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-        // Convert to a CFURLRef, ensuring we preserve the index information
+        self.calls.borrow_mut().push(MacOsApiCall::GetItemUrl(item));
         item as *const _ as CFURLRef
     }
 
     unsafe fn url_to_target(&self, url: CFURLRef) -> Target {
+        self.calls.borrow_mut().push(MacOsApiCall::UrlToTarget(url));
+        
         if url.is_null() {
             return Target::Home(dirs::home_dir().unwrap_or_default());
         }
