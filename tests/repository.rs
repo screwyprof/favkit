@@ -1,4 +1,7 @@
-use favkit::{Repository, Target};
+use favkit::{
+    finder::target::{Target, TargetLocation},
+    Repository,
+};
 use test_utils::MockMacOsApi;
 
 mod test_utils;
@@ -8,11 +11,11 @@ fn test_repository_loads_favorites_from_macos_api() {
     // Given
     let home_dir = dirs::home_dir().unwrap();
     let expected_favorites = vec![
-        Target::Home(home_dir.clone()),
-        Target::Desktop(home_dir.join("Desktop")),
-        Target::AirDrop("nwnode://domain-AirDrop".to_string()),
-        Target::CustomPath(home_dir.join("Projects")),
-        Target::Documents(home_dir.join("Documents")),
+        Target::Home(TargetLocation::Path(home_dir.clone())),
+        Target::Desktop(TargetLocation::Path(home_dir.join("Desktop"))),
+        Target::AirDrop(TargetLocation::Url("nwnode://domain-AirDrop".to_string())),
+        Target::CustomPath(TargetLocation::Path(home_dir.join("Projects"))),
+        Target::Documents(TargetLocation::Path(home_dir.join("Documents"))),
     ];
 
     let mock_api = MockMacOsApi::with_favorites(expected_favorites.clone());

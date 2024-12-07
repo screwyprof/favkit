@@ -1,21 +1,52 @@
-use std::path::PathBuf;
-use std::fmt;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TargetLocation {
+    Path(PathBuf),
+    Url(String),
+}
+
+impl TargetLocation {
+    pub fn as_path(&self) -> Option<&Path> {
+        match self {
+            Self::Path(p) => Some(p),
+            Self::Url(_) => None,
+        }
+    }
+
+    pub fn as_url(&self) -> Option<&str> {
+        match self {
+            Self::Path(_) => None,
+            Self::Url(u) => Some(u),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Target {
-    AirDrop(String),
-    Applications(PathBuf),
-    Desktop(PathBuf),
-    Documents(PathBuf),
-    Downloads(PathBuf),
-    Home(PathBuf),
-    Recents(PathBuf),
-    CustomPath(PathBuf),
+    Home(TargetLocation),
+    Desktop(TargetLocation),
+    Documents(TargetLocation),
+    Downloads(TargetLocation),
+    Applications(TargetLocation),
+    AirDrop(TargetLocation),
+    CustomPath(TargetLocation),
 }
 
 impl Target {
-    /// Returns a human-readable label for the target.
-    pub fn label(&self) -> &str {
+    pub fn location(&self) -> &TargetLocation {
+        match self {
+            Self::Home(loc) |
+            Self::Desktop(loc) |
+            Self::Documents(loc) |
+            Self::Downloads(loc) |
+            Self::Applications(loc) |
+            Self::AirDrop(loc) |
+            Self::CustomPath(loc) => loc,
+        }
+    }
+
+    pub fn default_display_name(&self) -> &str {
         match self {
             Self::Home(_) => "Home",
             Self::Desktop(_) => "Desktop",
@@ -23,57 +54,10 @@ impl Target {
             Self::Downloads(_) => "Downloads",
             Self::Applications(_) => "Applications",
             Self::AirDrop(_) => "AirDrop",
-            Self::Recents(_) => "Recents",
-            Self::CustomPath(_) => "Custom Path",
-        }
-    }
-
-    pub fn from_path(path_str: &str) -> Self {
-        if path_str.starts_with("nwnode://domain-AirDrop") {
-            return Self::AirDrop(path_str.to_string());
-        }
-
-        let path = PathBuf::from(path_str);
-        
-        // Check against home directory paths
-        if let Some(home_dir) = dirs::home_dir() {
-            if path == home_dir {
-                return Self::Home(path);
-            }
-            if path == home_dir.join("Desktop") {
-                return Self::Desktop(path);
-            }
-            if path == home_dir.join("Documents") {
-                return Self::Documents(path);
-            }
-            if path == home_dir.join("Downloads") {
-                return Self::Downloads(path);
-            }
-        }
-
-        // Check for special paths
-        if path == PathBuf::from("/Applications") {
-            return Self::Applications(path);
-        }
-        if path == PathBuf::from("/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch") {
-            return Self::Recents(path);
-        }
-
-        Self::CustomPath(path)
-    }
-}
-
-impl fmt::Display for Target {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Home(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::Desktop(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::Documents(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::Downloads(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::Applications(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::AirDrop(url) => write!(f, "{} ({})", self.label(), url),
-            Self::Recents(path) => write!(f, "{} ({})", self.label(), path.display()),
-            Self::CustomPath(path) => write!(f, "{} ({})", self.label(), path.display()),
+            Self::CustomPath(loc) => loc.as_path()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                .unwrap_or("Unknown"),
         }
     }
 }

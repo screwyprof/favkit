@@ -28,7 +28,7 @@ mod tests {
     use super::*;
     use crate::finder::{
         sidebar_item::SidebarItem,
-        target::Target,
+        target::{Target, TargetLocation},
     };
     use std::path::PathBuf;
 
@@ -36,8 +36,8 @@ mod tests {
     fn test_finder_provides_access_to_sidebar() {
         // Given
         let favorites = vec![
-            SidebarItem::new(Target::Home(PathBuf::from("/Users/test"))),
-            SidebarItem::new(Target::Desktop(PathBuf::from("/Users/test/Desktop"))),
+            SidebarItem::new(Target::Home(TargetLocation::Path(PathBuf::from("/Users/test")))),
+            SidebarItem::new(Target::Desktop(TargetLocation::Path(PathBuf::from("/Users/test/Desktop")))),
         ];
         let sidebar = sidebar::Sidebar::new(favorites.clone());
         let finder = Finder::new(sidebar);

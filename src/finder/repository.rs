@@ -1,10 +1,10 @@
-use super::{
-    macos::MacOsApi,
-    macos_url,
-    sidebar::Sidebar,
-    sidebar_item::SidebarItem,
-};
+use core_foundation::base::TCFType;
+use core_foundation::string::CFString;
 use core_services::LSSharedFileListItemRef;
+use super::macos::MacOsApi;
+use super::macos_url::url_to_target;
+use super::sidebar::Sidebar;
+use super::sidebar_item::SidebarItem;
 
 /// Repository is responsible for loading and saving sidebar items.
 pub struct Repository {
@@ -17,31 +17,39 @@ impl Repository {
     }
 
     pub fn load(&self) -> Sidebar {
+        let mut items = Vec::new();
+
         unsafe {
-            let favorites_list = self.api.get_favorites_list();
-            if favorites_list.is_null() {
-                return Sidebar::new(vec![]);
+            let favorites = self.api.get_favorites_list();
+            if favorites.is_null() {
+                return Sidebar::new(items);
             }
 
             let mut seed = 0;
-            let array = self.api.get_favorites_snapshot(favorites_list, &mut seed);
+            let snapshot = self.api.get_favorites_snapshot(favorites, &mut seed);
+            let items_array = snapshot.get_all_values();
 
-            let items = array
-                .get_all_values()
-                .iter()
-                .filter_map(|&item_ref| {
-                    let item_ref = item_ref as LSSharedFileListItemRef;
-                    let url_ref = self.api.get_item_url(item_ref);
-                    if url_ref.is_null() {
-                        return None;
-                    }
+            for item in items_array {
+                let item = item as LSSharedFileListItemRef;
+                let url_ref = self.api.get_item_url(item);
+                if url_ref.is_null() {
+                    continue;
+                }
 
-                    let target = macos_url::url_to_target(url_ref);
-                    Some(SidebarItem::new(target))
-                })
-                .collect();
+                let target = url_to_target(url_ref);
+                let display_name = self.api.get_item_display_name(item);
+                
+                let item = if display_name.is_null() {
+                    SidebarItem::new(target)
+                } else {
+                    let cf_string = CFString::wrap_under_get_rule(display_name);
+                    SidebarItem::with_display_name(target, cf_string.to_string())
+                };
 
-            Sidebar::new(items)
+                items.push(item);
+            }
         }
+
+        Sidebar::new(items)
     }
 }
