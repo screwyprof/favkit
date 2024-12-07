@@ -32,21 +32,19 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_finder_integration() {
+    fn test_finder_provides_access_to_sidebar() {
         // Given
         let favorites = vec![
             SidebarItem::new(Target::Home(PathBuf::from("/Users/test"))),
             SidebarItem::new(Target::Desktop(PathBuf::from("/Users/test/Desktop"))),
         ];
-        let sidebar = sidebar::Sidebar::new(favorites);
+        let sidebar = sidebar::Sidebar::new(favorites.clone());
         let finder = Finder::new(sidebar);
 
         // When
         let result = finder.sidebar().favorites();
 
         // Then
-        assert_eq!(result.len(), 2);
-        assert!(matches!(result[0].target(), Target::Home(_)));
-        assert!(matches!(result[1].target(), Target::Desktop(_)));
+        assert_eq!(result, favorites.as_slice());
     }
 }
