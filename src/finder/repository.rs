@@ -6,7 +6,6 @@ use super::{
 use core_services::LSSharedFileListItemRef;
 
 /// Repository is responsible for loading and saving sidebar items.
-#[allow(dead_code)]
 pub struct Repository {
     api: Box<dyn MacOsApi>,
 }

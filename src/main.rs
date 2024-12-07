@@ -5,8 +5,6 @@ use favkit::{
     Repository,
 };
 
-mod finder;
-
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() {
     let api = Box::new(favkit::finder::macos_impl::SystemMacOsApi::new());
