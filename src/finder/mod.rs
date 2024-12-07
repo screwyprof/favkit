@@ -8,12 +8,10 @@ pub mod target;
 
 /// The Finder represents a macOS Finder window.
 /// It provides access to the sidebar items and allows modifying them.
-#[allow(dead_code)]
 pub struct Finder {
     sidebar: sidebar::Sidebar,
 }
 
-#[allow(dead_code)]
 impl Finder {
     pub fn new(sidebar: sidebar::Sidebar) -> Self {
         Self { sidebar }
