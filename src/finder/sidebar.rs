@@ -1,10 +1,12 @@
 use super::sidebar_item::SidebarItem;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Sidebar {
     favorites: Vec<SidebarItem>,
 }
 
+#[allow(dead_code)]
 impl Sidebar {
     pub fn new(favorites: Vec<SidebarItem>) -> Self {
         Self { favorites }

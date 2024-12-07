@@ -4,9 +4,15 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub struct SidebarItem(pub Target);
 
+#[allow(dead_code)]
 impl SidebarItem {
     pub fn new(target: Target) -> Self {
         Self(target)
+    }
+
+    /// Returns a reference to the inner target
+    pub fn target(&self) -> &Target {
+        &self.0
     }
 }
 

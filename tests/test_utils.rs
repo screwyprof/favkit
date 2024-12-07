@@ -39,7 +39,8 @@ impl MockMacOsApi {
 
 impl MacOsApi for MockMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
-        ptr::null_mut()
+        // Return a non-null pointer to indicate a valid list
+        1 as LSSharedFileListRef
     }
 
     unsafe fn get_favorites_snapshot(

@@ -1,17 +1,16 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use favkit::finder::{
+use favkit::{
     Finder,
-    macos_impl::SystemMacOsApi,
-    repository::Repository,
+    Repository,
 };
 
 mod finder;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() {
-    let api = SystemMacOsApi::new();
-    let repository = Repository::new(Box::new(api));
+    let api = Box::new(favkit::finder::macos_impl::SystemMacOsApi::new());
+    let repository = Repository::new(api);
     let sidebar = repository.load();
     let finder = Finder::new(sidebar);
 
