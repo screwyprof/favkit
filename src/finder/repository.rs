@@ -49,10 +49,12 @@ impl Repository {
                 let target = if url_ref.is_null() {
                     continue; // Skip items with no URL
                 } else {
-                    let cfurl = CFURL::wrap_under_create_rule(url_ref);
-                    match Target::try_from(&cfurl) {
-                        Ok(target) => target,
-                        Err(_) => continue,
+                    unsafe {
+                        let cfurl = CFURL::wrap_under_create_rule(url_ref);
+                        match Target::try_from(&cfurl) {
+                            Ok(target) => target,
+                            Err(_) => continue,
+                        }
                     }
                 };
                 println!("Item {} Target: {:?}", idx, target);
@@ -65,10 +67,19 @@ impl Repository {
                         _ => None // Skip other items with no display name
                     }
                 } else {
-                    let cf_string = CFString::wrap_under_get_rule(display_name);
-                    let name = cf_string.to_string();
-                    println!("Item {} display name: {}", idx, name);
-                    Some(SidebarItem::new(target, &name))
+                    unsafe {
+                        let cf_string = CFString::wrap_under_create_rule(display_name);
+                        let name = cf_string.to_string();
+                        if name.is_empty() {
+                            match target {
+                                Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
+                                _ => None // Skip other items with empty display name
+                            }
+                        } else {
+                            println!("Item {} display name: {}", idx, name);
+                            Some(SidebarItem::new(target, &name))
+                        }
+                    }
                 };
 
                 if let Some(item) = item {

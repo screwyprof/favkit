@@ -27,7 +27,7 @@ impl TryFrom<&CFURL> for Target {
         // Handle AirDrop URLs
         if url_str.starts_with("nwnode://") || url_str.starts_with("airdrop://") || url_str == "AirDrop" {
             println!("Detected AirDrop URL");
-            return Ok(Target::AirDrop("airdrop://".to_string()));
+            return Ok(Target::AirDrop("nwnode://domain-AirDrop".to_string()));
         }
 
         // Handle null or empty URLs
@@ -78,7 +78,7 @@ impl TryFrom<&Target> for CFURL {
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
         let url_str = match target {
-            Target::AirDrop(_) => "airdrop://".to_string(),
+            Target::AirDrop(_) => "nwnode://domain-AirDrop".to_string(),
             Target::UserPath(path) |
             Target::Documents(path) |
             Target::Downloads(path) |
@@ -118,7 +118,7 @@ mod tests {
             CFURL::wrap_under_create_rule(url_ref)
         };
         let target = Target::try_from(&url).unwrap();
-        assert!(matches!(target, Target::AirDrop(s) if s == "airdrop://"));
+        assert!(matches!(target, Target::AirDrop(s) if s == "nwnode://domain-AirDrop"));
 
         // Test file URL
         let cf_str = CFString::new("file:///Applications");
@@ -137,9 +137,9 @@ mod tests {
     #[test]
     fn test_convert_target_to_url() {
         // Test AirDrop target
-        let target = Target::AirDrop("airdrop://".to_string());
+        let target = Target::AirDrop("nwnode://domain-AirDrop".to_string());
         let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), "airdrop://");
+        assert_eq!(url.get_string().to_string(), "nwnode://domain-AirDrop");
 
         // Test file target
         let target = Target::Applications(PathBuf::from("/Applications"));
