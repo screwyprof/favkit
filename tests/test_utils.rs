@@ -3,7 +3,6 @@
 use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
-    string::{CFString, CFStringRef},
     url::CFURLRef,
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
@@ -11,6 +10,7 @@ use favkit::{MacOsApi, SidebarItem};
 use favkit::errors::{FinderError, FavoritesErrorKind};
 use std::{
     ffi::c_void,
+    fmt::Debug,
     ptr,
     sync::{Arc, Mutex},
 };
@@ -166,7 +166,7 @@ impl MacOsApi for ApiCallRecorder {
         Ok(array)
     }
 
-    unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
+    unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> Option<String> {
         println!(
             "MOCK: get_item_display_name called with item_ref: {:?}",
             item_ref
@@ -177,24 +177,21 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetItemDisplayName(item_ref));
 
-        let index = (item_ref as i64 - 1) as usize;
+        let index = (item_ref as usize) - 1;
         println!("MOCK: Looking up item at index {}", index);
 
         if let Some(item) = self.state.items.get(index) {
             println!("MOCK: Found item: {:?}", item);
             if self.should_return_null_name(item_ref) {
                 println!("MOCK: Returning null name for item");
-                ptr::null()
+                None
             } else {
                 println!("MOCK: Returning display name: {}", item.display_name());
-                let cfstr = CFString::new(item.display_name());
-                let ptr = cfstr.as_concrete_TypeRef();
-                std::mem::forget(cfstr); // Don't drop the CFString since we're returning its pointer
-                ptr
+                Some(item.display_name().to_string())
             }
         } else {
             println!("MOCK: Item not found, returning null");
-            ptr::null()
+            None
         }
     }
 

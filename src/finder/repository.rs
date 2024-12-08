@@ -3,7 +3,7 @@ use crate::finder::sidebar::item::SidebarItem;
 use crate::finder::sidebar::Target;
 use crate::finder::system::api::MacOsApi;
 use crate::finder::system::url::MacOsUrl;
-use core_foundation::{array::CFArray, base::TCFType, string::CFString};
+use core_foundation::array::CFArray;
 use core_services::LSSharedFileListItemRef;
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -49,12 +49,9 @@ impl Repository {
         }
 
         // Get display name for other items
-        let name = self.get_display_name(item)?;
-        if name.is_empty() {
-            None // Skip items with empty display name
-        } else {
-            Some(SidebarItem::new(target, &name))
-        }
+        self.get_display_name(item)
+            .filter(|name| !name.is_empty())
+            .map(|name| SidebarItem::new(target, &name))
     }
 
     /// Get the target from an item's URL
@@ -72,14 +69,6 @@ impl Repository {
 
     /// Get the display name for an item
     fn get_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
-        // SAFETY: We trust that Core Foundation provides a valid display name pointer
-        let display_name = unsafe { self.api.get_item_display_name(item) };
-        if display_name.is_null() {
-            return None;
-        }
-
-        // SAFETY: We've checked that display_name is not null
-        let cf_string = unsafe { CFString::wrap_under_create_rule(display_name) };
-        Some(cf_string.to_string())
+        unsafe { self.api.get_item_display_name(item) }
     }
 }

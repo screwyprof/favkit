@@ -1,4 +1,4 @@
-use core_foundation::{array::CFArray, base::TCFType, string::CFStringRef, url::CFURLRef};
+use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURLRef};
 use core_services::{
     kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
     LSSharedFileListItemCopyDisplayName, LSSharedFileListItemCopyResolvedURL,
@@ -33,8 +33,7 @@ pub trait MacOsApi {
     /// # Safety
     /// The caller must ensure that:
     /// - The item parameter is a valid LSSharedFileListItemRef
-    /// - The returned CFStringRef is properly released when no longer needed
-    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef;
+    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> Option<String>;
 
     /// Gets the resolved URL of a favorites list item.
     ///
@@ -85,8 +84,14 @@ impl MacOsApi for RealMacOsApi {
         Ok(array)
     }
 
-    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {
-        LSSharedFileListItemCopyDisplayName(item)
+    unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
+        let name = LSSharedFileListItemCopyDisplayName(item);
+        if name.is_null() {
+            None
+        } else {
+            let cf_str = CFString::wrap_under_create_rule(name);
+            Some(cf_str.to_string())
+        }
     }
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
