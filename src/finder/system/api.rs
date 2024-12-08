@@ -5,6 +5,7 @@ use core_services::{
     LSSharedFileListItemRef, LSSharedFileListRef,
 };
 use std::ptr;
+use crate::errors::{FinderError, FavoritesErrorKind};
 
 pub trait MacOsApi {
     /// Creates a reference to the system's favorites list.
@@ -25,12 +26,11 @@ pub trait MacOsApi {
         &self,
         list: LSSharedFileListRef,
         seed: &mut u32,
-    ) -> CFArray<LSSharedFileListItemRef>;
+    ) -> Result<CFArray<LSSharedFileListItemRef>, FinderError>;
 
     /// Gets the display name of a favorites list item.
     ///
     /// # Safety
-    /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that:
     /// - The item parameter is a valid LSSharedFileListItemRef
     /// - The returned CFStringRef is properly released when no longer needed
@@ -39,7 +39,6 @@ pub trait MacOsApi {
     /// Gets the resolved URL of a favorites list item.
     ///
     /// # Safety
-    /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that:
     /// - The item parameter is a valid LSSharedFileListItemRef
     /// - The returned CFURLRef is properly released when no longer needed
@@ -69,9 +68,15 @@ impl MacOsApi for RealMacOsApi {
         &self,
         list: LSSharedFileListRef,
         seed: &mut u32,
-    ) -> CFArray<LSSharedFileListItemRef> {
+    ) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
         let array_ref = LSSharedFileListCopySnapshot(list, seed);
-        CFArray::wrap_under_create_rule(array_ref)
+        let array = CFArray::wrap_under_create_rule(array_ref);
+        if array.as_concrete_TypeRef().is_null() {
+            return Err(FinderError::FavoritesError {
+                kind: FavoritesErrorKind::FailedToGetSnapshot,
+            });
+        }
+        Ok(array)
     }
 
     unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> CFStringRef {

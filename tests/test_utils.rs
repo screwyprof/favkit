@@ -8,6 +8,7 @@ use core_foundation::{
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{MacOsApi, SidebarItem};
+use favkit::errors::{FinderError, FavoritesErrorKind};
 use std::{
     ffi::c_void,
     ptr,
@@ -131,7 +132,7 @@ impl MacOsApi for ApiCallRecorder {
         &self,
         list: LSSharedFileListRef,
         _seed: &mut u32,
-    ) -> CFArray<LSSharedFileListItemRef> {
+    ) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
         println!("MOCK: get_favorites_snapshot called with list: {:?}", list);
         self.state
             .calls
@@ -149,14 +150,20 @@ impl MacOsApi for ApiCallRecorder {
         println!("MOCK: Created {} item refs", values.len());
 
         // Create array and wrap it
-        let array = CFArrayCreate(
+        let array_ref = CFArrayCreate(
             kCFAllocatorDefault,
             values.as_ptr() as *const *const c_void,
             values.len() as CFIndex,
             ptr::null(),
         );
-        println!("MOCK: Created CFArray: {:?}", array);
-        CFArray::wrap_under_create_rule(array)
+        println!("MOCK: Created CFArray: {:?}", array_ref);
+        let array = CFArray::wrap_under_create_rule(array_ref);
+        if array.as_concrete_TypeRef().is_null() {
+            return Err(FinderError::FavoritesError {
+                kind: FavoritesErrorKind::FailedToGetSnapshot,
+            });
+        }
+        Ok(array)
     }
 
     unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
@@ -170,7 +177,7 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetItemDisplayName(item_ref));
 
-        let index = (item_ref as usize) - 1;
+        let index = (item_ref as i64 - 1) as usize;
         println!("MOCK: Looking up item at index {}", index);
 
         if let Some(item) = self.state.items.get(index) {
