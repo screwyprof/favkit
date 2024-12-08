@@ -10,10 +10,17 @@ use crate::finder::sidebar::Target;
 
 #[derive(Debug, Error)]
 pub enum UrlError {
-    #[error("Invalid URL format: {0}")]
-    InvalidUrl(String),
-    #[error("Failed to convert path to URL")]
-    PathToUrl,
+    #[error("Invalid URL scheme: {0}")]
+    InvalidScheme(String),
+
+    #[error("URL contains invalid characters: {0}")]
+    InvalidFormat(String),
+
+    #[error("Path contains non-UTF8 characters: {0}")]
+    NonUtf8Path(PathBuf),
+
+    #[error("Failed to create Core Foundation URL")]
+    CoreFoundationError,
 }
 
 /// A safe wrapper around Core Foundation URL operations
@@ -66,7 +73,7 @@ impl TryFrom<&str> for MacOsUrl {
     fn try_from(url: &str) -> Result<Self, Self::Error> {
         // Check for scheme://
         if !url.contains("://") {
-            return Err(UrlError::InvalidUrl("URL must contain ://".into()));
+            return Err(UrlError::InvalidFormat("URL must contain ://".into()));
         }
 
         let cf_str = CFString::new(url);
@@ -78,7 +85,7 @@ impl TryFrom<&str> for MacOsUrl {
             );
             
             if url_ref.is_null() {
-                return Err(UrlError::InvalidUrl("Failed to create CFURL".into()));
+                return Err(UrlError::CoreFoundationError);
             }
             
             Ok(MacOsUrl::from_ref(url_ref))
@@ -141,7 +148,7 @@ impl TryFrom<&CFURL> for Target {
 
         let path = mac_url
             .to_path()
-            .ok_or(UrlError::InvalidUrl("Failed to convert URL to path".into()))?;
+            .ok_or(UrlError::InvalidFormat("Failed to convert URL to path".into()))?;
 
         Ok(match path.as_path() {
             p if dirs::document_dir().is_some_and(|d| p == d.as_path()) => 
@@ -187,7 +194,7 @@ impl TryFrom<&Target> for MacOsUrl {
                 if let Some(path_str) = path.to_str() {
                     MacOsUrl::try_from(format!("file://{}", path_str))
                 } else {
-                    Err(UrlError::InvalidUrl("Path contains invalid UTF-8".into()))
+                    Err(UrlError::NonUtf8Path(path.clone()))
                 }
             }
         }
