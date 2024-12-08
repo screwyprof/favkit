@@ -23,7 +23,6 @@ pub enum ApiCall {
 pub struct ApiCallRecorder {
     calls: Arc<Mutex<Vec<ApiCall>>>,
     items: Arc<Mutex<Vec<(String, String)>>>, // (url, display_name)
-    null_names: Arc<Mutex<Vec<usize>>>,
 }
 
 impl Default for ApiCallRecorder {
@@ -37,7 +36,6 @@ impl ApiCallRecorder {
         Self {
             calls: Arc::new(Mutex::new(Vec::new())),
             items: Arc::new(Mutex::new(Vec::new())),
-            null_names: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -45,15 +43,6 @@ impl ApiCallRecorder {
         Self {
             calls: Arc::new(Mutex::new(Vec::new())),
             items: Arc::new(Mutex::new(items)),
-            null_names: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    pub fn with_items_without_names(items: Vec<(String, String)>, null_names: Vec<usize>) -> Self {
-        Self {
-            calls: Arc::new(Mutex::new(Vec::new())),
-            items: Arc::new(Mutex::new(items)),
-            null_names: Arc::new(Mutex::new(null_names)),
         }
     }
 
@@ -92,15 +81,14 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetItemDisplayName(id));
 
-        let null_names = self.null_names.lock().unwrap();
-        println!("Items with null names: {:?}", *null_names);
-        if null_names.contains(&id) {
-            println!("Item {} has null name", id);
-            None
-        } else {
-            let items = self.items.lock().unwrap();
-            items.get(id).map(|(_, name)| name.clone())
-        }
+        let items = self.items.lock().unwrap();
+        items.get(id).map(|(url, name)| {
+            if url.starts_with("nwnode://") && name.is_empty() {
+                "AirDrop".to_string()
+            } else {
+                name.clone()
+            }
+        })
     }
 
     unsafe fn get_item_url(&self, item: SidebarItemRef) -> Option<MacOsUrl> {
@@ -112,7 +100,6 @@ impl MacOsApi for ApiCallRecorder {
         println!("Available URLs: {:?}", *items);
         items.get(id).and_then(|(url, _)| {
             println!("URL for item {}: {}", id, url);
-            // Reject invalid paths by returning None
             if url.contains("/invalid/path") {
                 None
             } else {

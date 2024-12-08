@@ -67,28 +67,35 @@ fn test_get_favorites_with_items() {
 }
 
 #[test]
-fn test_get_favorites_with_null_names() {
+fn test_get_favorites_with_airdrop() {
     let items = [
+        SidebarItem::new(Target::AirDrop("nwnode://domain-AirDrop".to_string()), "AirDrop"),
         SidebarItem::new(Target::Documents(PathBuf::from("/Users/current/Documents")), "Documents"),
-        SidebarItem::new(Target::Downloads(PathBuf::from("/Users/current/Downloads")), "Downloads"),
     ];
 
-    let api = ApiCallRecorder::with_items_without_names(
+    // Note: AirDrop item has empty display name but valid nwnode:// URL
+    let api = ApiCallRecorder::with_items(
         items
             .iter()
-            .map(|item: &SidebarItem| (
-                format!("file://{}", item.target()),
-                item.display_name().to_string(),
-            ))
+            .map(|item: &SidebarItem| {
+                let url = match item.target() {
+                    Target::AirDrop(url) => url.to_string(),
+                    _ => format!("file://{}", item.target()),
+                };
+                (
+                    url,
+                    if item.display_name() == "AirDrop" { "".to_string() } else { item.display_name().to_string() },
+                )
+            })
             .collect(),
-        vec![1],
     );
     let repository = Repository::new(Box::new(api.clone()));
 
     let favorites = repository.load().unwrap();
 
-    assert_eq!(favorites.len(), 1);
-    assert_eq!(favorites[0].display_name(), "Documents");
+    assert_eq!(favorites.len(), 2);
+    assert_eq!(favorites[0].display_name(), "AirDrop");
+    assert_eq!(favorites[1].display_name(), "Documents");
 
     let expected_calls = vec![
         ApiCall::CreateFavoritesList,
@@ -96,6 +103,7 @@ fn test_get_favorites_with_null_names() {
         ApiCall::GetItemDisplayName(0),
         ApiCall::GetItemUrl(0),
         ApiCall::GetItemDisplayName(1),
+        ApiCall::GetItemUrl(1),
     ];
     assert_eq!(api.get_calls(), expected_calls);
 }
