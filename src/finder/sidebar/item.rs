@@ -45,10 +45,7 @@ mod tests {
                 Target::Downloads(std::path::PathBuf::from("/Users/test/Downloads")),
                 "Downloads",
             ),
-            (
-                Target::AirDrop("airdrop://".to_string()),
-                "AirDrop",
-            ),
+            (Target::AirDrop("airdrop://".to_string()), "AirDrop"),
         ];
 
         for (target, display_name) in test_cases {

@@ -1,6 +1,6 @@
+use crate::finder::system::url::UrlError;
 use std::path::PathBuf;
 use thiserror::Error;
-use crate::finder::system::url::UrlError;
 
 #[derive(Debug, Error)]
 pub enum FinderError {
@@ -29,7 +29,11 @@ impl FinderError {
     }
 
     pub fn with_source(mut self, source: std::io::Error) -> Self {
-        if let FinderError::InvalidPath { source: ref mut err, .. } = self {
+        if let FinderError::InvalidPath {
+            source: ref mut err,
+            ..
+        } = self
+        {
             *err = Some(source);
         }
         self

@@ -6,7 +6,7 @@ fn test_load_favorites() -> Result<(), Box<dyn std::error::Error>> {
     let repository = Repository::new(api);
     let sidebar = repository.load()?;
     let finder = Finder::new(sidebar);
-    
+
     println!("{}", finder);
     Ok(())
 }

@@ -4,11 +4,15 @@ use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
     string::{CFString, CFStringRef},
-    url::{CFURL, CFURLCreateWithString, CFURLRef},
+    url::{CFURLRef, CFURL},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{MacOsApi, SidebarItem, Target};
-use std::{ffi::c_void, ptr, sync::{Arc, Mutex}};
+use std::{
+    ffi::c_void,
+    ptr,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ApiCall {
@@ -128,6 +132,7 @@ impl MacOsApi for ApiCallRecorder {
         list: LSSharedFileListRef,
         _seed: &mut u32,
     ) -> CFArray<LSSharedFileListItemRef> {
+        println!("MOCK: get_favorites_snapshot called with list: {:?}", list);
         self.state
             .calls
             .lock()
@@ -136,51 +141,93 @@ impl MacOsApi for ApiCallRecorder {
 
         // Create array of indices as LSSharedFileListItemRef
         let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
-            .map(|i| i as LSSharedFileListItemRef)
+            .map(|i| {
+                println!("MOCK: Creating item ref for index {}", i);
+                (i + 1) as LSSharedFileListItemRef
+            })
             .collect();
+        println!("MOCK: Created {} item refs", values.len());
 
         // Create array and wrap it
-        let array_ref = CFArrayCreate(
+        let array = CFArrayCreate(
             kCFAllocatorDefault,
             values.as_ptr() as *const *const c_void,
             values.len() as CFIndex,
             ptr::null(),
         );
-        CFArray::wrap_under_create_rule(array_ref)
+        println!("MOCK: Created CFArray: {:?}", array);
+        CFArray::wrap_under_create_rule(array)
     }
 
     unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
+        println!(
+            "MOCK: get_item_display_name called with item_ref: {:?}",
+            item_ref
+        );
         self.state
             .calls
             .lock()
             .unwrap()
             .push(ApiCall::GetItemDisplayName(item_ref));
 
-        if let Some(item) = self.get_item_by_ref(item_ref) {
+        let index = (item_ref as usize) - 1;
+        println!("MOCK: Looking up item at index {}", index);
+
+        if let Some(item) = self.state.items.get(index) {
+            println!("MOCK: Found item: {:?}", item);
             if self.should_return_null_name(item_ref) {
+                println!("MOCK: Returning null name for item");
                 ptr::null()
             } else {
-                CFString::new(&item.display_name()).as_concrete_TypeRef()
+                println!("MOCK: Returning display name: {}", item.display_name());
+                let cfstr = CFString::new(&item.display_name());
+                let ptr = cfstr.as_concrete_TypeRef();
+                std::mem::forget(cfstr); // Don't drop the CFString since we're returning its pointer
+                ptr
             }
         } else {
+            println!("MOCK: Item not found, returning null");
             ptr::null()
         }
     }
 
     unsafe fn get_item_url(&self, item_ref: LSSharedFileListItemRef) -> CFURLRef {
+        println!("MOCK: get_item_url called with item_ref: {:?}", item_ref);
         self.state
             .calls
             .lock()
             .unwrap()
             .push(ApiCall::GetItemUrl(item_ref));
 
-        if let Some(item) = self.get_item_by_ref(item_ref) {
-            if let Ok(url) = CFURL::try_from(item.target()) {
-                url.as_concrete_TypeRef()
-            } else {
-                ptr::null()
+        let index = (item_ref as usize) - 1;
+        println!("MOCK: Looking up item at index {}", index);
+
+        if let Some(item) = self.state.items.get(index) {
+            println!("MOCK: Found item: {:?}", item);
+            match item.target() {
+                Target::AirDrop(_) => {
+                    // Use the correct AirDrop URL format
+                    let url_str = "nwnode://domain-AirDrop";
+                    println!("MOCK: Using AirDrop URL: {}", url_str);
+                    let url = CFURL::try_from(&Target::AirDrop(url_str.to_string())).unwrap();
+                    let ptr = url.as_concrete_TypeRef();
+                    std::mem::forget(url);
+                    ptr
+                }
+                _ => {
+                    if let Ok(url) = CFURL::try_from(item.target()) {
+                        println!("MOCK: Created CFURL successfully");
+                        let ptr = url.as_concrete_TypeRef();
+                        std::mem::forget(url);
+                        ptr
+                    } else {
+                        println!("MOCK: Failed to create CFURL, returning null");
+                        ptr::null()
+                    }
+                }
             }
         } else {
+            println!("MOCK: Item not found, returning null");
             ptr::null()
         }
     }

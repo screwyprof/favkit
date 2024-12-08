@@ -1,10 +1,10 @@
 pub mod repository;
-pub mod system;
 pub mod sidebar;
+pub mod system;
 
 pub use repository::Repository;
+pub use sidebar::{item::SidebarItem, Target};
 pub use system::{MacOsApi, RealMacOsApi};
-pub use sidebar::{Target, item::SidebarItem};
 
 pub struct Finder {
     sidebar: Vec<SidebarItem>,
@@ -30,9 +30,4 @@ impl Repository {
     pub fn new_with_real_api() -> Self {
         Self::new(Box::new(RealMacOsApi::new()))
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }

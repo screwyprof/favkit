@@ -1,7 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use favkit::errors::Result;
-use favkit::{Finder, SystemMacOsApi, Repository};
+use favkit::{Finder, Repository, SystemMacOsApi};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<()> {

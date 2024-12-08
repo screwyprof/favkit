@@ -1,13 +1,9 @@
-use core_foundation::{
-    base::TCFType,
-    string::CFString,
-    url::CFURL,
-};
-use core_services::LSSharedFileListItemRef;
-use crate::finder::system::api::MacOsApi;
-use crate::finder::sidebar::Target;
-use crate::finder::sidebar::item::SidebarItem;
 use crate::errors::FinderError;
+use crate::finder::sidebar::item::SidebarItem;
+use crate::finder::sidebar::Target;
+use crate::finder::system::api::MacOsApi;
+use core_foundation::{base::TCFType, string::CFString, url::CFURL};
+use core_services::LSSharedFileListItemRef;
 
 /// Repository is responsible for loading and saving sidebar items.
 pub struct Repository {
@@ -24,14 +20,18 @@ impl Repository {
             // Get the favorites list
             let favorites = self.api.get_favorites_list();
             if favorites.is_null() {
-                return Err(FinderError::SystemError("Could not get favorites list".to_string()));
+                return Err(FinderError::SystemError(
+                    "Could not get favorites list".to_string(),
+                ));
             }
 
             // Get a snapshot of the favorites
             let mut seed = 0;
             let snapshot = self.api.get_favorites_snapshot(favorites, &mut seed);
             if snapshot.as_concrete_TypeRef().is_null() {
-                return Err(FinderError::SystemError("Could not get favorites snapshot".to_string()));
+                return Err(FinderError::SystemError(
+                    "Could not get favorites snapshot".to_string(),
+                ));
             }
 
             // Get all items from the snapshot
@@ -43,18 +43,16 @@ impl Repository {
             for (idx, item) in items_array.iter().enumerate() {
                 let item = *item as LSSharedFileListItemRef;
                 println!("Processing item {}", idx);
-                
+
                 // Get the URL for this item
                 let url_ref = self.api.get_item_url(item);
                 let target = if url_ref.is_null() {
                     continue; // Skip items with no URL
                 } else {
-                    unsafe {
-                        let cfurl = CFURL::wrap_under_create_rule(url_ref);
-                        match Target::try_from(&cfurl) {
-                            Ok(target) => target,
-                            Err(_) => continue,
-                        }
+                    let cfurl = CFURL::wrap_under_create_rule(url_ref);
+                    match Target::try_from(&cfurl) {
+                        Ok(target) => target,
+                        Err(_) => continue,
                     }
                 };
                 println!("Item {} Target: {:?}", idx, target);
@@ -64,21 +62,19 @@ impl Repository {
                 let item = if display_name.is_null() {
                     match target {
                         Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
-                        _ => None // Skip other items with no display name
+                        _ => None, // Skip other items with no display name
                     }
                 } else {
-                    unsafe {
-                        let cf_string = CFString::wrap_under_create_rule(display_name);
-                        let name = cf_string.to_string();
-                        if name.is_empty() {
-                            match target {
-                                Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
-                                _ => None // Skip other items with empty display name
-                            }
-                        } else {
-                            println!("Item {} display name: {}", idx, name);
-                            Some(SidebarItem::new(target, &name))
+                    let cf_string = CFString::wrap_under_create_rule(display_name);
+                    let name = cf_string.to_string();
+                    if name.is_empty() {
+                        match target {
+                            Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
+                            _ => None, // Skip other items with empty display name
                         }
+                    } else {
+                        println!("Item {} display name: {}", idx, name);
+                        Some(SidebarItem::new(target, &name))
                     }
                 };
 

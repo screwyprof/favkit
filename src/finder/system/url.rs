@@ -1,11 +1,11 @@
 use core_foundation::{
-    base::{TCFType, kCFAllocatorDefault},
+    base::{kCFAllocatorDefault, TCFType},
     string::CFString,
-    url::{CFURL, CFURLCreateWithString},
+    url::{CFURLCreateWithString, CFURL},
 };
+use dirs;
 use std::{convert::TryFrom, path::PathBuf};
 use thiserror::Error;
-use dirs;
 
 use crate::finder::sidebar::Target;
 
@@ -23,9 +23,9 @@ impl TryFrom<&CFURL> for Target {
     fn try_from(url: &CFURL) -> Result<Self, Self::Error> {
         let url_str = url.get_string().to_string();
         println!("Converting URL: {}", url_str);
-        
+
         // Handle AirDrop URLs
-        if url_str.starts_with("nwnode://") || url_str.starts_with("airdrop://") || url_str == "AirDrop" {
+        if url_str.starts_with("nwnode://") {
             println!("Detected AirDrop URL");
             return Ok(Target::AirDrop("nwnode://domain-AirDrop".to_string()));
         }
@@ -78,14 +78,14 @@ impl TryFrom<&Target> for CFURL {
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
         let url_str = match target {
-            Target::AirDrop(_) => "nwnode://domain-AirDrop".to_string(),
-            Target::UserPath(path) |
-            Target::Documents(path) |
-            Target::Downloads(path) |
-            Target::Applications(path) |
-            Target::Home(path) => format!("file://{}", path.display()),
+            Target::AirDrop(_) => "airdrop://".to_string(),
+            Target::UserPath(path)
+            | Target::Documents(path)
+            | Target::Downloads(path)
+            | Target::Applications(path)
+            | Target::Home(path) => format!("file://{}", path.display()),
         };
-        
+
         let cf_str = CFString::new(&url_str);
         unsafe {
             let url_ref = CFURLCreateWithString(
@@ -139,11 +139,14 @@ mod tests {
         // Test AirDrop target
         let target = Target::AirDrop("nwnode://domain-AirDrop".to_string());
         let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), "nwnode://domain-AirDrop");
+        assert_eq!(url.get_string().to_string(), "airdrop://");
 
         // Test file target
         let target = Target::Applications(PathBuf::from("/Applications"));
         let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), format!("file://{}", "/Applications"));
+        assert_eq!(
+            url.get_string().to_string(),
+            format!("file://{}", "/Applications")
+        );
     }
 }

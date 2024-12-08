@@ -24,7 +24,7 @@ fn test_load_empty_favorites() {
 fn test_load_favorites() {
     let items = vec![
         SidebarItem::new(
-            Target::AirDrop("airdrop://".to_string()),
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
             "AirDrop",
         ),
         SidebarItem::new(
@@ -44,7 +44,7 @@ fn test_load_favorites() {
 fn test_load_favorites_with_multiple_items() {
     let items = vec![
         SidebarItem::new(
-            Target::AirDrop("airdrop://".to_string()),
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
             "AirDrop",
         ),
         SidebarItem::new(
@@ -66,12 +66,10 @@ fn test_load_favorites_with_multiple_items() {
 
 #[test]
 fn test_load_favorites_with_invalid_path() {
-    let items = vec![
-        SidebarItem::new(
-            Target::UserPath(PathBuf::from("/invalid/path")),
-            "Invalid Path",
-        ),
-    ];
+    let items = vec![SidebarItem::new(
+        Target::UserPath(PathBuf::from("/invalid/path")),
+        "Invalid Path",
+    )];
 
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
@@ -82,12 +80,10 @@ fn test_load_favorites_with_invalid_path() {
 
 #[test]
 fn test_load_favorites_with_unsupported_url() {
-    let items = vec![
-        SidebarItem::new(
-            Target::UserPath(PathBuf::from("/some/invalid/path")),
-            "Unsupported URL",
-        ),
-    ];
+    let items = vec![SidebarItem::new(
+        Target::UserPath(PathBuf::from("/some/invalid/path")),
+        "Unsupported URL",
+    )];
 
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
@@ -100,7 +96,7 @@ fn test_load_favorites_with_unsupported_url() {
 fn test_load_favorites_with_null_display_names() {
     let items = vec![
         SidebarItem::new(
-            Target::AirDrop("airdrop://".to_string()),
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
             "AirDrop",
         ),
         SidebarItem::new(
