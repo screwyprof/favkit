@@ -119,13 +119,13 @@ impl ApiCallRecorder {
 }
 
 impl MacOsApi for ApiCallRecorder {
-    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
+    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError> {
         self.state
             .calls
             .lock()
             .unwrap()
             .push(ApiCall::CreateFavoritesList);
-        1 as LSSharedFileListRef
+        Ok(1 as LSSharedFileListRef)
     }
 
     unsafe fn get_favorites_snapshot(

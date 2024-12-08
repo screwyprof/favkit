@@ -13,7 +13,7 @@ pub trait MacOsApi {
     /// # Safety
     /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that the returned LSSharedFileListRef is properly released when no longer needed.
-    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef;
+    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError>;
 
     /// Gets a snapshot of the current state of the favorites list.
     ///
@@ -60,8 +60,14 @@ impl Default for RealMacOsApi {
 }
 
 impl MacOsApi for RealMacOsApi {
-    unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
-        LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null())
+    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError> {
+        let list = LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null());
+        if list.is_null() {
+            return Err(FinderError::FavoritesError {
+                kind: FavoritesErrorKind::FailedToGetList,
+            });
+        }
+        Ok(list)
     }
 
     unsafe fn get_favorites_snapshot(

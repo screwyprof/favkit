@@ -1,4 +1,4 @@
-use crate::errors::{FinderError, FavoritesErrorKind};
+use crate::errors::FinderError;
 use crate::finder::sidebar::item::SidebarItem;
 use crate::finder::sidebar::Target;
 use crate::finder::system::api::MacOsApi;
@@ -31,12 +31,7 @@ impl Repository {
     /// Get a snapshot of the favorites list
     fn get_favorites_snapshot(&self) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
         // SAFETY: We trust that Core Foundation provides a valid favorites list
-        let favorites = unsafe { self.api.get_favorites_list() };
-        if favorites.is_null() {
-            return Err(FinderError::FavoritesError {
-                kind: FavoritesErrorKind::FailedToGetList,
-            });
-        }
+        let favorites = unsafe { self.api.get_favorites_list()? };
 
         let mut seed = 0;
         // SAFETY: We trust that Core Foundation provides a valid snapshot from a valid favorites list
