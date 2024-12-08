@@ -86,12 +86,10 @@ impl MacOsApi for RealMacOsApi {
 
     unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
         let name = LSSharedFileListItemCopyDisplayName(item);
-        if name.is_null() {
-            None
-        } else {
-            let cf_str = CFString::wrap_under_create_rule(name);
-            Some(cf_str.to_string())
-        }
+        (!name.is_null())
+            .then_some(name)
+            .map(|ptr| unsafe { CFString::wrap_under_create_rule(ptr) })
+            .map(|cf_str| cf_str.to_string())
     }
 
     unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
