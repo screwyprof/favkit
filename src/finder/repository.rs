@@ -68,12 +68,13 @@ impl Repository {
     /// Get the target from an item's URL
     fn get_target_from_item(&self, item: LSSharedFileListItemRef) -> Option<Target> {
         // SAFETY: We trust that Core Foundation provides a valid URL for the item
-        let url_ref = unsafe { self.api.get_item_url(item) };
-        if url_ref.is_null() {
-            return None;
-        }
-
-        let url = MacOsUrl::from(url_ref);
+        let url = unsafe { 
+            self.api
+                .get_item_url(item)
+                .as_ref()
+                .and_then(|url_ref| MacOsUrl::from_nullable_ref(url_ref))
+        }?;
+        
         Target::try_from(url).ok()
     }
 
@@ -85,7 +86,7 @@ impl Repository {
             return None;
         }
 
-        // SAFETY: We trust that Core Foundation provides a valid display name string
+        // SAFETY: We've checked that display_name is not null
         let cf_string = unsafe { CFString::wrap_under_create_rule(display_name) };
         Some(cf_string.to_string())
     }

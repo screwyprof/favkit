@@ -26,6 +26,18 @@ impl MacOsUrl {
         self.0.to_path()
     }
 
+    /// Creates a MacOsUrl from a raw CFURLRef pointer, returning None if the pointer is null
+    /// 
+    /// # Safety
+    /// The caller must ensure that url_ref is either null or a valid CFURLRef pointer
+    pub unsafe fn from_nullable_ref(url_ref: CFURLRef) -> Option<Self> {
+        if url_ref.is_null() {
+            None
+        } else {
+            Some(Self(CFURL::wrap_under_create_rule(url_ref)))
+        }
+    }
+
     /// Creates a MacOsUrl from a raw CFURLRef pointer
     /// 
     /// # Safety
