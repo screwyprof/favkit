@@ -71,12 +71,12 @@ impl Repository {
                 // Get display name
                 let display_name = self.api.get_item_display_name(item);
                 let item = match target {
-                    Target::AirDrop(_) => SidebarItem::with_display_name(target, "AirDrop"),
+                    Target::AirDrop(_) => SidebarItem::new(target, "AirDrop"),
                     _ => if display_name.is_null() {
-                        SidebarItem::new(target)
+                        SidebarItem::new(target, "")
                     } else {
                         let cf_string = CFString::wrap_under_get_rule(display_name);
-                        SidebarItem::with_display_name(target, cf_string.to_string())
+                        SidebarItem::new(target, cf_string.to_string())
                     }
                 };
 

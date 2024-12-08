@@ -1,20 +1,16 @@
 #![allow(dead_code)]
 
 use core_foundation::{
-    array::CFArrayCreate,
+    array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
     string::{CFString, CFStringRef},
     url::{CFURLCreateWithString, CFURLRef},
 };
-use core_services::{CFArray, LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::finder::{macos::MacOsApi, sidebar_item::SidebarItem, target::{Target, TargetLocation}};
-use std::{
-    ffi::c_void,
-    ptr,
-    sync::{Arc, Mutex},
-};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use favkit::{MacOsApi, SidebarItem, Target};
+use std::{ffi::c_void, ptr, sync::{Arc, Mutex}};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ApiCall {
     CreateFavoritesList,
     GetFavoritesSnapshot(LSSharedFileListRef),
@@ -138,9 +134,9 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetFavoritesSnapshot(list));
 
-        // Create item refs for our items in the exact order they were provided
+        // Create array of indices as LSSharedFileListItemRef
         let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
-            .map(|i| self.get_test_item(i))
+            .map(|i| i as LSSharedFileListItemRef)
             .collect();
 
         // Create array and wrap it
@@ -174,16 +170,16 @@ impl MacOsApi for ApiCallRecorder {
         }
     }
 
-    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
+    unsafe fn get_item_url(&self, item_ref: LSSharedFileListItemRef) -> CFURLRef {
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::GetItemUrl(item));
+            .push(ApiCall::GetItemUrl(item_ref));
 
-        if let Some(item) = self.get_item_by_ref(item) {
-            match item.target().location() {
-                TargetLocation::Url(url) if url.starts_with("unsupported://") => {
+        if let Some(item) = self.get_item_by_ref(item_ref) {
+            match item.target() {
+                Target::AirDrop(url) => {
                     let cf_str = CFString::new(url);
                     CFURLCreateWithString(
                         kCFAllocatorDefault,
@@ -191,17 +187,10 @@ impl MacOsApi for ApiCallRecorder {
                         ptr::null(),
                     )
                 }
-                TargetLocation::Path(path) => {
+                Target::Documents(path) | Target::Downloads(path) | 
+                Target::Applications(path) | Target::Home(path) | Target::UserPath(path) => {
                     let path = format!("file://{}", path.display());
                     let cf_str = CFString::new(&path);
-                    CFURLCreateWithString(
-                        kCFAllocatorDefault,
-                        cf_str.as_concrete_TypeRef(),
-                        ptr::null(),
-                    )
-                }
-                TargetLocation::Url(url) => {
-                    let cf_str = CFString::new(url);
                     CFURLCreateWithString(
                         kCFAllocatorDefault,
                         cf_str.as_concrete_TypeRef(),

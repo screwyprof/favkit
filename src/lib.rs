@@ -5,6 +5,6 @@ pub mod finder;
 
 // Re-export key types
 pub use finder::{
-    Finder, MacOsApi, RealMacOsApi, Repository,
+    Finder, MacOsApi, RealMacOsApi as SystemMacOsApi, Repository,
     sidebar::{Target, item::SidebarItem},
 };

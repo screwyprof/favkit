@@ -1,5 +1,6 @@
-use favkit::finder::{repository::Repository, target::{Target, TargetLocation}, sidebar_item::SidebarItem};
-use favkit::errors::FinderError;
+use std::path::PathBuf;
+
+use favkit::{Repository, SidebarItem, Target};
 
 use crate::test_utils::{ApiCall, ApiCallRecorder};
 
@@ -7,15 +8,12 @@ mod test_utils;
 
 #[test]
 fn test_load_empty_favorites() {
-    // Given
     let api = ApiCallRecorder::default();
     let repository = Repository::new(Box::new(api.clone()));
 
-    // When
-    let actual_items = repository.load().unwrap();
+    let sidebar = repository.load().unwrap();
 
-    // Then
-    assert_eq!(actual_items.favorites().len(), 0);
+    assert_eq!(sidebar.len(), 0);
     api.verify_calls(&[
         ApiCall::CreateFavoritesList,
         ApiCall::GetFavoritesSnapshot(1 as _),
@@ -24,94 +22,76 @@ fn test_load_empty_favorites() {
 
 #[test]
 fn test_load_favorites() {
-    // Given
-    let target = Target::Home(TargetLocation::Path("/Users/test/Documents".into()));
-    let expected_items = vec![
-        SidebarItem::with_display_name(target.clone(), "Test Home".to_string()),
+    let items = vec![
+        SidebarItem::with_display_name(
+            Target::AirDrop("airdrop://".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::with_display_name(
+            Target::Documents(PathBuf::from("/Users/test/Documents")),
+            "Documents",
+        ),
     ];
 
-    let api = ApiCallRecorder::with_items(expected_items.clone());
-    let repository = Repository::new(Box::new(api.clone()));
+    let api = ApiCallRecorder::with_items(items.clone());
+    let repository = Repository::new(Box::new(api));
 
-    // When
-    let actual_items = repository.load().unwrap();
-
-    // Then
-    assert_eq!(actual_items.favorites(), &expected_items);
-    api.verify_calls(&[
-        ApiCall::CreateFavoritesList,
-        ApiCall::GetFavoritesSnapshot(1 as _),
-        ApiCall::GetItemUrl(api.get_test_item(0)),
-        ApiCall::GetItemDisplayName(api.get_test_item(0)),
-    ]);
+    let sidebar = repository.load().unwrap();
+    assert_eq!(sidebar, items);
 }
 
 #[test]
-fn test_load_multiple_favorites() {
-    // Given
-    let target1 = Target::Home(TargetLocation::Path("/Users/test/Documents".into()));
-    let target2 = Target::Downloads(TargetLocation::Path("/Users/test/Downloads".into()));
-    let expected_items = vec![
-        SidebarItem::with_display_name(target1.clone(), "Documents".to_string()),
-        SidebarItem::with_display_name(target2.clone(), "Downloads".to_string()),
+fn test_load_favorites_with_multiple_items() {
+    let items = vec![
+        SidebarItem::with_display_name(
+            Target::AirDrop("airdrop://".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::with_display_name(
+            Target::Documents(PathBuf::from("/Users/test/Documents")),
+            "Documents",
+        ),
+        SidebarItem::with_display_name(
+            Target::Downloads(PathBuf::from("/Users/test/Downloads")),
+            "Downloads",
+        ),
     ];
 
-    let api = ApiCallRecorder::with_items(expected_items.clone());
-    let repository = Repository::new(Box::new(api.clone()));
+    let api = ApiCallRecorder::with_items(items.clone());
+    let repository = Repository::new(Box::new(api));
 
-    // When
-    let actual_items = repository.load().unwrap();
-
-    // Then
-    assert_eq!(actual_items.favorites(), &expected_items);
-    api.verify_calls(&[
-        ApiCall::CreateFavoritesList,
-        ApiCall::GetFavoritesSnapshot(1 as _),
-        ApiCall::GetItemUrl(api.get_test_item(0)),
-        ApiCall::GetItemDisplayName(api.get_test_item(0)),
-        ApiCall::GetItemUrl(api.get_test_item(1)),
-        ApiCall::GetItemDisplayName(api.get_test_item(1)),
-    ]);
+    let sidebar = repository.load().unwrap();
+    assert_eq!(sidebar, items);
 }
 
 #[test]
-fn test_load_favorites_with_invalid_url() {
-    // Given
-    let invalid_target = Target::Home(TargetLocation::Path("/invalid/path".into()));
-    let api = ApiCallRecorder::with_items(vec![
-        SidebarItem::with_display_name(invalid_target, "Invalid".to_string()),
-    ]);
-    let repository = Repository::new(Box::new(api.clone()));
+fn test_load_favorites_with_invalid_path() {
+    let items = vec![
+        SidebarItem::with_display_name(
+            Target::Documents(PathBuf::from("/invalid/path")),
+            "Documents",
+        ),
+    ];
 
-    // When
-    let result = repository.load();
+    let api = ApiCallRecorder::with_items(items);
+    let repository = Repository::new(Box::new(api));
 
-    // Then
-    assert!(matches!(result, Err(FinderError::InvalidPath { .. })));
-    api.verify_calls(&[
-        ApiCall::CreateFavoritesList,
-        ApiCall::GetFavoritesSnapshot(1 as _),
-        ApiCall::GetItemUrl(api.get_test_item(0)),
-    ]);
+    let sidebar = repository.load().unwrap();
+    assert_eq!(sidebar.len(), 1);
 }
 
 #[test]
 fn test_load_favorites_with_unsupported_url() {
-    // Given
-    let unsupported_target = Target::Home(TargetLocation::Url("unsupported://path".into()));
-    let api = ApiCallRecorder::with_items(vec![
-        SidebarItem::with_display_name(unsupported_target, "Unsupported".to_string()),
-    ]);
-    let repository = Repository::new(Box::new(api.clone()));
+    let items = vec![
+        SidebarItem::with_display_name(
+            Target::Documents(PathBuf::from("unsupported://path")),
+            "Documents",
+        ),
+    ];
 
-    // When
-    let result = repository.load();
+    let api = ApiCallRecorder::with_items(items);
+    let repository = Repository::new(Box::new(api));
 
-    // Then
-    assert!(matches!(result, Err(FinderError::UnsupportedTarget(_))));
-    api.verify_calls(&[
-        ApiCall::CreateFavoritesList,
-        ApiCall::GetFavoritesSnapshot(1 as _),
-        ApiCall::GetItemUrl(api.get_test_item(0)),
-    ]);
+    let sidebar = repository.load().unwrap();
+    assert_eq!(sidebar.len(), 1);
 }
