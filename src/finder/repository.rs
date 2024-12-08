@@ -1,6 +1,5 @@
 use crate::errors::FinderError;
 use crate::finder::sidebar::item::SidebarItem;
-use crate::finder::sidebar::target::Target;
 use crate::finder::system::api::{MacOsApi, SidebarItemRef};
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -86,24 +85,12 @@ impl<A: MacOsApi> Repository<A> {
     /// - The item has an empty display name (except for AirDrop)
     unsafe fn process_item(&self, item_ref: SidebarItemRef) -> Option<SidebarItem> {
         // Get the display name first to match the expected order of API calls
-        let display_name = match self.api.get_item_display_name(item_ref) {
-            Some(name) if !name.is_empty() => name,
-            Some(_) => "AirDrop".to_string(), // Empty name might be AirDrop
-            None => return None,
-        };
-
+        let display_name = self.api.get_item_display_name(item_ref);
+        
         // Get the URL and try to convert it to a target
         let url = self.api.get_item_url(item_ref)?;
         
-        // If it's not AirDrop and has an empty name, return None
-        if display_name == "AirDrop" && !url.is_airdrop() {
-            return None;
-        }
-        
-        // Try to convert the URL to a target, return None if invalid
-        match Target::try_from(&url) {
-            Ok(target) => Some(SidebarItem::new(target, display_name)),
-            Err(_) => None,
-        }
+        // Try to create a sidebar item from the URL and display name
+        SidebarItem::try_from((&url, display_name)).ok()
     }
 }
