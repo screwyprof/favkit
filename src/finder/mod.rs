@@ -20,6 +20,12 @@ impl Finder {
     }
 }
 
+impl std::fmt::Display for Finder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Finder")
+    }
+}
+
 impl Repository {
     pub fn new_with_real_api() -> Self {
         Self::new(Box::new(RealMacOsApi::new()))

@@ -23,11 +23,11 @@ fn test_load_empty_favorites() {
 #[test]
 fn test_load_favorites() {
     let items = vec![
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::AirDrop("airdrop://".to_string()),
             "AirDrop",
         ),
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::Documents(PathBuf::from("/Users/test/Documents")),
             "Documents",
         ),
@@ -43,15 +43,15 @@ fn test_load_favorites() {
 #[test]
 fn test_load_favorites_with_multiple_items() {
     let items = vec![
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::AirDrop("airdrop://".to_string()),
             "AirDrop",
         ),
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::Documents(PathBuf::from("/Users/test/Documents")),
             "Documents",
         ),
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::Downloads(PathBuf::from("/Users/test/Downloads")),
             "Downloads",
         ),
@@ -67,7 +67,7 @@ fn test_load_favorites_with_multiple_items() {
 #[test]
 fn test_load_favorites_with_invalid_path() {
     let items = vec![
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::Documents(PathBuf::from("/invalid/path")),
             "Documents",
         ),
@@ -83,7 +83,7 @@ fn test_load_favorites_with_invalid_path() {
 #[test]
 fn test_load_favorites_with_unsupported_url() {
     let items = vec![
-        SidebarItem::with_display_name(
+        SidebarItem::new(
             Target::Documents(PathBuf::from("unsupported://path")),
             "Documents",
         ),
