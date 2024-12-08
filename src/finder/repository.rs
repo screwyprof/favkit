@@ -2,7 +2,8 @@ use crate::errors::FinderError;
 use crate::finder::sidebar::item::SidebarItem;
 use crate::finder::sidebar::Target;
 use crate::finder::system::api::MacOsApi;
-use core_foundation::{base::TCFType, string::CFString, url::CFURL};
+use crate::finder::system::url::MacOsUrl;
+use core_foundation::{base::TCFType, string::CFString};
 use core_services::LSSharedFileListItemRef;
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -49,11 +50,8 @@ impl Repository {
                 let target = if url_ref.is_null() {
                     continue; // Skip items with no URL
                 } else {
-                    let cfurl = CFURL::wrap_under_create_rule(url_ref);
-                    match Target::try_from(&cfurl) {
-                        Ok(target) => target,
-                        Err(_) => continue,
-                    }
+                    let url = MacOsUrl::from(url_ref);
+                    Target::try_from(url)?
                 };
                 println!("Item {} Target: {:?}", idx, target);
 

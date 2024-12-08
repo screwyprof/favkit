@@ -1,34 +1,118 @@
 use core_foundation::{
     base::{kCFAllocatorDefault, TCFType},
     string::CFString,
-    url::{CFURLCreateWithString, CFURL},
+    url::{CFURLCreateWithString, CFURL, CFURLRef},
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::finder::sidebar::Target;
 
 #[derive(Debug, Error)]
 pub enum UrlError {
-    #[error("Invalid URL format")]
-    InvalidUrl,
+    #[error("Invalid URL format: {0}")]
+    InvalidUrl(String),
     #[error("Failed to convert path to URL")]
     PathToUrl,
+}
+
+/// A safe wrapper around Core Foundation URL operations
+#[derive(Debug, Clone)]
+pub struct MacOsUrl(CFURL);
+
+impl MacOsUrl {
+    /// Gets the path from the URL if it exists
+    pub fn to_path(&self) -> Option<PathBuf> {
+        self.0.to_path()
+    }
+
+    /// Creates a MacOsUrl from a raw CFURLRef pointer
+    /// 
+    /// # Safety
+    /// The caller must ensure that url_ref is a valid CFURLRef pointer
+    pub unsafe fn from_ref(url_ref: CFURLRef) -> Self {
+        Self::from(CFURL::wrap_under_create_rule(url_ref))
+    }
+}
+
+impl TryFrom<&str> for MacOsUrl {
+    type Error = UrlError;
+
+    fn try_from(url: &str) -> Result<Self, Self::Error> {
+        // Check for scheme://
+        if !url.contains("://") {
+            return Err(UrlError::InvalidUrl("URL must contain ://".into()));
+        }
+
+        let cf_str = CFString::new(url);
+        unsafe {
+            let url_ref = CFURLCreateWithString(
+                kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            );
+            
+            if url_ref.is_null() {
+                return Err(UrlError::InvalidUrl("Failed to create CFURL".into()));
+            }
+            
+            Ok(MacOsUrl::from_ref(url_ref))
+        }
+    }
+}
+
+impl TryFrom<String> for MacOsUrl {
+    type Error = UrlError;
+
+    fn try_from(url: String) -> Result<Self, Self::Error> {
+        Self::try_from(url.as_str())
+    }
+}
+
+impl From<MacOsUrl> for String {
+    fn from(url: MacOsUrl) -> Self {
+        url.0.get_string().to_string()
+    }
+}
+
+impl From<&MacOsUrl> for String {
+    fn from(url: &MacOsUrl) -> Self {
+        url.0.get_string().to_string()
+    }
+}
+
+impl AsRef<CFURL> for MacOsUrl {
+    fn as_ref(&self) -> &CFURL {
+        &self.0
+    }
+}
+
+impl From<CFURL> for MacOsUrl {
+    fn from(url: CFURL) -> Self {
+        MacOsUrl(url)
+    }
+}
+
+impl From<CFURLRef> for MacOsUrl {
+    fn from(url_ref: CFURLRef) -> Self {
+        unsafe { MacOsUrl::from_ref(url_ref) }
+    }
 }
 
 impl TryFrom<&CFURL> for Target {
     type Error = UrlError;
 
     fn try_from(url: &CFURL) -> Result<Self, Self::Error> {
-        let url_str = url.get_string().to_string();
+        let mac_url = MacOsUrl::from(url.clone());
+        let url_str: String = mac_url.as_ref().get_string().to_string();
         
         if url_str.starts_with("nwnode://") {
             return Ok(Target::AirDrop("nwnode://domain-AirDrop".to_string()));
         }
 
-        let path = url
+        let path = mac_url
             .to_path()
-            .ok_or(UrlError::InvalidUrl)?;
+            .ok_or(UrlError::InvalidUrl("Failed to convert URL to path".into()))?;
 
         Ok(match path.as_path() {
             p if dirs::document_dir().is_some_and(|d| p == d.as_path()) => 
@@ -44,80 +128,121 @@ impl TryFrom<&CFURL> for Target {
     }
 }
 
+impl TryFrom<MacOsUrl> for Target {
+    type Error = UrlError;
+
+    fn try_from(url: MacOsUrl) -> Result<Self, Self::Error> {
+        Target::try_from(url.as_ref())
+    }
+}
+
+impl TryFrom<&MacOsUrl> for Target {
+    type Error = UrlError;
+
+    fn try_from(url: &MacOsUrl) -> Result<Self, Self::Error> {
+        Target::try_from(url.as_ref())
+    }
+}
+
+impl TryFrom<&Target> for MacOsUrl {
+    type Error = UrlError;
+
+    fn try_from(target: &Target) -> Result<Self, Self::Error> {
+        match target {
+            Target::AirDrop(url) => MacOsUrl::try_from(url.as_str()),
+            Target::Documents(path) |
+            Target::Applications(path) |
+            Target::Downloads(path) |
+            Target::Home(path) |
+            Target::UserPath(path) => {
+                if let Some(path_str) = path.to_str() {
+                    MacOsUrl::try_from(format!("file://{}", path_str))
+                } else {
+                    Err(UrlError::InvalidUrl("Path contains invalid UTF-8".into()))
+                }
+            }
+        }
+    }
+}
+
 impl TryFrom<&Target> for CFURL {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
         let url_str = match target {
-            Target::AirDrop(url) => url.clone(),
+            Target::AirDrop(_) => "nwnode://domain-AirDrop".to_string(),
             Target::UserPath(path)
             | Target::Documents(path)
             | Target::Downloads(path)
             | Target::Applications(path)
             | Target::Home(path) => format!("file://{}", path.display()),
         };
-        let cf_str = CFString::new(&url_str);
-        
-        unsafe {
-            let url_ref = CFURLCreateWithString(
-                kCFAllocatorDefault,
-                cf_str.as_concrete_TypeRef(),
-                std::ptr::null(),
-            );
-            
-            if url_ref.is_null() {
-                return Err(UrlError::PathToUrl);
-            }
-            
-            Ok(CFURL::wrap_under_create_rule(url_ref))
-        }
+        Ok(MacOsUrl::try_from(url_str)?.0)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_convert_url_to_target() {
         // Test AirDrop URL
-        let cf_str = CFString::new("nwnode://domain-AirDrop");
-        let url = unsafe {
-            let url_ref = CFURLCreateWithString(
-                kCFAllocatorDefault,
-                cf_str.as_concrete_TypeRef(),
-                std::ptr::null(),
-            );
-            CFURL::wrap_under_create_rule(url_ref)
-        };
-        let target = Target::try_from(&url).unwrap();
+        let url = MacOsUrl::try_from("nwnode://domain-AirDrop").unwrap();
+        let target = Target::try_from(url.as_ref()).unwrap();
         assert!(matches!(target, Target::AirDrop(s) if s == "nwnode://domain-AirDrop"));
 
         // Test file URL
-        let cf_str = CFString::new("file:///Applications");
-        let url = unsafe {
-            let url_ref = CFURLCreateWithString(
-                kCFAllocatorDefault,
-                cf_str.as_concrete_TypeRef(),
-                std::ptr::null(),
-            );
-            CFURL::wrap_under_create_rule(url_ref)
-        };
-        let target = Target::try_from(&url).unwrap();
-        assert!(matches!(target, Target::Applications(p) if p == PathBuf::from("/Applications")));
+        let url = MacOsUrl::try_from("file:///Applications").unwrap();
+        let target = Target::try_from(url.as_ref()).unwrap();
+        assert!(matches!(target, Target::Applications(p) if p == Path::new("/Applications")));
     }
 
     #[test]
     fn test_convert_target_to_url() {
         // Test AirDrop target
-        let target = Target::AirDrop("nwnode://domain-AirDrop".to_string());
-        let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), "nwnode://domain-AirDrop");
+        let target = Target::AirDrop("any string".to_string()); // The input string doesn't matter
+        let url = MacOsUrl::from(CFURL::try_from(&target).unwrap());
+        let url_str: String = (&url).into();
+        assert_eq!(url_str, "nwnode://domain-AirDrop");
 
         // Test file target
-        let target = Target::Applications(PathBuf::from("/Applications"));
-        let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), "file:///Applications");
+        let target = Target::Applications(Path::new("/Applications").to_path_buf());
+        let url = MacOsUrl::from(CFURL::try_from(&target).unwrap());
+        let url_str: String = (&url).into();
+        assert_eq!(url_str, "file:///Applications");
+    }
+
+    #[test]
+    fn test_macos_url_creation() {
+        // Valid URLs
+        assert!(MacOsUrl::try_from("file:///Applications").is_ok());
+        assert!(MacOsUrl::try_from("nwnode://domain-AirDrop").is_ok());
+        assert!(MacOsUrl::try_from("http://example.com").is_ok());
+        assert!(MacOsUrl::try_from("https://example.com").is_ok());
+        assert!(MacOsUrl::try_from("custom://anything").is_ok());
+        
+        // Invalid URLs
+        assert!(MacOsUrl::try_from("not a url").is_err());
+    }
+
+    #[test]
+    fn test_url_conversions() {
+        let url_str = "file:///Applications";
+        let url = MacOsUrl::try_from(url_str).unwrap();
+        
+        // Test String conversions
+        let converted: String = (&url).into();
+        assert_eq!(converted, url_str);
+        
+        let converted: String = url.clone().into();
+        assert_eq!(converted, url_str);
+        
+        // Test CFURL conversions
+        let cf_url = url.as_ref();
+        assert_eq!(cf_url.get_string().to_string(), url_str);
+        
+        let mac_url = MacOsUrl::from(cf_url.clone());
+        assert_eq!(String::from(&mac_url), url_str);
     }
 }
