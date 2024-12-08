@@ -1,13 +1,12 @@
-#![allow(dead_code)]
-
 use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{MacOsApi, SidebarItem, Target};
-use favkit::errors::{FinderError, FavoritesErrorKind};
+use favkit::errors::FinderError;
 use favkit::finder::system::url::MacOsUrl;
+use favkit::finder::system::api::{SidebarItemRef, SidebarItemArray};
 use std::{
     ffi::c_void,
     fmt::Debug,
@@ -19,8 +18,8 @@ use std::{
 pub enum ApiCall {
     CreateFavoritesList,
     GetFavoritesSnapshot(LSSharedFileListRef),
-    GetItemDisplayName(LSSharedFileListItemRef),
-    GetItemUrl(LSSharedFileListItemRef),
+    GetItemDisplayName(SidebarItemRef),
+    GetItemUrl(SidebarItemRef),
 }
 
 struct ApiCallState {
@@ -88,32 +87,23 @@ impl ApiCallRecorder {
         }
     }
 
-    pub fn get_test_item(&self, index: usize) -> LSSharedFileListItemRef {
-        (index + 1) as LSSharedFileListItemRef
-    }
-
-    fn get_next_ref(&self) -> LSSharedFileListItemRef {
-        let mut next_ref = self.state.next_ref.lock().unwrap();
-        let current = *next_ref;
-        *next_ref += 1;
-        current as LSSharedFileListItemRef
-    }
-
     pub fn verify_calls(&self, expected_calls: &[ApiCall]) {
-        let calls = self.state.calls.lock().unwrap();
         assert_eq!(
-            &*calls, expected_calls,
-            "API calls don't match expected calls"
+            &*self.state.calls.lock().unwrap(),
+            expected_calls,
+            "API calls did not match expected"
         );
     }
 
-    fn get_item_by_ref(&self, item: LSSharedFileListItemRef) -> Option<&SidebarItem> {
-        let index = (item as i64 - 1) as usize;
+    fn get_item_by_ref(&self, item: SidebarItemRef) -> Option<&SidebarItem> {
+        // SAFETY: This is test code and we ensure the reference is valid
+        let index = (unsafe { item.as_raw() } as i64 - 1) as usize;
         self.state.items.get(index)
     }
 
-    fn should_return_null_name(&self, item: LSSharedFileListItemRef) -> bool {
-        let index = (item as i64 - 1) as usize;
+    fn should_return_null_name(&self, item: SidebarItemRef) -> bool {
+        // SAFETY: This is test code and we ensure the reference is valid
+        let index = (unsafe { item.as_raw() } as i64 - 1) as usize;
         self.state.items_without_names.contains(&index)
     }
 }
@@ -125,6 +115,7 @@ impl MacOsApi for ApiCallRecorder {
             .lock()
             .unwrap()
             .push(ApiCall::CreateFavoritesList);
+
         Ok(1 as LSSharedFileListRef)
     }
 
@@ -132,7 +123,7 @@ impl MacOsApi for ApiCallRecorder {
         &self,
         list: LSSharedFileListRef,
         _seed: &mut u32,
-    ) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
+    ) -> Result<SidebarItemArray, FinderError> {
         println!("MOCK: get_favorites_snapshot called with list: {:?}", list);
         self.state
             .calls
@@ -140,51 +131,42 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetFavoritesSnapshot(list));
 
-        let items_count = self.state.items.len();
-        println!("MOCK: Creating array with {} items", items_count);
+        let items_len = self.state.items.len();
+        println!("MOCK: Creating array with {} items", items_len);
 
-        let values: Vec<LSSharedFileListItemRef> = (1..=items_count)
+        let item_refs: Vec<LSSharedFileListItemRef> = (1..=items_len)
             .map(|i| i as LSSharedFileListItemRef)
             .collect();
 
-        let array_ref = CFArrayCreate(
-            kCFAllocatorDefault,
-            values.as_ptr() as *const *const c_void,
-            values.len() as CFIndex,
-            ptr::null(),
-        );
-
-        if array_ref.is_null() {
-            return Err(FinderError::FavoritesError {
-                kind: FavoritesErrorKind::FailedToGetSnapshot,
-            });
-        }
+        let array_ref = unsafe {
+            CFArrayCreate(
+                kCFAllocatorDefault,
+                item_refs.as_ptr() as *const *const c_void,
+                item_refs.len() as CFIndex,
+                ptr::null(),
+            )
+        };
 
         let array = CFArray::wrap_under_create_rule(array_ref);
-        Ok(array)
+        Ok(unsafe { SidebarItemArray::new(array) })
     }
 
-    unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> Option<String> {
-        println!("MOCK: get_item_display_name called with item_ref: {:?}", item_ref);
+    unsafe fn get_item_display_name(&self, item: SidebarItemRef) -> Option<String> {
+        println!("MOCK: get_item_display_name called with item_ref: {:?}", item);
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::GetItemDisplayName(item_ref));
+            .push(ApiCall::GetItemDisplayName(item));
 
-        let index = (item_ref as usize) - 1;
-        println!("MOCK: Looking up item at index {}", index);
-
-        if let Some(item) = self.state.items.get(index) {
+        if self.should_return_null_name(item) {
+            println!("MOCK: Returning null name for item");
+            None
+        } else if let Some(item) = self.get_item_by_ref(item) {
             println!("MOCK: Found item: {:?}", item);
             // Return None for AirDrop items to simulate macOS behavior
             if matches!(item.target(), Target::AirDrop(_)) {
                 println!("MOCK: AirDrop item, returning None for display name");
-                return None;
-            }
-
-            if self.should_return_null_name(item_ref) {
-                println!("MOCK: Returning null name for item");
                 None
             } else {
                 println!("MOCK: Returning display name: {}", item.display_name());
@@ -196,18 +178,15 @@ impl MacOsApi for ApiCallRecorder {
         }
     }
 
-    unsafe fn get_item_url(&self, item_ref: LSSharedFileListItemRef) -> Option<MacOsUrl> {
-        println!("MOCK: get_item_url called with item_ref: {:?}", item_ref);
+    unsafe fn get_item_url(&self, item: SidebarItemRef) -> Option<MacOsUrl> {
+        println!("MOCK: get_item_url called with item_ref: {:?}", item);
         self.state
             .calls
             .lock()
             .unwrap()
-            .push(ApiCall::GetItemUrl(item_ref));
+            .push(ApiCall::GetItemUrl(item));
 
-        let index = (item_ref as usize) - 1;
-        println!("MOCK: Looking up item at index {}", index);
-
-        if let Some(item) = self.state.items.get(index) {
+        if let Some(item) = self.get_item_by_ref(item) {
             println!("MOCK: Found item: {:?}", item);
             match item.target() {
                 Target::AirDrop(url) => Some(MacOsUrl::try_from(url.as_str()).unwrap()),

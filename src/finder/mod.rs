@@ -6,6 +6,15 @@ pub use repository::Repository;
 pub use sidebar::{item::SidebarItem, Target};
 pub use system::{MacOsApi, RealMacOsApi};
 
+/// A type alias for a Repository that uses the real macOS API
+pub type RealRepository = Repository<RealMacOsApi>;
+
+impl RealRepository {
+    pub fn new_with_real_api() -> Self {
+        Self::new(RealMacOsApi::new())
+    }
+}
+
 pub struct Finder {
     sidebar: Vec<SidebarItem>,
 }
@@ -23,11 +32,5 @@ impl Finder {
 impl std::fmt::Display for Finder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Finder")
-    }
-}
-
-impl Repository {
-    pub fn new_with_real_api() -> Self {
-        Self::new(Box::new(RealMacOsApi::new()))
     }
 }

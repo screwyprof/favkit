@@ -1,66 +1,50 @@
-use core_services::LSSharedFileListItemRef;
-
-use crate::{
-    errors::FinderError,
-    finder::{
-        sidebar::{target::Target, item::SidebarItem},
-        system::api::MacOsApi,
-    },
-};
-
-use core_foundation::array::CFArray;
+use crate::errors::FinderError;
+use crate::finder::sidebar::item::SidebarItem;
+use crate::finder::sidebar::target::Target;
+use crate::finder::system::api::{MacOsApi, SidebarItemRef};
 
 /// Repository is responsible for loading and saving sidebar items.
-pub struct Repository {
-    api: Box<dyn MacOsApi>,
+pub struct Repository<A: MacOsApi> {
+    api: A,
 }
 
-impl Repository {
-    pub fn new(api: Box<dyn MacOsApi>) -> Self {
+impl<A: MacOsApi> Repository<A> {
+    pub fn new(api: A) -> Self {
         Self { api }
     }
 
     /// Load all sidebar items from the favorites list
     pub fn load(&self) -> Result<Vec<SidebarItem>, FinderError> {
-        let snapshot = self.get_favorites_snapshot()?;
-        let items = snapshot
-            .get_all_values()
-            .iter()
-            .filter_map(|item| self.process_item(*item as LSSharedFileListItemRef))
-            .collect();
+        let mut items = Vec::new();
+        let mut seed = 0;
+
+        // SAFETY: We ensure that the list is properly released when no longer needed
+        unsafe {
+            let list = self.api.get_favorites_list()?;
+            let snapshot = self.api.get_favorites_snapshot(list, &mut seed)?;
+
+            for item_ref in snapshot.iter() {
+                if let Some(item) = self.process_item(item_ref) {
+                    items.push(item);
+                }
+            }
+        }
 
         Ok(items)
     }
 
-    /// Get a snapshot of the favorites list
-    fn get_favorites_snapshot(&self) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
-        // SAFETY: We trust that Core Foundation provides a valid favorites list
-        let favorites = unsafe { self.api.get_favorites_list()? };
-
-        let mut seed = 0;
-        // SAFETY: We trust that Core Foundation provides a valid snapshot from a valid favorites list
-        unsafe { self.api.get_favorites_snapshot(favorites, &mut seed) }
-    }
-
     /// Process a single item from the favorites list
-    fn process_item(&self, item: LSSharedFileListItemRef) -> Option<SidebarItem> {
-        // Get URL first
-        let url = unsafe { self.api.get_item_url(item) }?;
+    unsafe fn process_item(&self, item_ref: SidebarItemRef) -> Option<SidebarItem> {
+        let url = self.api.get_item_url(item_ref)?;
+        let display_name = self.api.get_item_display_name(item_ref);
 
-        // Try to convert URL to target
-        let target = Target::try_from(&url).ok()?;
+        let target = Target::try_from(url).ok()?;
 
-        // Handle AirDrop specially - it will have empty display name from macOS
-        if let Target::AirDrop(_) = target {
-            return Some(SidebarItem::new(target, "AirDrop"));
+        match target {
+            Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
+            _ => display_name
+                .filter(|name| !name.is_empty())
+                .map(|name| SidebarItem::new(target, name)),
         }
-
-        // Get display name for non-AirDrop items
-        let display_name = unsafe { self.api.get_item_display_name(item) };
-
-        // For other items, require a non-empty display name
-        display_name
-            .filter(|name| !name.is_empty())
-            .map(|name| SidebarItem::new(target, &name))
     }
 }
