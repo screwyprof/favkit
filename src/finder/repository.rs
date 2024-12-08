@@ -3,7 +3,7 @@ use crate::finder::sidebar::item::SidebarItem;
 use crate::finder::sidebar::Target;
 use crate::finder::system::api::MacOsApi;
 use crate::finder::system::url::MacOsUrl;
-use core_foundation::{base::TCFType, string::CFString};
+use core_foundation::{array::CFArray, base::TCFType, string::CFString};
 use core_services::LSSharedFileListItemRef;
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -16,75 +16,77 @@ impl Repository {
         Self { api }
     }
 
+    /// Load all sidebar items from the favorites list
     pub fn load(&self) -> Result<Vec<SidebarItem>, FinderError> {
-        // Get the favorites list
+        let snapshot = self.get_favorites_snapshot()?;
+        let items = snapshot
+            .get_all_values()
+            .iter()
+            .filter_map(|item| self.process_item(*item as LSSharedFileListItemRef))
+            .collect();
+
+        Ok(items)
+    }
+
+    /// Get a snapshot of the favorites list
+    fn get_favorites_snapshot(&self) -> Result<CFArray<LSSharedFileListItemRef>, FinderError> {
         // SAFETY: We trust that Core Foundation provides a valid favorites list
         let favorites = unsafe { self.api.get_favorites_list() };
         if favorites.is_null() {
-            return Err(FinderError::SystemError(
-                "Could not get favorites list".to_string(),
-            ));
+            return Err(FinderError::SystemError("Could not get favorites list".into()));
         }
 
-        // Get a snapshot of the favorites
         let mut seed = 0;
         // SAFETY: We trust that Core Foundation provides a valid snapshot from a valid favorites list
         let snapshot = unsafe { self.api.get_favorites_snapshot(favorites, &mut seed) };
         if snapshot.as_concrete_TypeRef().is_null() {
-            return Err(FinderError::SystemError(
-                "Could not get favorites snapshot".to_string(),
-            ));
+            return Err(FinderError::SystemError("Could not get favorites snapshot".into()));
         }
 
-        // Get all items from the snapshot
-        let items_array = snapshot.get_all_values();
-        let mut items = Vec::new();
-        println!("Processing {} items", items_array.len());
+        Ok(snapshot)
+    }
 
-        // Process each item
-        for (idx, item) in items_array.iter().enumerate() {
-            let item = *item as LSSharedFileListItemRef;
+    /// Process a single item from the favorites list
+    fn process_item(&self, item: LSSharedFileListItemRef) -> Option<SidebarItem> {
+        // Get target from URL
+        let target = self.get_target_from_item(item)?;
 
-            // Get the URL for this item
-            // SAFETY: We trust that Core Foundation provides a valid URL for the item
-            let url_ref = unsafe { self.api.get_item_url(item) };
-            if url_ref.is_null() {
-                continue; // Skip items with no URL
-            }
-            let url = MacOsUrl::from(url_ref);
-            let target = Target::try_from(url)?;
-            println!("Item {} Target: {:?}", idx, target);
-
-            // Get display name
-            // SAFETY: We trust that Core Foundation provides a valid display name pointer
-            let display_name = unsafe { self.api.get_item_display_name(item) };
-            let item = if display_name.is_null() {
-                match target {
-                    Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
-                    _ => None, // Skip other items with no display name
-                }
-            } else {
-                // SAFETY: We trust that Core Foundation provides a valid display name string
-                let cf_string = unsafe { CFString::wrap_under_create_rule(display_name) };
-                let name = cf_string.to_string();
-                if name.is_empty() {
-                    match target {
-                        Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
-                        _ => None, // Skip other items with empty display name
-                    }
-                } else {
-                    println!("Item {} display name: {}", idx, name);
-                    Some(SidebarItem::new(target, &name))
-                }
-            };
-
-            if let Some(item) = item {
-                println!("Created item {}: {:?}", idx, item);
-                items.push(item);
-            }
+        // Handle AirDrop specially - it always has "AirDrop" as display name
+        if let Target::AirDrop(_) = target {
+            return Some(SidebarItem::new(target, "AirDrop"));
         }
 
-        println!("Final items: {:?}", items);
-        Ok(items)
+        // Get display name for other items
+        let name = self.get_display_name(item)?;
+        if name.is_empty() {
+            None // Skip items with empty display name
+        } else {
+            Some(SidebarItem::new(target, &name))
+        }
+    }
+
+    /// Get the target from an item's URL
+    fn get_target_from_item(&self, item: LSSharedFileListItemRef) -> Option<Target> {
+        // SAFETY: We trust that Core Foundation provides a valid URL for the item
+        let url_ref = unsafe { self.api.get_item_url(item) };
+        if url_ref.is_null() {
+            return None;
+        }
+
+        let url = MacOsUrl::from(url_ref);
+        Target::try_from(url).ok()
+    }
+
+    /// Get the display name for an item
+    fn get_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
+        // SAFETY: We trust that Core Foundation provides a valid display name pointer
+        let display_name = unsafe { self.api.get_item_display_name(item) };
+        if display_name.is_null() {
+            return None;
+        }
+
+        // SAFETY: We trust that Core Foundation provides a valid display name string
+        let cf_string = unsafe { CFString::wrap_under_create_rule(display_name) };
+        Some(cf_string.to_string())
     }
 }
