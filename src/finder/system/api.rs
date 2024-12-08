@@ -1,11 +1,20 @@
-use core_foundation::{array::CFArray, base::TCFType, string::CFString, url::CFURLRef};
+use core_foundation::{
+    base::TCFType,
+    string::CFString,
+    array::CFArray,
+};
+
 use core_services::{
     kLSSharedFileListFavoriteItems, LSSharedFileListCopySnapshot, LSSharedFileListCreate,
     LSSharedFileListItemCopyDisplayName, LSSharedFileListItemCopyResolvedURL,
     LSSharedFileListItemRef, LSSharedFileListRef,
 };
 use std::ptr;
-use crate::errors::{FinderError, FavoritesErrorKind};
+
+use crate::{
+    errors::{FinderError, FavoritesErrorKind},
+    finder::system::url::MacOsUrl,
+};
 
 pub trait MacOsApi {
     /// Gets the favorites list.
@@ -34,13 +43,13 @@ pub trait MacOsApi {
     /// - The item parameter is a valid LSSharedFileListItemRef
     unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> Option<String>;
 
-    /// Gets the resolved URL of a favorites list item.
-    ///
+    /// Get the URL of a sidebar item
+    /// 
     /// # Safety
     /// The caller must ensure that:
-    /// - The item parameter is a valid LSSharedFileListItemRef
-    /// - The returned CFURLRef is properly released when no longer needed
-    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef;
+    /// - `item` is a valid pointer to a `LSSharedFileListItemRef`
+    /// - The item reference remains valid for the duration of this call
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> Option<MacOsUrl>;
 }
 
 pub struct RealMacOsApi;
@@ -91,7 +100,14 @@ impl MacOsApi for RealMacOsApi {
             .map(|cf_str| cf_str.to_string())
     }
 
-    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> CFURLRef {
-        LSSharedFileListItemCopyResolvedURL(item, 0, ptr::null_mut())
+    /// Get the URL of a sidebar item
+    /// 
+    /// # Safety
+    /// The caller must ensure that:
+    /// - `item` is a valid pointer to a `LSSharedFileListItemRef`
+    /// - The item reference remains valid for the duration of this call
+    unsafe fn get_item_url(&self, item: LSSharedFileListItemRef) -> Option<MacOsUrl> {
+        let url = LSSharedFileListItemCopyResolvedURL(item, 0, ptr::null_mut());
+        (!url.is_null()).then(|| MacOsUrl::from(url))
     }
 }

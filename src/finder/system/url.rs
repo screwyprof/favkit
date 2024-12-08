@@ -94,14 +94,14 @@ impl TryFrom<String> for MacOsUrl {
     }
 }
 
-impl From<MacOsUrl> for String {
-    fn from(url: MacOsUrl) -> Self {
+impl From<&MacOsUrl> for String {
+    fn from(url: &MacOsUrl) -> Self {
         url.0.get_string().to_string()
     }
 }
 
-impl From<&MacOsUrl> for String {
-    fn from(url: &MacOsUrl) -> Self {
+impl From<MacOsUrl> for String {
+    fn from(url: MacOsUrl) -> Self {
         url.0.get_string().to_string()
     }
 }
@@ -118,8 +118,10 @@ impl From<CFURL> for MacOsUrl {
     }
 }
 
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl From<CFURLRef> for MacOsUrl {
+    /// # Safety
+    /// The caller must ensure that url_ref is a valid CFURLRef pointer
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn from(url_ref: CFURLRef) -> Self {
         // SAFETY: We trust that Core Foundation gives us valid pointers
         unsafe { Self::from_ref(url_ref) }

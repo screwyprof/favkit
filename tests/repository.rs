@@ -25,7 +25,7 @@ fn test_load_favorites() {
     let items = vec![
         SidebarItem::new(
             Target::AirDrop("nwnode://domain-AirDrop".to_string()),
-            "AirDrop",
+            "",
         ),
         SidebarItem::new(
             Target::Documents(dirs::document_dir().unwrap()),
@@ -36,8 +36,19 @@ fn test_load_favorites() {
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
 
+    let expected = vec![
+        SidebarItem::new(
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::new(
+            Target::Documents(dirs::document_dir().unwrap()),
+            "Documents",
+        ),
+    ];
+
     let sidebar = repository.load().unwrap();
-    assert_eq!(sidebar, items);
+    assert_eq!(sidebar, expected);
 }
 
 #[test]
@@ -45,7 +56,7 @@ fn test_load_favorites_with_multiple_items() {
     let items = vec![
         SidebarItem::new(
             Target::AirDrop("nwnode://domain-AirDrop".to_string()),
-            "AirDrop",
+            "",
         ),
         SidebarItem::new(
             Target::Documents(dirs::document_dir().unwrap()),
@@ -60,8 +71,23 @@ fn test_load_favorites_with_multiple_items() {
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
 
+    let expected = vec![
+        SidebarItem::new(
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::new(
+            Target::Documents(dirs::document_dir().unwrap()),
+            "Documents",
+        ),
+        SidebarItem::new(
+            Target::Downloads(dirs::download_dir().unwrap()),
+            "Downloads",
+        ),
+    ];
+
     let sidebar = repository.load().unwrap();
-    assert_eq!(sidebar, items);
+    assert_eq!(sidebar, expected);
 }
 
 #[test]
@@ -101,7 +127,7 @@ fn test_load_favorites_with_null_display_names() {
     let items = vec![
         SidebarItem::new(
             Target::AirDrop("nwnode://domain-AirDrop".to_string()),
-            "AirDrop",
+            "",
         ),
         SidebarItem::new(
             Target::Documents(dirs::document_dir().unwrap()),
@@ -118,6 +144,21 @@ fn test_load_favorites_with_null_display_names() {
     let api = ApiCallRecorder::with_items_and_null_names(items.clone(), null_name_indices);
     let repository = Repository::new(Box::new(api));
 
+    let expected = vec![
+        SidebarItem::new(
+            Target::AirDrop("nwnode://domain-AirDrop".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::new(
+            Target::Documents(dirs::document_dir().unwrap()),
+            "Documents",
+        ),
+        SidebarItem::new(
+            Target::Downloads(dirs::download_dir().unwrap()),
+            "Downloads",
+        ),
+    ];
+
     let sidebar = repository.load().unwrap();
-    assert_eq!(sidebar, items);
+    assert_eq!(sidebar, expected);
 }

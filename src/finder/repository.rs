@@ -1,10 +1,14 @@
-use crate::errors::FinderError;
-use crate::finder::sidebar::item::SidebarItem;
-use crate::finder::sidebar::Target;
-use crate::finder::system::api::MacOsApi;
-use crate::finder::system::url::MacOsUrl;
-use core_foundation::array::CFArray;
 use core_services::LSSharedFileListItemRef;
+
+use crate::{
+    errors::FinderError,
+    finder::{
+        sidebar::{target::Target, item::SidebarItem},
+        system::api::MacOsApi,
+    },
+};
+
+use core_foundation::array::CFArray;
 
 /// Repository is responsible for loading and saving sidebar items.
 pub struct Repository {
@@ -40,30 +44,23 @@ impl Repository {
 
     /// Process a single item from the favorites list
     fn process_item(&self, item: LSSharedFileListItemRef) -> Option<SidebarItem> {
-        // Get target from URL
-        let target = self.get_target_from_item(item)?;
+        // Get URL first
+        let url = unsafe { self.api.get_item_url(item) }?;
 
-        // Handle AirDrop specially - it always has "AirDrop" as display name
+        // Try to convert URL to target
+        let target = Target::try_from(&url).ok()?;
+
+        // Handle AirDrop specially - it will have empty display name from macOS
         if let Target::AirDrop(_) = target {
             return Some(SidebarItem::new(target, "AirDrop"));
         }
 
-        // Get display name for other items
-        unsafe { self.api.get_item_display_name(item) }
+        // Get display name for non-AirDrop items
+        let display_name = unsafe { self.api.get_item_display_name(item) };
+
+        // For other items, require a non-empty display name
+        display_name
             .filter(|name| !name.is_empty())
             .map(|name| SidebarItem::new(target, &name))
-    }
-
-    /// Get the target from an item's URL
-    fn get_target_from_item(&self, item: LSSharedFileListItemRef) -> Option<Target> {
-        // SAFETY: We trust that Core Foundation provides a valid URL for the item
-        let url = unsafe { 
-            self.api
-                .get_item_url(item)
-                .as_ref()
-                .and_then(|url_ref| MacOsUrl::from_nullable_ref(url_ref))
-        }?;
-        
-        Target::try_from(url).ok()
     }
 }

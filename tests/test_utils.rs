@@ -3,11 +3,11 @@
 use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
-    url::CFURLRef,
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{MacOsApi, SidebarItem};
+use favkit::{MacOsApi, SidebarItem, Target};
 use favkit::errors::{FinderError, FavoritesErrorKind};
+use favkit::finder::system::url::MacOsUrl;
 use std::{
     ffi::c_void,
     fmt::Debug,
@@ -165,10 +165,7 @@ impl MacOsApi for ApiCallRecorder {
     }
 
     unsafe fn get_item_display_name(&self, item_ref: LSSharedFileListItemRef) -> Option<String> {
-        println!(
-            "MOCK: get_item_display_name called with item_ref: {:?}",
-            item_ref
-        );
+        println!("MOCK: get_item_display_name called with item_ref: {:?}", item_ref);
         self.state
             .calls
             .lock()
@@ -180,6 +177,12 @@ impl MacOsApi for ApiCallRecorder {
 
         if let Some(item) = self.state.items.get(index) {
             println!("MOCK: Found item: {:?}", item);
+            // Return None for AirDrop items to simulate macOS behavior
+            if matches!(item.target(), Target::AirDrop(_)) {
+                println!("MOCK: AirDrop item, returning None for display name");
+                return None;
+            }
+
             if self.should_return_null_name(item_ref) {
                 println!("MOCK: Returning null name for item");
                 None
@@ -193,7 +196,7 @@ impl MacOsApi for ApiCallRecorder {
         }
     }
 
-    unsafe fn get_item_url(&self, item_ref: LSSharedFileListItemRef) -> CFURLRef {
+    unsafe fn get_item_url(&self, item_ref: LSSharedFileListItemRef) -> Option<MacOsUrl> {
         println!("MOCK: get_item_url called with item_ref: {:?}", item_ref);
         self.state
             .calls
@@ -206,10 +209,16 @@ impl MacOsApi for ApiCallRecorder {
 
         if let Some(item) = self.state.items.get(index) {
             println!("MOCK: Found item: {:?}", item);
-            CFURLRef::from(item.target())
+            match item.target() {
+                Target::AirDrop(url) => Some(MacOsUrl::try_from(url.as_str()).unwrap()),
+                _ => {
+                    let url_str = String::from(item.target());
+                    MacOsUrl::try_from(url_str.as_str()).ok()
+                }
+            }
         } else {
-            println!("MOCK: Item not found, returning null");
-            ptr::null()
+            println!("MOCK: Item not found, returning None");
+            None
         }
     }
 }
