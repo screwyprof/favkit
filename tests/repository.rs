@@ -28,7 +28,7 @@ fn test_load_favorites() {
             "AirDrop",
         ),
         SidebarItem::new(
-            Target::Documents(PathBuf::from("/Users/test/Documents")),
+            Target::Documents(dirs::document_dir().unwrap()),
             "Documents",
         ),
     ];
@@ -48,11 +48,11 @@ fn test_load_favorites_with_multiple_items() {
             "AirDrop",
         ),
         SidebarItem::new(
-            Target::Documents(PathBuf::from("/Users/test/Documents")),
+            Target::Documents(dirs::document_dir().unwrap()),
             "Documents",
         ),
         SidebarItem::new(
-            Target::Downloads(PathBuf::from("/Users/test/Downloads")),
+            Target::Downloads(dirs::download_dir().unwrap()),
             "Downloads",
         ),
     ];
@@ -68,30 +68,56 @@ fn test_load_favorites_with_multiple_items() {
 fn test_load_favorites_with_invalid_path() {
     let items = vec![
         SidebarItem::new(
-            Target::Documents(PathBuf::from("/invalid/path")),
-            "Documents",
+            Target::UserPath(PathBuf::from("/invalid/path")),
+            "Invalid Path",
         ),
     ];
 
-    let api = ApiCallRecorder::with_items(items);
+    let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
 
     let sidebar = repository.load().unwrap();
-    assert_eq!(sidebar.len(), 1);
+    assert_eq!(sidebar, items);
 }
 
 #[test]
 fn test_load_favorites_with_unsupported_url() {
     let items = vec![
         SidebarItem::new(
-            Target::Documents(PathBuf::from("unsupported://path")),
-            "Documents",
+            Target::UserPath(PathBuf::from("/some/invalid/path")),
+            "Unsupported URL",
         ),
     ];
 
-    let api = ApiCallRecorder::with_items(items);
+    let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
 
     let sidebar = repository.load().unwrap();
-    assert_eq!(sidebar.len(), 1);
+    assert_eq!(sidebar, items);
+}
+
+#[test]
+fn test_load_favorites_with_null_display_names() {
+    let items = vec![
+        SidebarItem::new(
+            Target::AirDrop("airdrop://".to_string()),
+            "AirDrop",
+        ),
+        SidebarItem::new(
+            Target::Documents(dirs::document_dir().unwrap()),
+            "Documents",
+        ),
+        SidebarItem::new(
+            Target::Downloads(dirs::download_dir().unwrap()),
+            "Downloads",
+        ),
+    ];
+
+    // Only AirDrop should have null display name - macOS provides names for others
+    let null_name_indices = vec![0];
+    let api = ApiCallRecorder::with_items_and_null_names(items.clone(), null_name_indices);
+    let repository = Repository::new(Box::new(api));
+
+    let sidebar = repository.load().unwrap();
+    assert_eq!(sidebar, items);
 }

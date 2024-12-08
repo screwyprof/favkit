@@ -1,4 +1,3 @@
-use std::path::Path;
 use super::Target;
 
 /// A sidebar item represents a target with a display name.

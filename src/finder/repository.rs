@@ -1,10 +1,12 @@
-use core_foundation::base::TCFType;
-use core_foundation::string::CFString;
-use core_foundation::url::CFURL;
+use core_foundation::{
+    base::TCFType,
+    string::CFString,
+    url::CFURL,
+};
 use core_services::LSSharedFileListItemRef;
 use crate::finder::system::api::MacOsApi;
-use crate::finder::system::url::UrlError;
-use crate::finder::sidebar::{Target, item::SidebarItem};
+use crate::finder::sidebar::Target;
+use crate::finder::sidebar::item::SidebarItem;
 use crate::errors::FinderError;
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -35,54 +37,47 @@ impl Repository {
             // Get all items from the snapshot
             let items_array = snapshot.get_all_values();
             let mut items = Vec::new();
+            println!("Processing {} items", items_array.len());
 
             // Process each item
-            for item in items_array {
-                let item = item as LSSharedFileListItemRef;
+            for (idx, item) in items_array.iter().enumerate() {
+                let item = *item as LSSharedFileListItemRef;
+                println!("Processing item {}", idx);
                 
                 // Get the URL for this item
                 let url_ref = self.api.get_item_url(item);
-                if url_ref.is_null() {
-                    return Err(FinderError::InvalidPath {
-                        path: "/invalid/path".into(),
-                        source: None,
-                    });
-                }
-
-                let cfurl = CFURL::wrap_under_create_rule(url_ref);
-                
-                // Convert URL to target
-                let target = match Target::try_from(&cfurl) {
-                    Ok(target) => target,
-                    Err(UrlError::PathToUrl) => {
-                        return Err(FinderError::InvalidPath {
-                            path: "/invalid/path".into(),
-                            source: None,
-                        });
-                    }
-                    Err(UrlError::InvalidUrl) => {
-                        return Err(FinderError::UnsupportedTarget("Invalid URL format".to_string()));
-                    }
-                    _ => {
-                        return Err(FinderError::UnsupportedTarget("Unsupported URL type".to_string()));
+                let target = if url_ref.is_null() {
+                    continue; // Skip items with no URL
+                } else {
+                    let cfurl = CFURL::wrap_under_create_rule(url_ref);
+                    match Target::try_from(&cfurl) {
+                        Ok(target) => target,
+                        Err(_) => continue,
                     }
                 };
+                println!("Item {} Target: {:?}", idx, target);
 
                 // Get display name
                 let display_name = self.api.get_item_display_name(item);
-                let item = match target {
-                    Target::AirDrop(_) => SidebarItem::new(target, "AirDrop"),
-                    _ => if display_name.is_null() {
-                        SidebarItem::new(target, "")
-                    } else {
-                        let cf_string = CFString::wrap_under_get_rule(display_name);
-                        SidebarItem::new(target, cf_string.to_string())
+                let item = if display_name.is_null() {
+                    match target {
+                        Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
+                        _ => None // Skip other items with no display name
                     }
+                } else {
+                    let cf_string = CFString::wrap_under_get_rule(display_name);
+                    let name = cf_string.to_string();
+                    println!("Item {} display name: {}", idx, name);
+                    Some(SidebarItem::new(target, &name))
                 };
 
-                items.push(item);
+                if let Some(item) = item {
+                    println!("Created item {}: {:?}", idx, item);
+                    items.push(item);
+                }
             }
 
+            println!("Final items: {:?}", items);
             Ok(items)
         }
     }

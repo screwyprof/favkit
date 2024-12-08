@@ -71,6 +71,19 @@ impl std::fmt::Display for Target {
     }
 }
 
+impl Into<String> for &Target {
+    fn into(self) -> String {
+        match self {
+            Target::AirDrop(_) => "airdrop://".to_string(),
+            Target::UserPath(path) |
+            Target::Documents(path) |
+            Target::Downloads(path) |
+            Target::Applications(path) |
+            Target::Home(path) => format!("file://{}", path.display()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

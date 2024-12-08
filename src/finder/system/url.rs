@@ -1,40 +1,75 @@
 use core_foundation::{
+    base::{TCFType, kCFAllocatorDefault},
     string::CFString,
-    url::{CFURL, kCFURLPOSIXPathStyle},
+    url::{CFURL, CFURLCreateWithString},
 };
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::PathBuf};
 use thiserror::Error;
+use dirs;
 
 use crate::finder::sidebar::Target;
 
 #[derive(Debug, Error)]
 pub enum UrlError {
-    #[error("Failed to convert path to URL")]
-    PathToUrl,
     #[error("Invalid URL format")]
     InvalidUrl,
-    #[error("Failed to get path from URL")]
-    UrlToPath,
+    #[error("Failed to convert path to URL")]
+    PathToUrl,
 }
 
 impl TryFrom<&CFURL> for Target {
     type Error = UrlError;
 
     fn try_from(url: &CFURL) -> Result<Self, Self::Error> {
-        // First check for special URLs
-        let cf_string = url.get_string();
-        let url_str = cf_string.to_string();
+        let url_str = url.get_string().to_string();
+        println!("Converting URL: {}", url_str);
         
-        if url_str == "nwnode://domain-AirDrop" {
-            return Ok(Target::AirDrop(url_str));
+        // Handle AirDrop URLs
+        if url_str.starts_with("nwnode://") || url_str.starts_with("airdrop://") || url_str == "AirDrop" {
+            println!("Detected AirDrop URL");
+            return Ok(Target::AirDrop("airdrop://".to_string()));
         }
 
-        // Then handle regular paths
-        if let Some(path) = url.to_path() {
-            return Ok(Target::UserPath(path));
+        // Handle null or empty URLs
+        if url_str.is_empty() {
+            println!("Empty URL, using empty UserPath");
+            return Ok(Target::UserPath(PathBuf::new()));
         }
 
-        Err(UrlError::InvalidUrl)
+        if !url_str.starts_with("file://") {
+            println!("Non-file URL, using as UserPath: {}", url_str);
+            return Ok(Target::UserPath(PathBuf::from(url_str)));
+        }
+
+        let path = PathBuf::from(url_str.trim_start_matches("file://"));
+        let path_str = path.to_string_lossy();
+        println!("File URL path: {}", path_str);
+
+        // Match against standard directories
+        let target = match path.as_path() {
+            p if p.to_str() == Some("/Applications") => {
+                println!("Detected Applications path");
+                Target::Applications(path)
+            }
+            p if dirs::document_dir().map_or(false, |d| p == d.as_path()) => {
+                println!("Detected Documents path");
+                Target::Documents(path)
+            }
+            p if dirs::download_dir().map_or(false, |d| p == d.as_path()) => {
+                println!("Detected Downloads path");
+                Target::Downloads(path)
+            }
+            p if dirs::home_dir().map_or(false, |d| p == d.as_path()) => {
+                println!("Detected Home path");
+                Target::Home(path)
+            }
+            _ => {
+                println!("Using UserPath for: {}", path_str);
+                Target::UserPath(path)
+            }
+        };
+
+        Ok(target)
     }
 }
 
@@ -42,55 +77,26 @@ impl TryFrom<&Target> for CFURL {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
-        match target {
-            Target::AirDrop(url_str) => {
-                CFURL::from_path(url_str, false).ok_or(UrlError::InvalidUrl)
+        let url_str = match target {
+            Target::AirDrop(_) => "airdrop://".to_string(),
+            Target::UserPath(path) |
+            Target::Documents(path) |
+            Target::Downloads(path) |
+            Target::Applications(path) |
+            Target::Home(path) => format!("file://{}", path.display()),
+        };
+        
+        let cf_str = CFString::new(&url_str);
+        unsafe {
+            let url_ref = CFURLCreateWithString(
+                kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            );
+            if url_ref.is_null() {
+                return Err(UrlError::PathToUrl);
             }
-            Target::UserPath(path) => {
-                let path_str = path.to_str().ok_or(UrlError::PathToUrl)?;
-                let cf_str = CFString::new(path_str);
-                Ok(CFURL::from_file_system_path(
-                    cf_str,
-                    kCFURLPOSIXPathStyle,
-                    true,
-                ))
-            }
-            Target::Documents(path) => {
-                let path_str = path.to_str().ok_or(UrlError::PathToUrl)?;
-                let cf_str = CFString::new(path_str);
-                Ok(CFURL::from_file_system_path(
-                    cf_str,
-                    kCFURLPOSIXPathStyle,
-                    true,
-                ))
-            }
-            Target::Downloads(path) => {
-                let path_str = path.to_str().ok_or(UrlError::PathToUrl)?;
-                let cf_str = CFString::new(path_str);
-                Ok(CFURL::from_file_system_path(
-                    cf_str,
-                    kCFURLPOSIXPathStyle,
-                    true,
-                ))
-            }
-            Target::Applications(path) => {
-                let path_str = path.to_str().ok_or(UrlError::PathToUrl)?;
-                let cf_str = CFString::new(path_str);
-                Ok(CFURL::from_file_system_path(
-                    cf_str,
-                    kCFURLPOSIXPathStyle,
-                    true,
-                ))
-            }
-            Target::Home(path) => {
-                let path_str = path.to_str().ok_or(UrlError::PathToUrl)?;
-                let cf_str = CFString::new(path_str);
-                Ok(CFURL::from_file_system_path(
-                    cf_str,
-                    kCFURLPOSIXPathStyle,
-                    true,
-                ))
-            }
+            Ok(CFURL::wrap_under_create_rule(url_ref))
         }
     }
 }
@@ -98,44 +104,46 @@ impl TryFrom<&Target> for CFURL {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
-    fn test_convert_airdrop_url_to_target() {
-        let path = "nwnode://domain-AirDrop";
-        let url = CFURL::from_path(path, false).unwrap();
+    fn test_convert_url_to_target() {
+        // Test AirDrop URL
+        let cf_str = CFString::new("nwnode://domain-AirDrop");
+        let url = unsafe {
+            let url_ref = CFURLCreateWithString(
+                kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            );
+            CFURL::wrap_under_create_rule(url_ref)
+        };
         let target = Target::try_from(&url).unwrap();
-        
-        assert!(matches!(target, Target::AirDrop(url_str) if url_str == path));
-    }
+        assert!(matches!(target, Target::AirDrop(s) if s == "airdrop://"));
 
-    #[test]
-    fn test_convert_path_url_to_target() {
-        let path = "/Users/test/Documents";
-        let cf_str = CFString::new(path);
-        let url = CFURL::from_file_system_path(cf_str, kCFURLPOSIXPathStyle, true);
+        // Test file URL
+        let cf_str = CFString::new("file:///Applications");
+        let url = unsafe {
+            let url_ref = CFURLCreateWithString(
+                kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            );
+            CFURL::wrap_under_create_rule(url_ref)
+        };
         let target = Target::try_from(&url).unwrap();
-        
-        assert!(matches!(target, Target::UserPath(p) if p == PathBuf::from(path)));
+        assert!(matches!(target, Target::Applications(p) if p == PathBuf::from("/Applications")));
     }
 
     #[test]
     fn test_convert_target_to_url() {
-        let path = "nwnode://domain-AirDrop";
-        let target = Target::AirDrop(path.to_string());
+        // Test AirDrop target
+        let target = Target::AirDrop("airdrop://".to_string());
         let url = CFURL::try_from(&target).unwrap();
-        let url_path = url.to_path().unwrap();
-        
-        assert_eq!(url_path.to_str().unwrap(), path);
-    }
+        assert_eq!(url.get_string().to_string(), "airdrop://");
 
-    #[test]
-    fn test_convert_path_target_to_url() {
-        let path = "/Users/test/Documents";
-        let target = Target::UserPath(PathBuf::from(path));
+        // Test file target
+        let target = Target::Applications(PathBuf::from("/Applications"));
         let url = CFURL::try_from(&target).unwrap();
-        let path_from_url = url.to_path().unwrap();
-        
-        assert_eq!(path_from_url, PathBuf::from(path));
+        assert_eq!(url.get_string().to_string(), format!("file://{}", "/Applications"));
     }
 }

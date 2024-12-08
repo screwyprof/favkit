@@ -4,7 +4,7 @@ use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
     string::{CFString, CFStringRef},
-    url::{CFURLCreateWithString, CFURLRef},
+    url::{CFURL, CFURLCreateWithString, CFURLRef},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{MacOsApi, SidebarItem, Target};
@@ -160,10 +160,7 @@ impl MacOsApi for ApiCallRecorder {
             if self.should_return_null_name(item_ref) {
                 ptr::null()
             } else {
-                match item.target() {
-                    Target::AirDrop(_) => CFString::new("AirDrop").as_concrete_TypeRef(),
-                    _ => CFString::new(&item.display_name()).as_concrete_TypeRef()
-                }
+                CFString::new(&item.display_name()).as_concrete_TypeRef()
             }
         } else {
             ptr::null()
@@ -178,25 +175,10 @@ impl MacOsApi for ApiCallRecorder {
             .push(ApiCall::GetItemUrl(item_ref));
 
         if let Some(item) = self.get_item_by_ref(item_ref) {
-            match item.target() {
-                Target::AirDrop(url) => {
-                    let cf_str = CFString::new(url);
-                    CFURLCreateWithString(
-                        kCFAllocatorDefault,
-                        cf_str.as_concrete_TypeRef(),
-                        ptr::null(),
-                    )
-                }
-                Target::Documents(path) | Target::Downloads(path) | 
-                Target::Applications(path) | Target::Home(path) | Target::UserPath(path) => {
-                    let path = format!("file://{}", path.display());
-                    let cf_str = CFString::new(&path);
-                    CFURLCreateWithString(
-                        kCFAllocatorDefault,
-                        cf_str.as_concrete_TypeRef(),
-                        ptr::null(),
-                    )
-                }
+            if let Ok(url) = CFURL::try_from(item.target()) {
+                url.as_concrete_TypeRef()
+            } else {
+                ptr::null()
             }
         } else {
             ptr::null()
