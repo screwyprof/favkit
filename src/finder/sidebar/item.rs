@@ -26,7 +26,7 @@ impl SidebarItem {
 
 impl std::fmt::Display for SidebarItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.display_name)
+        write!(f, "{} -> {}", self.display_name(), self.target())
     }
 }
 
@@ -45,7 +45,7 @@ mod tests {
                 Target::Downloads(std::path::PathBuf::from("/Users/test/Downloads")),
                 "Downloads",
             ),
-            (Target::AirDrop("airdrop://".to_string()), "AirDrop"),
+            (Target::AirDrop("nwnode://domain-AirDrop".to_string()), "AirDrop"),
         ];
 
         for (target, display_name) in test_cases {

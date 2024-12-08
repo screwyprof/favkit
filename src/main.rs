@@ -12,7 +12,7 @@ fn main() -> Result<()> {
 
     println!("Favorites:");
     for favorite in finder.sidebar() {
-        println!("- {} ({})", favorite.display_name(), favorite.target());
+        println!("- {}", favorite);
     }
     Ok(())
 }
