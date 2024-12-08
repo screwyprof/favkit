@@ -48,12 +48,11 @@ impl Repository {
             // Get the URL for this item
             // SAFETY: We trust that Core Foundation provides a valid URL for the item
             let url_ref = unsafe { self.api.get_item_url(item) };
-            // SAFETY: We trust that Core Foundation provides either null or valid URL pointers
-            let url = unsafe { MacOsUrl::from_url_ref(url_ref) };
-            let target = match url {
-                Some(url) => Target::try_from(url)?,
-                None => continue, // Skip items with no URL
-            };
+            if url_ref.is_null() {
+                continue; // Skip items with no URL
+            }
+            let url = MacOsUrl::from(url_ref);
+            let target = Target::try_from(url)?;
             println!("Item {} Target: {:?}", idx, target);
 
             // Get display name
