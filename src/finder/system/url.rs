@@ -31,6 +31,11 @@ impl MacOsUrl {
         self.0.to_path()
     }
 
+    /// Returns true if this URL points to AirDrop
+    pub fn is_airdrop(&self) -> bool {
+        self.to_string().starts_with("nwnode://")
+    }
+
     /// Creates a MacOsUrl from a raw CFURLRef pointer
     /// 
     /// # Safety
@@ -72,12 +77,6 @@ impl std::fmt::Display for MacOsUrl {
     }
 }
 
-impl From<&MacOsUrl> for String {
-    fn from(url: &MacOsUrl) -> Self {
-        url.to_string()
-    }
-}
-
 impl AsRef<CFURL> for MacOsUrl {
     fn as_ref(&self) -> &CFURL {
         &self.0
@@ -88,9 +87,8 @@ impl TryFrom<&CFURL> for Target {
     type Error = UrlError;
 
     fn try_from(url: &CFURL) -> Result<Self, Self::Error> {
-        let url_str = url.get_string().to_string();
-        
-        if url_str.starts_with("nwnode://") {
+        let mac_url = MacOsUrl(url.clone());
+        if mac_url.is_airdrop() {
             return Ok(Target::AirDrop("nwnode://domain-AirDrop".to_string()));
         }
 

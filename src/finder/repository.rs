@@ -94,10 +94,9 @@ impl<A: MacOsApi> Repository<A> {
 
         // Get the URL and try to convert it to a target
         let url = self.api.get_item_url(item_ref)?;
-        let url_str = String::from(&url);
         
         // If it's not AirDrop and has an empty name, return None
-        if display_name == "AirDrop" && !url_str.starts_with("nwnode://") {
+        if display_name == "AirDrop" && !url.is_airdrop() {
             return None;
         }
         
