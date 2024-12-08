@@ -1,21 +1,23 @@
 use std::path::PathBuf;
 use thiserror::Error;
-use crate::finder::macos_url::UrlError;
+use crate::finder::system::url::UrlError;
 
 #[derive(Debug, Error)]
 pub enum FinderError {
+    #[error("System error: {0}")]
+    SystemError(String),
+
     #[error("Invalid path: {path}")]
     InvalidPath {
         path: PathBuf,
-        #[source]
         source: Option<std::io::Error>,
     },
+
     #[error("Unsupported target: {0}")]
     UnsupportedTarget(String),
-    #[error("System error: {0}")]
-    SystemError(String),
-    #[error(transparent)]
-    Url(#[from] UrlError),
+
+    #[error("URL error: {0}")]
+    UrlError(#[from] UrlError),
 }
 
 impl FinderError {

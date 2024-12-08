@@ -1,11 +1,10 @@
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
+use core_foundation::url::CFURL;
 use core_services::LSSharedFileListItemRef;
-use super::macos::MacOsApi;
-use super::macos_url::url_to_target;
-use super::sidebar::Sidebar;
-use super::sidebar_item::SidebarItem;
-use super::target::Target;
+use crate::finder::system::api::MacOsApi;
+use crate::finder::system::url::UrlError;
+use crate::finder::sidebar::{Target, item::SidebarItem};
 use crate::errors::FinderError;
 
 /// Repository is responsible for loading and saving sidebar items.
@@ -18,7 +17,7 @@ impl Repository {
         Self { api }
     }
 
-    pub fn load(&self) -> Result<Sidebar, FinderError> {
+    pub fn load(&self) -> Result<Vec<SidebarItem>, FinderError> {
         unsafe {
             // Get the favorites list
             let favorites = self.api.get_favorites_list();
@@ -50,36 +49,41 @@ impl Repository {
                     });
                 }
 
+                let cfurl = CFURL::wrap_under_create_rule(url_ref);
+                
                 // Convert URL to target
-                let target = match url_to_target(url_ref) {
+                let target = match Target::try_from(&cfurl) {
                     Ok(target) => target,
-                    Err(super::macos_url::UrlError::NullUrl) => {
+                    Err(UrlError::PathToUrl) => {
                         return Err(FinderError::InvalidPath {
                             path: "/invalid/path".into(),
                             source: None,
                         });
                     }
-                    Err(super::macos_url::UrlError::InvalidUrl(msg)) => {
-                        return Err(FinderError::UnsupportedTarget(msg));
+                    Err(UrlError::InvalidUrl) => {
+                        return Err(FinderError::UnsupportedTarget("Invalid URL format".to_string()));
+                    }
+                    _ => {
+                        return Err(FinderError::UnsupportedTarget("Unsupported URL type".to_string()));
                     }
                 };
 
                 // Get display name
                 let display_name = self.api.get_item_display_name(item);
-                let item = if display_name.is_null() {
-                    match target {
-                        Target::AirDrop(_) => SidebarItem::with_display_name(target, "AirDrop"),
-                        _ => SidebarItem::new(target)
+                let item = match target {
+                    Target::AirDrop(_) => SidebarItem::with_display_name(target, "AirDrop"),
+                    _ => if display_name.is_null() {
+                        SidebarItem::new(target)
+                    } else {
+                        let cf_string = CFString::wrap_under_get_rule(display_name);
+                        SidebarItem::with_display_name(target, cf_string.to_string())
                     }
-                } else {
-                    let cf_string = CFString::wrap_under_get_rule(display_name);
-                    SidebarItem::with_display_name(target, cf_string.to_string())
                 };
 
                 items.push(item);
             }
 
-            Ok(Sidebar::new(items))
+            Ok(items)
         }
     }
 }
