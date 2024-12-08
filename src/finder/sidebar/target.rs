@@ -19,13 +19,19 @@ pub enum Target {
 
 impl std::fmt::Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Target::AirDrop(url) => write!(f, "{}", url),
+        write!(f, "{}", String::from(self))
+    }
+}
+
+impl From<&Target> for String {
+    fn from(target: &Target) -> Self {
+        match target {
+            Target::AirDrop(_) => "nwnode://domain-AirDrop".to_string(),
             Target::Documents(path) |
             Target::Applications(path) |
             Target::Downloads(path) |
             Target::Home(path) |
-            Target::UserPath(path) => write!(f, "{}", path.display()),
+            Target::UserPath(path) => format!("file://{}", path.display()),
         }
     }
 }

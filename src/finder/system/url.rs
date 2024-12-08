@@ -3,10 +3,11 @@ use core_foundation::{
     string::CFString,
     url::{CFURLCreateWithString, CFURL, CFURLRef},
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::finder::sidebar::Target;
+use super::special_dirs::MacOsPath;
 
 #[derive(Debug, Error)]
 pub enum UrlError {
@@ -90,22 +91,8 @@ impl TryFrom<&str> for MacOsUrl {
     }
 }
 
-impl TryFrom<String> for MacOsUrl {
-    type Error = UrlError;
-
-    fn try_from(url: String) -> Result<Self, Self::Error> {
-        Self::try_from(url.as_str())
-    }
-}
-
 impl From<&MacOsUrl> for String {
     fn from(url: &MacOsUrl) -> Self {
-        url.0.get_string().to_string()
-    }
-}
-
-impl From<MacOsUrl> for String {
-    fn from(url: MacOsUrl) -> Self {
         url.0.get_string().to_string()
     }
 }
@@ -147,25 +134,8 @@ impl TryFrom<&CFURL> for Target {
             .to_path()
             .ok_or(UrlError::InvalidFormat("Failed to convert URL to path".into()))?;
 
-        Ok(match path.as_path() {
-            p if dirs::document_dir().is_some_and(|d| p == d.as_path()) => 
-                Target::Documents(p.to_path_buf()),
-            p if dirs::download_dir().is_some_and(|d| p == d.as_path()) => 
-                Target::Downloads(p.to_path_buf()),
-            p if dirs::home_dir().is_some_and(|d| p == d.as_path()) => 
-                Target::Home(p.to_path_buf()),
-            p if p == Path::new("/Applications") => 
-                Target::Applications(p.to_path_buf()),
-            p => Target::UserPath(p.to_path_buf())
-        })
-    }
-}
-
-impl TryFrom<MacOsUrl> for Target {
-    type Error = UrlError;
-
-    fn try_from(url: MacOsUrl) -> Result<Self, Self::Error> {
-        Target::try_from(url.as_ref())
+        Target::try_from(MacOsPath::from(path))
+            .map_err(UrlError::InvalidFormat)
     }
 }
 
@@ -181,20 +151,8 @@ impl TryFrom<&Target> for MacOsUrl {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
-        match target {
-            Target::AirDrop(url) => MacOsUrl::try_from(url.as_str()),
-            Target::Documents(path) |
-            Target::Applications(path) |
-            Target::Downloads(path) |
-            Target::Home(path) |
-            Target::UserPath(path) => {
-                if let Some(path_str) = path.to_str() {
-                    MacOsUrl::try_from(format!("file://{}", path_str))
-                } else {
-                    Err(UrlError::NonUtf8Path(path.clone()))
-                }
-            }
-        }
+        let url_str: String = target.into();
+        MacOsUrl::try_from(url_str.as_str())
     }
 }
 
@@ -202,50 +160,31 @@ impl TryFrom<&Target> for CFURL {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
-        let url_str = match target {
-            Target::AirDrop(_) => "nwnode://domain-AirDrop".to_string(),
-            Target::UserPath(path)
-            | Target::Documents(path)
-            | Target::Downloads(path)
-            | Target::Applications(path)
-            | Target::Home(path) => format!("file://{}", path.display()),
-        };
-        Ok(MacOsUrl::try_from(url_str)?.0)
+        let url_str: String = target.into();
+        Ok(MacOsUrl::try_from(url_str.as_str())?.0)
     }
 }
 
 impl From<&Target> for CFURLRef {
     fn from(target: &Target) -> Self {
-        match target {
-            Target::AirDrop(_) => {
-                let url_str = "nwnode://domain-AirDrop";
-                let cf_str = CFString::new(url_str);
-                let url_ref = unsafe {
-                    CFURLCreateWithString(
-                        kCFAllocatorDefault,
-                        cf_str.as_concrete_TypeRef(),
-                        std::ptr::null(),
-                    )
-                };
-                std::mem::forget(cf_str);
-                url_ref
-            }
-            _ => {
-                if let Ok(url) = CFURL::try_from(target) {
-                    let ptr = url.as_concrete_TypeRef();
-                    std::mem::forget(url);
-                    ptr
-                } else {
-                    std::ptr::null()
-                }
-            }
-        }
+        let url_str: String = target.into();
+        let cf_str = CFString::new(&url_str);
+        let url_ref = unsafe {
+            CFURLCreateWithString(
+                kCFAllocatorDefault,
+                cf_str.as_concrete_TypeRef(),
+                std::ptr::null(),
+            )
+        };
+        std::mem::forget(cf_str);
+        url_ref
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_convert_url_to_target() {
@@ -297,7 +236,7 @@ mod tests {
         let converted: String = (&url).into();
         assert_eq!(converted, url_str);
         
-        let converted: String = url.clone().into();
+        let converted: String = (&url.clone()).into();
         assert_eq!(converted, url_str);
         
         // Test CFURL conversions

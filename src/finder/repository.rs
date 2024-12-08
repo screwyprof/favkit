@@ -102,7 +102,7 @@ impl<A: MacOsApi> Repository<A> {
         }
         
         // Try to convert the URL to a target, return None if invalid
-        match Target::try_from(url) {
+        match Target::try_from(&url) {
             Ok(target) => Some(SidebarItem::new(target, display_name)),
             Err(_) => None,
         }
