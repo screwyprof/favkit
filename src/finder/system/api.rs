@@ -54,6 +54,12 @@ impl RealMacOsApi {
     }
 }
 
+impl Default for RealMacOsApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MacOsApi for RealMacOsApi {
     unsafe fn get_favorites_list(&self) -> LSSharedFileListRef {
         LSSharedFileListCreate(ptr::null(), kLSSharedFileListFavoriteItems, ptr::null())

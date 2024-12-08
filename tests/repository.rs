@@ -66,10 +66,12 @@ fn test_load_favorites_with_multiple_items() {
 
 #[test]
 fn test_load_favorites_with_invalid_path() {
-    let items = vec![SidebarItem::new(
-        Target::UserPath(PathBuf::from("/invalid/path")),
-        "Invalid Path",
-    )];
+    let items = vec![
+        SidebarItem::new(
+            Target::UserPath(PathBuf::from("/invalid/path")),
+            "Invalid Path",
+        ),
+    ];
 
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));
@@ -80,10 +82,12 @@ fn test_load_favorites_with_invalid_path() {
 
 #[test]
 fn test_load_favorites_with_unsupported_url() {
-    let items = vec![SidebarItem::new(
-        Target::UserPath(PathBuf::from("/some/invalid/path")),
-        "Unsupported URL",
-    )];
+    let items = vec![
+        SidebarItem::new(
+            Target::UserPath(PathBuf::from("/some/invalid/path")),
+            "Unsupported URL",
+        ),
+    ];
 
     let api = ApiCallRecorder::with_items(items.clone());
     let repository = Repository::new(Box::new(api));

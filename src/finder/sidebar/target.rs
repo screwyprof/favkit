@@ -71,9 +71,9 @@ impl std::fmt::Display for Target {
     }
 }
 
-impl Into<String> for &Target {
-    fn into(self) -> String {
-        match self {
+impl From<&Target> for String {
+    fn from(val: &Target) -> Self {
+        match val {
             Target::AirDrop(_) => "airdrop://".to_string(),
             Target::UserPath(path)
             | Target::Documents(path)

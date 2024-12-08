@@ -4,7 +4,7 @@ use core_foundation::{
     array::{CFArray, CFArrayCreate},
     base::{kCFAllocatorDefault, CFIndex, TCFType},
     string::{CFString, CFStringRef},
-    url::{CFURLRef, CFURL},
+    url::{CFURLRef, CFURL, CFURLCreateWithString},
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{MacOsApi, SidebarItem, Target};
@@ -180,7 +180,7 @@ impl MacOsApi for ApiCallRecorder {
                 ptr::null()
             } else {
                 println!("MOCK: Returning display name: {}", item.display_name());
-                let cfstr = CFString::new(&item.display_name());
+                let cfstr = CFString::new(item.display_name());
                 let ptr = cfstr.as_concrete_TypeRef();
                 std::mem::forget(cfstr); // Don't drop the CFString since we're returning its pointer
                 ptr
@@ -206,13 +206,16 @@ impl MacOsApi for ApiCallRecorder {
             println!("MOCK: Found item: {:?}", item);
             match item.target() {
                 Target::AirDrop(_) => {
-                    // Use the correct AirDrop URL format
                     let url_str = "nwnode://domain-AirDrop";
                     println!("MOCK: Using AirDrop URL: {}", url_str);
-                    let url = CFURL::try_from(&Target::AirDrop(url_str.to_string())).unwrap();
-                    let ptr = url.as_concrete_TypeRef();
-                    std::mem::forget(url);
-                    ptr
+                    let cf_str = CFString::new(url_str);
+                    let url_ref = CFURLCreateWithString(
+                        kCFAllocatorDefault,
+                        cf_str.as_concrete_TypeRef(),
+                        std::ptr::null(),
+                    );
+                    std::mem::forget(cf_str);
+                    url_ref
                 }
                 _ => {
                     if let Ok(url) = CFURL::try_from(item.target()) {

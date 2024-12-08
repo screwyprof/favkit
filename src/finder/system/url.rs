@@ -51,17 +51,17 @@ impl TryFrom<&CFURL> for Target {
                 println!("Detected Applications path");
                 Target::Applications(path)
             }
-            p if dirs::document_dir().map_or(false, |d| p == d.as_path()) => {
+            p if dirs::document_dir().is_some_and(|d| p == d.as_path()) => {
                 println!("Detected Documents path");
-                Target::Documents(path)
+                Target::Documents(p.to_path_buf())
             }
-            p if dirs::download_dir().map_or(false, |d| p == d.as_path()) => {
+            p if dirs::download_dir().is_some_and(|d| p == d.as_path()) => {
                 println!("Detected Downloads path");
-                Target::Downloads(path)
+                Target::Downloads(p.to_path_buf())
             }
-            p if dirs::home_dir().map_or(false, |d| p == d.as_path()) => {
+            p if dirs::home_dir().is_some_and(|d| p == d.as_path()) => {
                 println!("Detected Home path");
-                Target::Home(path)
+                Target::Home(p.to_path_buf())
             }
             _ => {
                 println!("Using UserPath for: {}", path_str);
@@ -78,7 +78,7 @@ impl TryFrom<&Target> for CFURL {
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
         let url_str = match target {
-            Target::AirDrop(_) => "airdrop://".to_string(),
+            Target::AirDrop(url) => url.clone(),
             Target::UserPath(path)
             | Target::Documents(path)
             | Target::Downloads(path)
@@ -139,7 +139,7 @@ mod tests {
         // Test AirDrop target
         let target = Target::AirDrop("nwnode://domain-AirDrop".to_string());
         let url = CFURL::try_from(&target).unwrap();
-        assert_eq!(url.get_string().to_string(), "airdrop://");
+        assert_eq!(url.get_string().to_string(), "nwnode://domain-AirDrop");
 
         // Test file target
         let target = Target::Applications(PathBuf::from("/Applications"));
