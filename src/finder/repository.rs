@@ -49,7 +49,7 @@ impl Repository {
         }
 
         // Get display name for other items
-        self.get_display_name(item)
+        unsafe { self.api.get_item_display_name(item) }
             .filter(|name| !name.is_empty())
             .map(|name| SidebarItem::new(target, &name))
     }
@@ -65,10 +65,5 @@ impl Repository {
         }?;
         
         Target::try_from(url).ok()
-    }
-
-    /// Get the display name for an item
-    fn get_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
-        unsafe { self.api.get_item_display_name(item) }
     }
 }

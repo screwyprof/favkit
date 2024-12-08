@@ -140,29 +140,27 @@ impl MacOsApi for ApiCallRecorder {
             .unwrap()
             .push(ApiCall::GetFavoritesSnapshot(list));
 
-        // Create array of indices as LSSharedFileListItemRef
-        let values: Vec<LSSharedFileListItemRef> = (0..self.state.items.len())
-            .map(|i| {
-                println!("MOCK: Creating item ref for index {}", i);
-                (i + 1) as LSSharedFileListItemRef
-            })
-            .collect();
-        println!("MOCK: Created {} item refs", values.len());
+        let items_count = self.state.items.len();
+        println!("MOCK: Creating array with {} items", items_count);
 
-        // Create array and wrap it
+        let values: Vec<LSSharedFileListItemRef> = (1..=items_count)
+            .map(|i| i as LSSharedFileListItemRef)
+            .collect();
+
         let array_ref = CFArrayCreate(
             kCFAllocatorDefault,
             values.as_ptr() as *const *const c_void,
             values.len() as CFIndex,
             ptr::null(),
         );
-        println!("MOCK: Created CFArray: {:?}", array_ref);
-        let array = CFArray::wrap_under_create_rule(array_ref);
-        if array.as_concrete_TypeRef().is_null() {
+
+        if array_ref.is_null() {
             return Err(FinderError::FavoritesError {
                 kind: FavoritesErrorKind::FailedToGetSnapshot,
             });
         }
+
+        let array = CFArray::wrap_under_create_rule(array_ref);
         Ok(array)
     }
 

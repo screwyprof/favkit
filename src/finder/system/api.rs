@@ -8,17 +8,16 @@ use std::ptr;
 use crate::errors::{FinderError, FavoritesErrorKind};
 
 pub trait MacOsApi {
-    /// Creates a reference to the system's favorites list.
+    /// Gets the favorites list.
     ///
     /// # Safety
-    /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
-    /// The caller must ensure that the returned LSSharedFileListRef is properly released when no longer needed.
+    /// The caller must ensure that:
+    /// - The returned LSSharedFileListRef is properly released when no longer needed
     unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError>;
 
-    /// Gets a snapshot of the current state of the favorites list.
+    /// Gets a snapshot of the favorites list.
     ///
     /// # Safety
-    /// This function is unsafe because it interacts with Core Foundation APIs that require manual memory management.
     /// The caller must ensure that:
     /// - The list parameter is a valid LSSharedFileListRef
     /// - The returned CFArray is properly released when no longer needed
@@ -85,10 +84,10 @@ impl MacOsApi for RealMacOsApi {
     }
 
     unsafe fn get_item_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
-        let name = LSSharedFileListItemCopyDisplayName(item);
-        (!name.is_null())
-            .then_some(name)
-            .map(|ptr| unsafe { CFString::wrap_under_create_rule(ptr) })
+        let ptr = LSSharedFileListItemCopyDisplayName(item);
+        (!ptr.is_null())
+            .then_some(ptr)
+            .map(|p| unsafe { CFString::wrap_under_create_rule(p) })
             .map(|cf_str| cf_str.to_string())
     }
 
