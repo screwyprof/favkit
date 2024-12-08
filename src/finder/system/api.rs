@@ -16,6 +16,36 @@ use crate::finder::system::url::MacOsUrl;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SidebarItemRef(pub(crate) LSSharedFileListItemRef);
 
+/// A reference to the system's favorites list
+///
+/// This type provides a safe wrapper around the raw `LSSharedFileListRef` pointer,
+/// ensuring proper lifetime management and type safety.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FavoritesList(LSSharedFileListRef);
+
+impl FavoritesList {
+    /// Creates a new `FavoritesList` from a raw `LSSharedFileListRef`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    /// - `list_ref` is a valid `LSSharedFileListRef`
+    /// - The reference remains valid for the lifetime of the returned `FavoritesList`
+    pub unsafe fn new(list_ref: LSSharedFileListRef) -> Self {
+        Self(list_ref)
+    }
+
+    /// Gets the underlying `LSSharedFileListRef`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the reference is used safely and according to the
+    /// macOS API requirements.
+    pub unsafe fn as_raw(&self) -> LSSharedFileListRef {
+        self.0
+    }
+}
+
 impl SidebarItemRef {
     /// Creates a new `SidebarItemRef` from a raw `LSSharedFileListItemRef`.
     ///
@@ -100,14 +130,11 @@ pub trait MacOsApi {
     /// - Allocate and manage raw pointers
     /// - Require manual memory management
     ///
-    /// The caller must ensure that the returned `LSSharedFileListRef` is properly
-    /// released when no longer needed.
-    ///
     /// # Errors
     ///
     /// Returns `FinderError` if:
     /// - Failed to create the favorites list
-    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError>;
+    unsafe fn get_favorites_list(&self) -> Result<FavoritesList, FinderError>;
 
     /// Gets a snapshot of the favorites list.
     ///
@@ -117,10 +144,6 @@ pub trait MacOsApi {
     /// - Allocate and manage raw pointers
     /// - Require manual memory management
     ///
-    /// The caller must ensure that:
-    /// - `list` is a valid `LSSharedFileListRef`
-    /// - The returned `SidebarItemArray` is properly released when no longer needed
-    ///
     /// # Errors
     ///
     /// Returns `FinderError` if:
@@ -128,7 +151,7 @@ pub trait MacOsApi {
     /// - The snapshot array is invalid
     unsafe fn get_favorites_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        list: &FavoritesList,
         seed: &mut u32,
     ) -> Result<SidebarItemArray, FinderError>;
 
@@ -164,13 +187,13 @@ pub trait MacOsApi {
 /// This allows using boxed implementations of `MacOsApi` where the trait is needed,
 /// enabling dynamic dispatch.
 impl<T: MacOsApi> MacOsApi for Box<T> {
-    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError> {
+    unsafe fn get_favorites_list(&self) -> Result<FavoritesList, FinderError> {
         (**self).get_favorites_list()
     }
 
     unsafe fn get_favorites_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        list: &FavoritesList,
         seed: &mut u32,
     ) -> Result<SidebarItemArray, FinderError> {
         (**self).get_favorites_snapshot(list, seed)
@@ -197,24 +220,26 @@ impl RealMacOsApi {
 }
 
 impl MacOsApi for RealMacOsApi {
-    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError> {
+    unsafe fn get_favorites_list(&self) -> Result<FavoritesList, FinderError> {
         let list_ref = LSSharedFileListCreate(
             kCFAllocatorDefault,
             kLSSharedFileListFavoriteItems,
             ptr::null(),
         );
 
-        (!list_ref.is_null()).then_some(list_ref).ok_or(FinderError::FavoritesError {
-            kind: FavoritesErrorKind::FailedToGetList,
-        })
+        (!list_ref.is_null())
+            .then(|| FavoritesList::new(list_ref))
+            .ok_or(FinderError::FavoritesError {
+                kind: FavoritesErrorKind::FailedToGetList,
+            })
     }
 
     unsafe fn get_favorites_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        list: &FavoritesList,
         seed: &mut u32,
     ) -> Result<SidebarItemArray, FinderError> {
-        let array_ref = LSSharedFileListCopySnapshot(list, seed);
+        let array_ref = LSSharedFileListCopySnapshot(list.as_raw(), seed);
         let array = CFArray::wrap_under_create_rule(array_ref);
 
         (!array.as_concrete_TypeRef().is_null())

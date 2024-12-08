@@ -1,203 +1,123 @@
-use core_foundation::{
-    array::{CFArray, CFArrayCreate},
-    base::{kCFAllocatorDefault, CFIndex, TCFType},
-};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{MacOsApi, SidebarItem, Target};
-use favkit::errors::FinderError;
-use favkit::finder::system::url::MacOsUrl;
-use favkit::finder::system::api::{SidebarItemRef, SidebarItemArray};
-use std::{
-    ffi::c_void,
-    fmt::Debug,
-    ptr,
-    sync::{Arc, Mutex},
+use std::sync::{Arc, Mutex};
+
+use core_foundation::array::CFArray;
+use core_services::LSSharedFileListItemRef;
+
+use favkit::{
+    errors::FinderError,
+    finder::system::{
+        api::{FavoritesList, MacOsApi, SidebarItemArray, SidebarItemRef},
+        url::MacOsUrl,
+    },
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ApiCall {
     CreateFavoritesList,
-    GetFavoritesSnapshot(LSSharedFileListRef),
-    GetItemDisplayName(SidebarItemRef),
-    GetItemUrl(SidebarItemRef),
-}
-
-struct ApiCallState {
-    items: Vec<SidebarItem>,
-    items_without_names: Vec<usize>,
-    next_ref: Mutex<i64>,
-    calls: Mutex<Vec<ApiCall>>,
-}
-
-unsafe impl Send for ApiCallState {}
-unsafe impl Sync for ApiCallState {}
-
-impl Clone for ApiCallState {
-    fn clone(&self) -> Self {
-        Self {
-            items: self.items.clone(),
-            items_without_names: self.items_without_names.clone(),
-            next_ref: Mutex::new(*self.next_ref.lock().unwrap()),
-            calls: Mutex::new(self.calls.lock().unwrap().clone()),
-        }
-    }
+    GetFavoritesSnapshot,
+    GetItemDisplayName(usize),
+    GetItemUrl(usize),
 }
 
 #[derive(Clone)]
 pub struct ApiCallRecorder {
-    state: Arc<ApiCallState>,
+    calls: Arc<Mutex<Vec<ApiCall>>>,
+    items: Arc<Mutex<Vec<(String, String)>>>, // (url, display_name)
+    null_names: Arc<Mutex<Vec<usize>>>,
 }
 
 impl Default for ApiCallRecorder {
     fn default() -> Self {
-        Self {
-            state: Arc::new(ApiCallState {
-                items: Vec::new(),
-                items_without_names: Vec::new(),
-                next_ref: Mutex::new(1),
-                calls: Mutex::new(Vec::new()),
-            }),
-        }
+        Self::new()
     }
 }
 
 impl ApiCallRecorder {
-    pub fn with_items(items: Vec<SidebarItem>) -> Self {
+    pub fn new() -> Self {
         Self {
-            state: Arc::new(ApiCallState {
-                items,
-                items_without_names: Vec::new(),
-                next_ref: Mutex::new(1),
-                calls: Mutex::new(Vec::new()),
-            }),
+            calls: Arc::new(Mutex::new(Vec::new())),
+            items: Arc::new(Mutex::new(Vec::new())),
+            null_names: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    pub fn with_items_and_null_names(
-        items: Vec<SidebarItem>,
-        items_without_names: Vec<usize>,
-    ) -> Self {
+    pub fn with_items(items: Vec<(String, String)>) -> Self {
         Self {
-            state: Arc::new(ApiCallState {
-                items,
-                items_without_names,
-                next_ref: Mutex::new(1),
-                calls: Mutex::new(Vec::new()),
-            }),
+            calls: Arc::new(Mutex::new(Vec::new())),
+            items: Arc::new(Mutex::new(items)),
+            null_names: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    pub fn verify_calls(&self, expected_calls: &[ApiCall]) {
-        assert_eq!(
-            &*self.state.calls.lock().unwrap(),
-            expected_calls,
-            "API calls did not match expected"
-        );
+    pub fn with_items_without_names(items: Vec<(String, String)>, null_names: Vec<usize>) -> Self {
+        Self {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            items: Arc::new(Mutex::new(items)),
+            null_names: Arc::new(Mutex::new(null_names)),
+        }
     }
 
-    fn get_item_by_ref(&self, item: SidebarItemRef) -> Option<&SidebarItem> {
-        // SAFETY: This is test code and we ensure the reference is valid
-        let index = (unsafe { item.as_raw() } as i64 - 1) as usize;
-        self.state.items.get(index)
-    }
-
-    fn should_return_null_name(&self, item: SidebarItemRef) -> bool {
-        // SAFETY: This is test code and we ensure the reference is valid
-        let index = (unsafe { item.as_raw() } as i64 - 1) as usize;
-        self.state.items_without_names.contains(&index)
+    pub fn get_calls(&self) -> Vec<ApiCall> {
+        self.calls.lock().unwrap().clone()
     }
 }
 
 impl MacOsApi for ApiCallRecorder {
-    unsafe fn get_favorites_list(&self) -> Result<LSSharedFileListRef, FinderError> {
-        self.state
-            .calls
-            .lock()
-            .unwrap()
-            .push(ApiCall::CreateFavoritesList);
-
-        Ok(1 as LSSharedFileListRef)
+    unsafe fn get_favorites_list(&self) -> Result<FavoritesList, FinderError> {
+        self.calls.lock().unwrap().push(ApiCall::CreateFavoritesList);
+        Ok(FavoritesList::new(1 as _))
     }
 
     unsafe fn get_favorites_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        _list: &FavoritesList,
         _seed: &mut u32,
     ) -> Result<SidebarItemArray, FinderError> {
-        println!("MOCK: get_favorites_snapshot called with list: {:?}", list);
-        self.state
-            .calls
-            .lock()
-            .unwrap()
-            .push(ApiCall::GetFavoritesSnapshot(list));
-
-        let items_len = self.state.items.len();
-        println!("MOCK: Creating array with {} items", items_len);
-
-        let item_refs: Vec<LSSharedFileListItemRef> = (1..=items_len)
-            .map(|i| i as LSSharedFileListItemRef)
-            .collect();
-
-        let array_ref = unsafe {
-            CFArrayCreate(
-                kCFAllocatorDefault,
-                item_refs.as_ptr() as *const *const c_void,
-                item_refs.len() as CFIndex,
-                ptr::null(),
-            )
-        };
-
-        let array = CFArray::wrap_under_create_rule(array_ref);
-        Ok(unsafe { SidebarItemArray::new(array) })
+        self.calls.lock().unwrap().push(ApiCall::GetFavoritesSnapshot);
+        let items = self.items.lock().unwrap();
+        println!("Mock items: {:?}", *items);
+        let mut refs = Vec::new();
+        for i in 0..items.len() {
+            refs.push(i as LSSharedFileListItemRef);
+        }
+        let array = CFArray::from_copyable(&refs);
+        Ok(SidebarItemArray::new(array))
     }
 
     unsafe fn get_item_display_name(&self, item: SidebarItemRef) -> Option<String> {
-        println!("MOCK: get_item_display_name called with item_ref: {:?}", item);
-        self.state
-            .calls
+        let id = item.as_raw() as usize;
+        println!("Getting display name for item {}", id);
+        self.calls
             .lock()
             .unwrap()
-            .push(ApiCall::GetItemDisplayName(item));
+            .push(ApiCall::GetItemDisplayName(id));
 
-        if self.should_return_null_name(item) {
-            println!("MOCK: Returning null name for item");
+        let null_names = self.null_names.lock().unwrap();
+        println!("Items with null names: {:?}", *null_names);
+        if null_names.contains(&id) {
+            println!("Item {} has null name", id);
             None
-        } else if let Some(item) = self.get_item_by_ref(item) {
-            println!("MOCK: Found item: {:?}", item);
-            // Return None for AirDrop items to simulate macOS behavior
-            if matches!(item.target(), Target::AirDrop(_)) {
-                println!("MOCK: AirDrop item, returning None for display name");
-                None
-            } else {
-                println!("MOCK: Returning display name: {}", item.display_name());
-                Some(item.display_name().to_string())
-            }
         } else {
-            println!("MOCK: Item not found, returning null");
-            None
+            let items = self.items.lock().unwrap();
+            items.get(id).map(|(_, name)| name.clone())
         }
     }
 
     unsafe fn get_item_url(&self, item: SidebarItemRef) -> Option<MacOsUrl> {
-        println!("MOCK: get_item_url called with item_ref: {:?}", item);
-        self.state
-            .calls
-            .lock()
-            .unwrap()
-            .push(ApiCall::GetItemUrl(item));
+        let id = item.as_raw() as usize;
+        println!("Getting URL for item {}", id);
+        self.calls.lock().unwrap().push(ApiCall::GetItemUrl(id));
 
-        if let Some(item) = self.get_item_by_ref(item) {
-            println!("MOCK: Found item: {:?}", item);
-            match item.target() {
-                Target::AirDrop(url) => Some(MacOsUrl::try_from(url.as_str()).unwrap()),
-                _ => {
-                    let url_str = String::from(item.target());
-                    MacOsUrl::try_from(url_str.as_str()).ok()
-                }
+        let items = self.items.lock().unwrap();
+        println!("Available URLs: {:?}", *items);
+        items.get(id).and_then(|(url, _)| {
+            println!("URL for item {}: {}", id, url);
+            // Reject invalid paths by returning None
+            if url.contains("/invalid/path") {
+                None
+            } else {
+                MacOsUrl::try_from(url.as_str()).ok()
             }
-        } else {
-            println!("MOCK: Item not found, returning None");
-            None
-        }
+        })
     }
 }

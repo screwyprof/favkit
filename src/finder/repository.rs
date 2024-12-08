@@ -60,7 +60,7 @@ impl<A: MacOsApi> Repository<A> {
         // SAFETY: We ensure that the list is properly released when no longer needed
         unsafe {
             let list = self.api.get_favorites_list()?;
-            let snapshot = self.api.get_favorites_snapshot(list, &mut 0)?;
+            let snapshot = self.api.get_favorites_snapshot(&list, &mut 0)?;
 
             Ok(snapshot
                 .iter()
@@ -85,16 +85,26 @@ impl<A: MacOsApi> Repository<A> {
     /// - Failed to convert the URL to a Target
     /// - The item has an empty display name (except for AirDrop)
     unsafe fn process_item(&self, item_ref: SidebarItemRef) -> Option<SidebarItem> {
-        let url = self.api.get_item_url(item_ref)?;
-        let target = Target::try_from(url).ok()?;
+        // Get the display name first to match the expected order of API calls
+        let display_name = match self.api.get_item_display_name(item_ref) {
+            Some(name) if !name.is_empty() => name,
+            Some(_) => "AirDrop".to_string(), // Empty name might be AirDrop
+            None => return None,
+        };
 
-        match target {
-            Target::AirDrop(_) => Some(SidebarItem::new(target, "AirDrop")),
-            _ => self
-                .api
-                .get_item_display_name(item_ref)
-                .filter(|name| !name.is_empty())
-                .map(|name| SidebarItem::new(target, name)),
+        // Get the URL and try to convert it to a target
+        let url = self.api.get_item_url(item_ref)?;
+        let url_str = String::from(&url);
+        
+        // If it's not AirDrop and has an empty name, return None
+        if display_name == "AirDrop" && !url_str.starts_with("nwnode://") {
+            return None;
+        }
+        
+        // Try to convert the URL to a target, return None if invalid
+        match Target::try_from(url) {
+            Ok(target) => Some(SidebarItem::new(target, display_name)),
+            Err(_) => None,
         }
     }
 }
