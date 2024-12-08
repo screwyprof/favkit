@@ -10,17 +10,14 @@ use crate::finder::sidebar::Target;
 
 #[derive(Debug, Error)]
 pub enum UrlError {
-    #[error("Invalid URL scheme: {0}")]
-    InvalidScheme(String),
-
     #[error("URL contains invalid characters: {0}")]
     InvalidFormat(String),
 
     #[error("Path contains non-UTF8 characters: {0}")]
     NonUtf8Path(PathBuf),
 
-    #[error("Failed to create Core Foundation URL")]
-    CoreFoundationError,
+    #[error("Core Foundation returned null when creating URL from '{0}'. The URL may be malformed or use an unsupported scheme")]
+    CoreFoundationError(String),
 }
 
 /// A safe wrapper around Core Foundation URL operations
@@ -85,7 +82,7 @@ impl TryFrom<&str> for MacOsUrl {
             );
             
             if url_ref.is_null() {
-                return Err(UrlError::CoreFoundationError);
+                return Err(UrlError::CoreFoundationError(url.to_string()));
             }
             
             Ok(MacOsUrl::from_ref(url_ref))
