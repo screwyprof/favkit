@@ -151,8 +151,7 @@ impl TryFrom<&Target> for MacOsUrl {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
-        let url_str: String = target.into();
-        MacOsUrl::try_from(url_str.as_str())
+        MacOsUrl::try_from(String::from(target).as_str())
     }
 }
 
@@ -160,15 +159,13 @@ impl TryFrom<&Target> for CFURL {
     type Error = UrlError;
 
     fn try_from(target: &Target) -> Result<Self, Self::Error> {
-        let url_str: String = target.into();
-        Ok(MacOsUrl::try_from(url_str.as_str())?.0)
+        Ok(MacOsUrl::try_from(target)?.0)
     }
 }
 
 impl From<&Target> for CFURLRef {
     fn from(target: &Target) -> Self {
-        let url_str: String = target.into();
-        let cf_str = CFString::new(&url_str);
+        let cf_str = CFString::new(&String::from(target));
         let url_ref = unsafe {
             CFURLCreateWithString(
                 kCFAllocatorDefault,
