@@ -31,7 +31,20 @@ impl MacOsUrl {
     /// # Safety
     /// The caller must ensure that url_ref is a valid CFURLRef pointer
     pub unsafe fn from_ref(url_ref: CFURLRef) -> Self {
-        Self::from(CFURL::wrap_under_create_rule(url_ref))
+        Self(CFURL::wrap_under_create_rule(url_ref))
+    }
+
+    /// Creates a MacOsUrl from a raw CFURLRef pointer.
+    /// Returns None if the pointer is null.
+    /// 
+    /// # Safety
+    /// The caller must ensure that url_ref is either null or a valid CFURLRef pointer
+    pub unsafe fn from_url_ref(url_ref: CFURLRef) -> Option<Self> {
+        if url_ref.is_null() {
+            None
+        } else {
+            Some(Self::from_ref(url_ref))
+        }
     }
 }
 
@@ -90,12 +103,6 @@ impl AsRef<CFURL> for MacOsUrl {
 impl From<CFURL> for MacOsUrl {
     fn from(url: CFURL) -> Self {
         MacOsUrl(url)
-    }
-}
-
-impl From<CFURLRef> for MacOsUrl {
-    fn from(url_ref: CFURLRef) -> Self {
-        unsafe { MacOsUrl::from_ref(url_ref) }
     }
 }
 
@@ -178,6 +185,35 @@ impl TryFrom<&Target> for CFURL {
             | Target::Home(path) => format!("file://{}", path.display()),
         };
         Ok(MacOsUrl::try_from(url_str)?.0)
+    }
+}
+
+impl From<&Target> for CFURLRef {
+    fn from(target: &Target) -> Self {
+        match target {
+            Target::AirDrop(_) => {
+                let url_str = "nwnode://domain-AirDrop";
+                let cf_str = CFString::new(url_str);
+                let url_ref = unsafe {
+                    CFURLCreateWithString(
+                        kCFAllocatorDefault,
+                        cf_str.as_concrete_TypeRef(),
+                        std::ptr::null(),
+                    )
+                };
+                std::mem::forget(cf_str);
+                url_ref
+            }
+            _ => {
+                if let Ok(url) = CFURL::try_from(target) {
+                    let ptr = url.as_concrete_TypeRef();
+                    std::mem::forget(url);
+                    ptr
+                } else {
+                    std::ptr::null()
+                }
+            }
+        }
     }
 }
 
