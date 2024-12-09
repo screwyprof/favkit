@@ -14,7 +14,7 @@ CARGO_LLVM_COV_FLAGS := --no-cfg-coverage-nightly
 COVERAGE_DIR := target/coverage
 LLVM_COV_DIR := target/llvm-cov
 COVERAGE_ENV := CARGO_INCREMENTAL=0 \
-                RUSTFLAGS='-Cinstrument-coverage' \
+                RUSTFLAGS='-Cinstrument-coverage --cfg coverage_nightly' \
                 LLVM_PROFILE_FILE='$(COVERAGE_DIR)/coverage-%p-%m.profraw'
 
 all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
