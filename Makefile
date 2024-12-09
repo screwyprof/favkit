@@ -2,12 +2,12 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-# Mark all targets as PHONY
-.PHONY: help run test fmt lint check coverage coverage-text coverage-detailed clean clean-coverage all build build-release watch
+.PHONY: help run test fmt lint check coverage coverage-text coverage-detailed clean clean-coverage watch
 
 # Cargo settings
 CARGO := cargo
-CARGO_TEST_FLAGS := --quiet
+CARGO_FLAGS := --quiet
+CARGO_TEST_FLAGS :=
 CARGO_LLVM_COV_FLAGS := --no-cfg-coverage-nightly
 
 # Coverage settings
@@ -16,6 +16,8 @@ LLVM_COV_DIR := target/llvm-cov
 COVERAGE_ENV := CARGO_INCREMENTAL=0 \
                 RUSTFLAGS='-Cinstrument-coverage' \
                 LLVM_PROFILE_FILE='$(COVERAGE_DIR)/coverage-%p-%m.profraw'
+
+all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
 
 help: ## Show available commands
 	@printf "\033[1;34mUsage:\033[0m\n"
@@ -28,13 +30,13 @@ help: ## Show available commands
 
 ##@ Development Commands
 run: ## Run the project
-	$(CARGO) run
+	@$(CARGO) $(CARGO_FLAGS) run
 
 test: ## Run all tests
-	$(CARGO) test $(CARGO_TEST_FLAGS)
+	@$(CARGO) $(CARGO_FLAGS) test $(CARGO_TEST_FLAGS)
 
 watch: ## Watch for changes and run tests and clippy
-	$(CARGO) watch \
+	@$(CARGO) watch \
 		-w src \
 		-w tests \
 		-x "test --features test-utils" \
@@ -42,45 +44,35 @@ watch: ## Watch for changes and run tests and clippy
 		-c
 
 build: ## Build debug version
-	$(CARGO) build --all-features
+	@$(CARGO) $(CARGO_FLAGS) build --all-features
 
 build-release: ## Build optimized release version
-	$(CARGO) build --all-features --release
+	@$(CARGO) $(CARGO_FLAGS) build --all-features --release
 
 ##@ Code Quality
-fmt: ## Check code formatting
-	$(CARGO) fmt --all -- --check
+fmt: ## Format code
+	@$(CARGO) fmt --all
 
-lint: ## Run clippy linter
-	$(CARGO) clippy --all-features -- -D warnings
+lint: ## Run clippy
+	@$(CARGO) $(CARGO_FLAGS) clippy --all-targets --all-features -- -D warnings
 
-check: ## Perform compile checks without producing binaries
-	$(CARGO) check --all-features
+check: fmt lint ## Run all checks
+	@$(CARGO) $(CARGO_FLAGS) check --all-features
 
 ##@ Coverage
-coverage: clean-coverage ## Generate HTML coverage report and open it
-	@printf "\033[1;34mGenerating coverage report...\033[0m\n"
-	@$(COVERAGE_ENV) $(CARGO) test $(CARGO_TEST_FLAGS)
-	@$(CARGO) llvm-cov $(CARGO_LLVM_COV_FLAGS) --html
+coverage: ## Generate code coverage report and open it in browser
+	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --html
+	@echo "Opening coverage report..."
 	@open $(LLVM_COV_DIR)/html/index.html
 
-coverage-text: clean-coverage ## Show brief coverage report in terminal
-	@printf "\033[1;34mGenerating coverage report...\033[0m\n"
-	@$(COVERAGE_ENV) $(CARGO) test $(CARGO_TEST_FLAGS)
-	@$(CARGO) llvm-cov $(CARGO_LLVM_COV_FLAGS) --summary-only
+coverage-text: ## Generate code coverage report in text format
+	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --text
 
-coverage-detailed: clean-coverage ## Show detailed coverage report in terminal
-	@printf "\033[1;34mGenerating detailed coverage report...\033[0m\n"
-	@$(COVERAGE_ENV) $(CARGO) test $(CARGO_TEST_FLAGS)
-	@$(CARGO) llvm-cov $(CARGO_LLVM_COV_FLAGS)
+##@ Cleanup
+clean: ## Clean build artifacts
+	@$(CARGO) $(CARGO_FLAGS) clean
 
-##@ Cleaning
-clean: clean-coverage ## Clean all build artifacts
-	$(CARGO) clean
-
-clean-coverage: ## Clean coverage data
+clean-coverage: ## Clean coverage artifacts
 	@rm -rf $(COVERAGE_DIR) $(LLVM_COV_DIR)
-	@mkdir -p $(COVERAGE_DIR) $(LLVM_COV_DIR)
 
-##@ CI/CD
-all: fmt lint test build-release ## Run all checks and build release version
+checks: check test coverage ## Run all checks, tests and coverage
