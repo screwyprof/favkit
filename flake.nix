@@ -17,37 +17,35 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        rust-bin = pkgs.rust-bin;
+        
+        # Build the package
+        favkit = pkgs.rustPlatform.buildRustPackage {
+          pname = "favkit";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          
+          buildInputs = with pkgs.darwin.apple_sdk.frameworks; [
+            CoreServices
+            CoreFoundation
+          ];
+        };
       in
       {
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [
-            (rust-bin.nightly.latest.default.override {
-              extensions = [ "rust-src" "llvm-tools-preview" ];
-            })
-            cargo-watch
-            cargo-binutils
-            grcov
-          ];
+        # Development environment
+        devShells.default = import ./shell.nix { inherit pkgs; };
 
-          buildInputs = with pkgs; [
-            # MacOS specific dependencies
-            darwin.apple_sdk.frameworks.CoreServices
-            darwin.apple_sdk.frameworks.CoreFoundation
-          ];
-
-          # Environment variables for code coverage
-          CARGO_INCREMENTAL = "0";
-          RUSTFLAGS = "-Cinstrument-coverage --cfg coverage_nightly";
-          LLVM_PROFILE_FILE = "target/coverage/coverage-%p-%m.profraw";
-
-          shellHook = ''
-            # Install cargo-llvm-cov if not already installed
-            if ! command -v cargo-llvm-cov &> /dev/null; then
-              echo "Installing cargo-llvm-cov..."
-              cargo install cargo-llvm-cov
-            fi
-          '';
+        # Package output
+        packages = {
+          default = favkit;
+          favkit = favkit;
         };
-      });
+
+        # Meta information
+        meta = {
+          maintainers = ["Maksim Shcherbo <max@happygopher.nl>"];
+          platforms = ["x86_64-darwin" "aarch64-darwin"];
+        };
+      }
+    );
 }
