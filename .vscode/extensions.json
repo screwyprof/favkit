@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "hdevalke.rust-test-lens",
+        "usernamehw.errorlens",
+        "tamasfe.even-better-toml",
+        "formulahendry.auto-close-tag",
+        "pkief.material-icon-theme",
+        "pkief.material-product-icons",
+        "dracula-theme.theme-dracula",
+        "ms-vscode.makefile-tools",
+    ]
+}
