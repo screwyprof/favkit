@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test fmt lint check coverage coverage-text coverage-detailed clean clean-coverage watch
+.PHONY: help run test fmt lint check coverage coverage-text coverage-lcov clean clean-coverage watch
 
 # Cargo settings
 CARGO := cargo
@@ -67,6 +67,9 @@ coverage: ## Generate code coverage report and open it in browser
 
 coverage-text: ## Generate code coverage report in text format
 	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --text
+
+coverage-lcov: ## Generate LCOV coverage report for VS Code
+	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --lcov --output-path $(COVERAGE_DIR)/lcov.info
 
 ##@ Cleanup
 clean: ## Clean build artifacts
