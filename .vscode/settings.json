@@ -2,14 +2,14 @@
   // Language Specific Settings
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.inlayHints.enabled": "onUnlessPressed",
   },
 
   // Editor Settings
   "editor.fontFamily": "MesloLGMDZ Nerd Font, JetBrainsMono NF, FiraCode Nerd Font, monospace",
   "editor.fontLigatures": true,
   "editor.fontSize": 20,
-  "editor.inlayHints.enabled": "onUnlessPressed",
   "editor.inlineSuggest.enabled": true,
   "editor.lineHeight": 30,
 
@@ -47,17 +47,31 @@
   "rust-analyzer.inlayHints.parameterHints.enable": true,
   "rust-analyzer.inlayHints.renderColons": true,
   "rust-analyzer.inlayHints.typeHints.enable": true,
+  "rust-analyzer.lens.enable": true,
+  "rust-analyzer.lens.run.enable": true,
+  "rust-analyzer.lens.implementations.enable": true,
+  "rust-analyzer.lens.references.adt.enable": true,
+  "rust-analyzer.lens.references.method.enable": true,
+  "rust-analyzer.lens.references.trait.enable": true,
+
+  // Test Explorer Settings
+  "testExplorer.codeLens": true,
+  "testExplorer.gutterDecoration": true,
+  "testExplorer.onStart": "retire",
+
+  // Coverage Settings
+  "coverage-gutters.coverageFileNames": [
+    "target/coverage/lcov.info"
+  ],
+  "coverage-gutters.showGutterCoverage": true,
+  "coverage-gutters.showLineCoverage": true,
+  "coverage-gutters.showRulerCoverage": true,
+  "coverage-gutters.highlightdark": "rgba(64,128,64,0.4)",
 
   // Terminal Settings
   "terminal.integrated.defaultProfile.osx": "zsh",
-  "terminal.integrated.fontFamily": "MesloLGMDZ Nerd Font, JetBrainsMono NF, FiraCode Nerd Font, monospace",
+  "terminal.integrated.fontFamily": "'MesloLGMDZ Nerd Font', 'JetBrainsMono NF', 'FiraCode Nerd Font', monospace",
   "terminal.integrated.fontSize": 20,
-  "terminal.integrated.profiles.osx": {
-    "zsh": {
-      "path": "/usr/bin/login",
-      "args": ["-fp", "${env:USER}", "-c", "exec zsh"]
-    }
-  },
 
   // Window Settings
   "window.zoomLevel": 1,
@@ -83,7 +97,7 @@
     "terminal.background": "#21222C",
     "terminal.foreground": "#e9e9f4"
   },
-  "workbench.colorTheme": "Dracula Theme",
+  "workbench.colorTheme": "Dracula",
   "workbench.iconTheme": "material-icon-theme",
   "workbench.productIconTheme": "material-product-icons",
   "chat.editor.fontFamily": "'MesloLGMDZ Nerd Font', 'JetBrainsMono NF', 'FiraCode Nerd Font', monospace"
