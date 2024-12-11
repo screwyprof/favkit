@@ -2,20 +2,23 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test fmt lint check coverage coverage-text coverage-lcov clean clean-coverage watch
+.PHONY: help run test fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean clean-coverage watch build build-release
 
 # Cargo settings
 CARGO := cargo
 CARGO_FLAGS := --quiet
 CARGO_TEST_FLAGS :=
-CARGO_LLVM_COV_FLAGS := --no-cfg-coverage-nightly
+CARGO_LLVM_COV_FLAGS := --all-features --workspace --show-missing-lines \
+                        --ignore-filename-regex=".cargo|test.rs" \
+						--branch
 
 # Coverage settings
 COVERAGE_DIR := target/coverage
-LLVM_COV_DIR := target/llvm-cov
-COVERAGE_ENV := CARGO_INCREMENTAL=0 \
-                RUSTFLAGS='-Cinstrument-coverage --cfg coverage_nightly' \
-                LLVM_PROFILE_FILE='$(COVERAGE_DIR)/coverage-%p-%m.profraw'
+
+# Environment variables for coverage
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS=-C instrument-coverage -C codegen-units=1 -C opt-level=0 -C link-dead-code --cfg coverage_nightly
+export LLVM_PROFILE_FILE=$(COVERAGE_DIR)/coverage-%p-%m.profraw
 
 all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
 
@@ -61,21 +64,36 @@ check: fmt lint ## Run all checks
 
 ##@ Coverage
 coverage: ## Generate code coverage report and open it in browser
-	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --html
-	@echo "Opening coverage report..."
-	@open $(LLVM_COV_DIR)/html/index.html
+	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --html --open
 
 coverage-text: ## Generate code coverage report in text format
-	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --text
+	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --text
 
-coverage-lcov: ## Generate LCOV coverage report for VS Code
-	@$(COVERAGE_ENV) $(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --lcov --output-path $(COVERAGE_DIR)/lcov.info
+coverage-summary: ## Generate code coverage summary
+	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --summary-only
+
+coverage-lcov: ## Generate code coverage report in lcov format
+	@mkdir -p $(COVERAGE_DIR)
+	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --lcov \
+		| rustfilt | sed '/^Uncovered/,$$d' > $(COVERAGE_DIR)/lcov.info
+
+coverage-html: coverage-lcov ## Generate detailed HTML coverage report with all metrics
+	@genhtml $(COVERAGE_DIR)/lcov.info \
+		--output-directory $(COVERAGE_DIR)/html \
+		--prefix $(shell pwd) \
+		--title "FavKit Coverage Report" \
+		--legend \
+		--show-details \
+		--missed \
+		--dark-mode \
+		--sort \
+		--branch-coverage
+	@echo "Opening coverage report..."
+	@open $(COVERAGE_DIR)/html/index.html
 
 ##@ Cleanup
 clean: ## Clean build artifacts
 	@$(CARGO) $(CARGO_FLAGS) clean
-
-clean-coverage: ## Clean coverage artifacts
-	@rm -rf $(COVERAGE_DIR) $(LLVM_COV_DIR)
+	@rm -rf $(COVERAGE_DIR)
 
 checks: check test coverage ## Run all checks, tests and coverage

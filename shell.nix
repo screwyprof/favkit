@@ -13,6 +13,8 @@ let
   devTools = with pkgs; [
     cargo-watch
     cargo-binutils
+    lcov
+    rustfilt
   ];
 
   # macOS specific dependencies
