@@ -7,12 +7,17 @@ use core_foundation::{
     string::CFStringRef,
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{Favorites, FinderApi, system::api::MacOsApi};
+use favkit::{
+    Favorites, FinderApi,
+    finder::{FinderError, ListErrorKind},
+    system::api::MacOsApi,
+};
 use std::cell::Cell;
 
 struct MockMacOsApi {
     create_called: Cell<bool>,
     copy_snapshot_called: Cell<bool>,
+    return_null: Cell<bool>,
 }
 
 impl MockMacOsApi {
@@ -20,6 +25,7 @@ impl MockMacOsApi {
         Self {
             create_called: Cell::new(false),
             copy_snapshot_called: Cell::new(false),
+            return_null: Cell::new(false),
         }
     }
 }
@@ -32,7 +38,11 @@ impl MacOsApi for MockMacOsApi {
         _list_options: CFTypeRef,
     ) -> LSSharedFileListRef {
         self.create_called.set(true);
-        1 as LSSharedFileListRef
+        if self.return_null.get() {
+            std::ptr::null_mut()
+        } else {
+            1 as LSSharedFileListRef
+        }
     }
 
     #[allow(clippy::vec_init_then_push)]
@@ -62,4 +72,21 @@ fn should_call_macos_api_when_getting_list() {
 
     assert!(mock_api.create_called.get());
     assert!(mock_api.copy_snapshot_called.get());
+}
+
+#[test]
+fn should_return_error_when_list_handle_is_null() {
+    let mock_api = MockMacOsApi::new();
+    mock_api.return_null.set(true);
+    let favorites = Favorites::new(&mock_api);
+    let finder = FinderApi::new(&favorites);
+
+    let result = finder.get_favorites_list();
+
+    assert!(matches!(
+        result,
+        Err(FinderError::ListError {
+            kind: ListErrorKind::NullHandle
+        })
+    ));
 }

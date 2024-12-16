@@ -1,7 +1,7 @@
 mod errors;
 
 use crate::favorites::FavoritesApi;
-pub use errors::Result;
+pub use errors::{FinderError, ListErrorKind, Result};
 
 pub struct FinderApi<'a> {
     favorites: &'a dyn FavoritesApi,
