@@ -3,7 +3,7 @@ use core_foundation::{
     base::{CFAllocatorRef, CFTypeRef},
     string::CFStringRef,
 };
-use core_services::LSSharedFileListRef;
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 
 /// Trait for interacting with MacOS APIs.
 /// This allows us to mock the MacOS API for testing.
@@ -36,4 +36,17 @@ pub trait MacOsApi {
         list: LSSharedFileListRef,
         seed: *mut u32,
     ) -> CFArrayRef;
+
+    /// Gets the display name of a shared file list item.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because:
+    /// - It interacts with raw C pointers through Core Foundation API
+    /// - The caller must ensure the item reference is valid
+    /// - The returned string reference must be properly released
+    unsafe fn ls_shared_file_list_item_copy_display_name(
+        &self,
+        item: LSSharedFileListItemRef,
+    ) -> CFStringRef;
 }

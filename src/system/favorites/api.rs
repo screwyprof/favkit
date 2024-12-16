@@ -1,4 +1,7 @@
-use core_foundation::base::kCFAllocatorDefault;
+use core_foundation::{
+    base::{TCFType, kCFAllocatorDefault},
+    string::CFString,
+};
 use core_services::kLSSharedFileListFavoriteItems;
 
 use crate::{
@@ -49,8 +52,18 @@ impl FavoritesApi for Favorites<'_> {
     fn list_items(&self) -> Result<Vec<String>> {
         unsafe {
             let list = self.list_create()?;
-            let _array = self.copy_snapshot(list)?;
-            Ok(vec![])
+            let snapshot = self.copy_snapshot(list)?;
+
+            let mut names = Vec::new();
+            for i in 0..snapshot.len() {
+                if let Some(item) = snapshot.get(i) {
+                    let name_ref = self.api.ls_shared_file_list_item_copy_display_name(item);
+                    let cf_string = CFString::wrap_under_get_rule(name_ref);
+                    names.push(cf_string.to_string());
+                }
+            }
+
+            Ok(names)
         }
     }
 }

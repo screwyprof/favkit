@@ -3,7 +3,7 @@ use core_foundation::{
     base::{CFAllocatorRef, CFTypeRef},
     string::CFStringRef,
 };
-use core_services::LSSharedFileListRef;
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 
 use crate::system::api::MacOsApi;
 
@@ -23,8 +23,6 @@ impl MacOsApi for RealMacOsApi {
         list_type: CFStringRef,
         list_options: CFTypeRef,
     ) -> LSSharedFileListRef {
-        // SAFETY: We're calling an unsafe Core Foundation API.
-        // The safety requirements are enforced by the caller.
         unsafe { core_services::LSSharedFileListCreate(allocator, list_type, list_options) }
     }
 
@@ -33,8 +31,13 @@ impl MacOsApi for RealMacOsApi {
         list: LSSharedFileListRef,
         seed: *mut u32,
     ) -> CFArrayRef {
-        // SAFETY: We're calling an unsafe Core Foundation API.
-        // The safety requirements are enforced by the caller.
         unsafe { core_services::LSSharedFileListCopySnapshot(list, seed) }
+    }
+
+    unsafe fn ls_shared_file_list_item_copy_display_name(
+        &self,
+        item: LSSharedFileListItemRef,
+    ) -> CFStringRef {
+        unsafe { core_services::LSSharedFileListItemCopyDisplayName(item) }
     }
 }
