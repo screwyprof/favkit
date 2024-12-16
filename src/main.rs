@@ -1,14 +1,14 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use favkit::{FinderApi, MacOsFavorites, RealMacOsApi, finder::Result};
+use favkit::{Favorites, FinderApi, RealMacOsApi, finder::Result};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<()> {
     let macos_api = RealMacOsApi::new();
-    let favorites = MacOsFavorites::new(&macos_api);
-    let api = FinderApi::new(&favorites);
+    let favorites = Favorites::new(&macos_api);
+    let finder = FinderApi::new(&favorites);
 
-    let _favorites = api.get_favorites_list()?;
+    let _favorites = finder.get_favorites_list()?;
 
     Ok(())
 }

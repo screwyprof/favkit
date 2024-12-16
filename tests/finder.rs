@@ -6,7 +6,7 @@ use core_foundation::{
     string::CFStringRef,
 };
 use core_services::LSSharedFileListRef;
-use favkit::{FinderApi, MacOsFavorites, system::api::MacOsApi};
+use favkit::{Favorites, FinderApi, system::api::MacOsApi};
 use std::cell::Cell;
 
 struct MockMacOsApi {
@@ -36,10 +36,10 @@ impl MacOsApi for MockMacOsApi {
 #[test]
 fn should_call_macos_api_when_getting_list() {
     let mock_api = MockMacOsApi::new();
-    let favorites = MacOsFavorites::new(&mock_api);
-    let api = FinderApi::new(&favorites);
+    let favorites = Favorites::new(&mock_api);
+    let finder = FinderApi::new(&favorites);
 
-    let _ = api.get_favorites_list();
+    let _ = finder.get_favorites_list();
 
     assert!(mock_api.create_called.get());
 }
