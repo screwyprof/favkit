@@ -1,5 +1,8 @@
-use core_foundation::base::kCFAllocatorDefault;
-use core_services::kLSSharedFileListFavoriteItems;
+use core_foundation::{
+    array::CFArray,
+    base::{TCFType, kCFAllocatorDefault},
+};
+use core_services::{LSSharedFileListItemRef, kLSSharedFileListFavoriteItems};
 
 use crate::{favorites::FavoritesApi, finder::Result, system::api::MacOsApi};
 
@@ -16,11 +19,15 @@ impl<'a> Favorites<'a> {
 impl FavoritesApi for Favorites<'_> {
     fn list_items(&self) -> Result<Vec<String>> {
         unsafe {
-            let _list = self.api.ls_shared_file_list_create(
+            let list = self.api.ls_shared_file_list_create(
                 kCFAllocatorDefault,
                 kLSSharedFileListFavoriteItems,
                 std::ptr::null(),
             );
+
+            let mut seed: u32 = 0;
+            let array_ref = self.api.ls_shared_file_list_copy_snapshot(list, &mut seed);
+            let _array = CFArray::<LSSharedFileListItemRef>::wrap_under_get_rule(array_ref);
 
             Ok(vec![])
         }

@@ -1,4 +1,5 @@
 use core_foundation::{
+    array::CFArrayRef,
     base::{CFAllocatorRef, CFTypeRef},
     string::CFStringRef,
 };
@@ -21,4 +22,18 @@ pub trait MacOsApi {
         list_type: CFStringRef,
         list_options: CFTypeRef,
     ) -> LSSharedFileListRef;
+
+    /// Gets a snapshot of the shared file list.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because:
+    /// - It interacts with raw C pointers through Core Foundation API
+    /// - The caller must ensure the list reference is valid
+    /// - The returned array reference must be properly released
+    unsafe fn ls_shared_file_list_copy_snapshot(
+        &self,
+        list: LSSharedFileListRef,
+        seed: *mut u32,
+    ) -> CFArrayRef;
 }
