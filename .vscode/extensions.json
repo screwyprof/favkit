@@ -7,11 +7,9 @@
         "tamasfe.even-better-toml",
         "formulahendry.auto-close-tag",
         "jnoortheen.nix-ide",
-        "pkief.material-icon-theme",
-        "pkief.material-product-icons",
-        "dracula-theme.theme-dracula",
         "ryanluker.vscode-coverage-gutters",
         "ms-vscode.makefile-tools",
-        "ms-vscode.live-server"
+        "ms-vscode.live-server",
+        "mkhl.direnv"
     ]
 }
