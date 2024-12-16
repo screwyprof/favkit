@@ -15,3 +15,9 @@ impl From<RawFavoritesList> for Option<FavoritesList> {
         (!list.0.is_null()).then_some(FavoritesList(list.0))
     }
 }
+
+impl From<FavoritesList> for LSSharedFileListRef {
+    fn from(list: FavoritesList) -> Self {
+        list.0
+    }
+}

@@ -41,7 +41,7 @@ impl<'a> Favorites<'a> {
         unsafe {
             let array_ref = self
                 .api
-                .ls_shared_file_list_copy_snapshot(list.0, &mut seed);
+                .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
             (!array_ref.is_null())
                 .then(|| CFArray::wrap_under_get_rule(array_ref))
                 .ok_or(FinderError::NullSnapshotHandle)
