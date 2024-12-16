@@ -16,24 +16,42 @@ impl From<CFArrayRef> for RawSnapshot {
 
 pub(crate) struct Snapshot(CFArray<LSSharedFileListItemRef>);
 
-impl Snapshot {
-    pub(crate) fn len(&self) -> usize {
-        self.0.len().try_into().unwrap()
-    }
+pub(crate) struct SnapshotIter<'a> {
+    snapshot: &'a Snapshot,
+    index: usize,
+}
 
-    pub(crate) fn get(&self, index: usize) -> Option<FavoriteItem> {
-        let cf_index: CFIndex = index.try_into().ok()?;
-        if cf_index >= self.0.len() {
+impl Iterator for SnapshotIter<'_> {
+    type Item = FavoriteItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let cf_index: CFIndex = self.index.try_into().ok()?;
+        if cf_index >= self.snapshot.0.len() {
             return None;
         }
 
         let range = CFRange::init(cf_index, 1);
-        let mut values = CFArray::get_values(&self.0, range);
-        values
+        let mut values = CFArray::get_values(&self.snapshot.0, range);
+        let item = values
             .pop()
             .map(|ptr| ptr as *mut OpaqueLSSharedFileListItemRef)
             .map(RawFavoriteItem::from)
-            .and_then(Option::from)
+            .and_then(Option::from);
+
+        self.index += 1;
+        item
+    }
+}
+
+impl<'a> IntoIterator for &'a Snapshot {
+    type Item = FavoriteItem;
+    type IntoIter = SnapshotIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SnapshotIter {
+            snapshot: self,
+            index: 0,
+        }
     }
 }
 

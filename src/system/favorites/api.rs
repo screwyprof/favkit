@@ -53,16 +53,16 @@ impl FavoritesApi for Favorites<'_> {
         unsafe {
             let list = self.list_create()?;
             let snapshot = self.copy_snapshot(list)?;
-            
+
             let mut names = Vec::new();
-            for i in 0..snapshot.len() {
-                if let Some(item) = snapshot.get(i) {
-                    let name_ref = self.api.ls_shared_file_list_item_copy_display_name(item.into());
-                    let cf_string = CFString::wrap_under_get_rule(name_ref);
-                    names.push(cf_string.to_string());
-                }
+            for item in &snapshot {
+                let name_ref = self
+                    .api
+                    .ls_shared_file_list_item_copy_display_name(item.into());
+                let cf_string = CFString::wrap_under_get_rule(name_ref);
+                names.push(cf_string.to_string());
             }
-            
+
             Ok(names)
         }
     }
