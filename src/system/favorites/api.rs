@@ -2,13 +2,15 @@ use core_foundation::{
     array::CFArray,
     base::{TCFType, kCFAllocatorDefault},
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, kLSSharedFileListFavoriteItems};
+use core_services::{LSSharedFileListItemRef, kLSSharedFileListFavoriteItems};
 
 use crate::{
     favorites::FavoritesApi,
     finder::{FinderError, Result},
     system::api::MacOsApi,
 };
+
+use super::list::{FavoritesList, RawFavoritesList};
 
 pub struct Favorites<'a> {
     api: &'a dyn MacOsApi,
@@ -19,7 +21,7 @@ impl<'a> Favorites<'a> {
         Self { api }
     }
 
-    unsafe fn list_create(&self) -> Result<LSSharedFileListRef> {
+    unsafe fn list_create(&self) -> Result<FavoritesList> {
         unsafe {
             let list_ref = self.api.ls_shared_file_list_create(
                 kCFAllocatorDefault,
@@ -27,19 +29,19 @@ impl<'a> Favorites<'a> {
                 std::ptr::null(),
             );
 
-            (!list_ref.is_null())
-                .then_some(list_ref)
-                .ok_or(FinderError::NullListHandle)
+            Option::from(RawFavoritesList::from(list_ref)).ok_or(FinderError::NullListHandle)
         }
     }
 
     unsafe fn copy_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        list: FavoritesList,
     ) -> Result<CFArray<LSSharedFileListItemRef>> {
         let mut seed: u32 = 0;
         unsafe {
-            let array_ref = self.api.ls_shared_file_list_copy_snapshot(list, &mut seed);
+            let array_ref = self
+                .api
+                .ls_shared_file_list_copy_snapshot(list.0, &mut seed);
             (!array_ref.is_null())
                 .then(|| CFArray::wrap_under_get_rule(array_ref))
                 .ok_or(FinderError::NullSnapshotHandle)
@@ -52,7 +54,6 @@ impl FavoritesApi for Favorites<'_> {
         unsafe {
             let list = self.list_create()?;
             let _array = self.copy_snapshot(list)?;
-
             Ok(vec![])
         }
     }
