@@ -16,7 +16,7 @@ let
     cargo-edit
     cargo-audit
     cargo-binutils
-    cargo-llvm-cov
+    #cargo-llvm-cov
 
     # Coverage tools
     lcov
@@ -35,7 +35,7 @@ let
     CARGO_NET_GIT_FETCH_WITH_CLI = "true";
     
     # Add cargo bin to PATH
-    PATH = "$HOME/.cargo/bin:$PATH";
+    PATH = "$HOME/.cargo/bin:${pkgs.lib.makeBinPath devTools}:$PATH";
   };
 in
 pkgs.mkShell {
@@ -51,5 +51,11 @@ pkgs.mkShell {
     echo "Rust development environment loaded"
     echo "Rust version: $(rustc --version)"
     echo "Cargo version: $(cargo --version)"
+
+    # Check if cargo-llvm-cov is available in PATH after adding cargo bin
+    if ! type cargo-llvm-cov >/dev/null 2>&1; then
+      echo "Installing cargo-llvm-cov..."
+      cargo install cargo-llvm-cov
+    fi
   '';
 }
