@@ -7,29 +7,56 @@ use core_foundation::{
     string::CFStringRef,
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::{Favorites, FinderApi, finder::FinderError, system::api::MacOsApi};
-use std::cell::Cell;
-use std::rc::Rc;
+use favkit::{
+    Favorites, FinderApi,
+    finder::{FinderError, Result},
+    system::api::MacOsApi,
+};
+
+type ListCreateFn = Box<dyn Fn() -> LSSharedFileListRef>;
+type SnapshotFn = Box<dyn Fn(LSSharedFileListRef) -> CFArrayRef>;
 
 struct MockMacOsApi {
-    create_called: Cell<bool>,
-    copy_snapshot_called: Cell<bool>,
-    return_null_list: Cell<bool>,
-    return_null_snapshot: Cell<bool>,
-    items: Rc<Vec<LSSharedFileListItemRef>>,
-    array: Cell<Option<CFArray<LSSharedFileListItemRef>>>,
+    list_create_fn: ListCreateFn,
+    snapshot_fn: SnapshotFn,
+    items: Option<CFArray<LSSharedFileListItemRef>>,
+}
+
+impl Default for MockMacOsApi {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockMacOsApi {
     fn new() -> Self {
         Self {
-            create_called: Cell::new(false),
-            copy_snapshot_called: Cell::new(false),
-            return_null_list: Cell::new(false),
-            return_null_snapshot: Cell::new(false),
-            items: Rc::new(Vec::new()),
-            array: Cell::new(None),
+            list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
+            snapshot_fn: Box::new(|_| std::ptr::null_mut()),
+            items: None,
         }
+    }
+
+    fn with_items(mut self, items: Vec<LSSharedFileListItemRef>) -> Self {
+        let array = CFArray::from_copyable(&items);
+        self.items = Some(array);
+        self
+    }
+
+    fn with_list_create<F>(mut self, f: F) -> Self
+    where
+        F: Fn() -> LSSharedFileListRef + 'static,
+    {
+        self.list_create_fn = Box::new(f);
+        self
+    }
+
+    fn with_snapshot<F>(mut self, f: F) -> Self
+    where
+        F: Fn(LSSharedFileListRef) -> CFArrayRef + 'static,
+    {
+        self.snapshot_fn = Box::new(f);
+        self
     }
 }
 
@@ -40,63 +67,62 @@ impl MacOsApi for MockMacOsApi {
         _list_type: CFStringRef,
         _list_options: CFTypeRef,
     ) -> LSSharedFileListRef {
-        self.create_called.set(true);
-        if self.return_null_list.get() {
-            std::ptr::null_mut()
-        } else {
-            1 as LSSharedFileListRef
-        }
+        (self.list_create_fn)()
     }
 
     unsafe fn ls_shared_file_list_copy_snapshot(
         &self,
-        _list: LSSharedFileListRef,
+        list: LSSharedFileListRef,
         _seed: *mut u32,
     ) -> CFArrayRef {
-        self.copy_snapshot_called.set(true);
-        if self.return_null_snapshot.get() {
-            std::ptr::null_mut()
+        if let Some(array) = &self.items {
+            array.as_concrete_TypeRef()
         } else {
-            let array = CFArray::from_copyable(&self.items);
-            let ptr = array.as_concrete_TypeRef();
-            self.array.set(Some(array)); // a hack to retain the array
-            ptr
+            (self.snapshot_fn)(list)
         }
     }
 }
 
 #[test]
-fn should_call_macos_api_when_getting_list() {
-    let mock_api = MockMacOsApi::new();
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+fn should_return_error_when_list_handle_is_null() -> Result<()> {
+    let mock_api = MockMacOsApi::new().with_list_create(std::ptr::null_mut);
 
-    let _ = finder.get_favorites_list();
-
-    assert!(mock_api.create_called.get());
-    assert!(mock_api.copy_snapshot_called.get());
-}
-
-#[test]
-fn should_return_error_when_list_handle_is_null() {
-    let mock_api = MockMacOsApi::new();
-    mock_api.return_null_list.set(true);
     let favorites = Favorites::new(&mock_api);
     let finder = FinderApi::new(&favorites);
 
     let result = finder.get_favorites_list();
 
     assert!(matches!(result, Err(FinderError::NullListHandle)));
+    Ok(())
 }
 
 #[test]
-fn should_return_error_when_snapshot_handle_is_null() {
-    let mock_api = MockMacOsApi::new();
-    mock_api.return_null_snapshot.set(true);
+fn should_return_error_when_snapshot_handle_is_null() -> Result<()> {
+    let mock_api = MockMacOsApi::new()
+        .with_list_create(|| 1 as LSSharedFileListRef)
+        .with_snapshot(|_| std::ptr::null_mut());
+
     let favorites = Favorites::new(&mock_api);
     let finder = FinderApi::new(&favorites);
 
     let result = finder.get_favorites_list();
 
     assert!(matches!(result, Err(FinderError::NullSnapshotHandle)));
+    Ok(())
+}
+
+#[test]
+fn should_get_empty_list_when_no_favorites() -> Result<()> {
+    let items: Vec<LSSharedFileListItemRef> = vec![];
+    let mock_api = MockMacOsApi::new()
+        .with_items(items)
+        .with_list_create(|| 1 as LSSharedFileListRef);
+
+    let favorites = Favorites::new(&mock_api);
+    let finder = FinderApi::new(&favorites);
+
+    let favorites = finder.get_favorites_list()?;
+    assert_eq!(favorites, Vec::<String>::new());
+
+    Ok(())
 }
