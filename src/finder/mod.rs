@@ -12,7 +12,7 @@ impl<'a> FinderApi<'a> {
         Self { favorites }
     }
 
-    pub fn get_favorites_list(&self) -> Result<Vec<String>> {
+    pub fn get_favorites_list(&self) -> Result<Vec<Option<String>>> {
         self.favorites.list_items()
     }
 }

@@ -140,7 +140,7 @@ fn should_get_empty_list_when_no_favorites() -> Result<()> {
     let finder = FinderApi::new(&favorites);
 
     let favorites = finder.get_favorites_list()?;
-    assert_eq!(favorites, Vec::<String>::new());
+    assert_eq!(favorites, Vec::<Option<String>>::new());
 
     Ok(())
 }
@@ -164,7 +164,38 @@ fn should_get_favorite_with_display_name() -> Result<()> {
     let finder = FinderApi::new(&favorites);
 
     let favorites = finder.get_favorites_list()?;
-    assert_eq!(favorites, vec![display_name.to_string()]);
+    assert_eq!(favorites, vec![Some(display_name.to_string())]);
+
+    Ok(())
+}
+
+#[test]
+fn should_include_favorite_with_null_display_name() -> Result<()> {
+    // Create two mock items (using non-null pointers)
+    let item1: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
+    let item2: LSSharedFileListItemRef = 2 as LSSharedFileListItemRef;
+    let items = vec![item1, item2];
+
+    // Create a display name for the first item only
+    let display_name = "Documents";
+    let cf_string = CFString::from_static_string(display_name);
+
+    let mock_api = MockMacOsApi::new()
+        .with_items(items)
+        .with_list_create(|| 1 as LSSharedFileListRef)
+        .with_display_name(move |item| {
+            if item == item1 {
+                cf_string.as_concrete_TypeRef()
+            } else {
+                std::ptr::null_mut()
+            }
+        });
+
+    let favorites = Favorites::new(&mock_api);
+    let finder = FinderApi::new(&favorites);
+
+    let favorites = finder.get_favorites_list()?;
+    assert_eq!(favorites, vec![Some(display_name.to_string()), None]);
 
     Ok(())
 }
