@@ -1,5 +1,5 @@
-use core_foundation::{array::CFArray, base::kCFAllocatorDefault};
-use core_services::{LSSharedFileListItemRef, kLSSharedFileListFavoriteItems};
+use core_foundation::base::kCFAllocatorDefault;
+use core_services::kLSSharedFileListFavoriteItems;
 
 use crate::{
     favorites::FavoritesApi,
@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     list::{FavoritesList, RawFavoritesList},
-    snapshot::RawSnapshot,
+    snapshot::{RawSnapshot, Snapshot},
 };
 
 pub struct Favorites<'a> {
@@ -33,10 +33,7 @@ impl<'a> Favorites<'a> {
         }
     }
 
-    unsafe fn copy_snapshot(
-        &self,
-        list: FavoritesList,
-    ) -> Result<CFArray<LSSharedFileListItemRef>> {
+    unsafe fn copy_snapshot(&self, list: FavoritesList) -> Result<Snapshot> {
         let mut seed: u32 = 0;
         unsafe {
             let array_ref = self

@@ -12,8 +12,12 @@ impl From<CFArrayRef> for RawSnapshot {
     }
 }
 
-impl From<RawSnapshot> for Option<CFArray<LSSharedFileListItemRef>> {
+#[allow(dead_code)]
+pub(crate) struct Snapshot(CFArray<LSSharedFileListItemRef>);
+
+impl From<RawSnapshot> for Option<Snapshot> {
     fn from(snapshot: RawSnapshot) -> Self {
-        (!snapshot.0.is_null()).then(|| unsafe { CFArray::wrap_under_get_rule(snapshot.0) })
+        (!snapshot.0.is_null())
+            .then(|| unsafe { Snapshot(CFArray::wrap_under_get_rule(snapshot.0)) })
     }
 }
