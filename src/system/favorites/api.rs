@@ -1,7 +1,4 @@
-use core_foundation::{
-    array::CFArray,
-    base::{TCFType, kCFAllocatorDefault},
-};
+use core_foundation::{array::CFArray, base::kCFAllocatorDefault};
 use core_services::{LSSharedFileListItemRef, kLSSharedFileListFavoriteItems};
 
 use crate::{
@@ -10,7 +7,10 @@ use crate::{
     system::api::MacOsApi,
 };
 
-use super::list::{FavoritesList, RawFavoritesList};
+use super::{
+    list::{FavoritesList, RawFavoritesList},
+    snapshot::RawSnapshot,
+};
 
 pub struct Favorites<'a> {
     api: &'a dyn MacOsApi,
@@ -42,9 +42,8 @@ impl<'a> Favorites<'a> {
             let array_ref = self
                 .api
                 .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
-            (!array_ref.is_null())
-                .then(|| CFArray::wrap_under_get_rule(array_ref))
-                .ok_or(FinderError::NullSnapshotHandle)
+
+            Option::from(RawSnapshot::from(array_ref)).ok_or(FinderError::NullSnapshotHandle)
         }
     }
 }
