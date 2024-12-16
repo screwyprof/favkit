@@ -2,4 +2,4 @@
 
 pub mod finder;
 
-pub use finder::FinderApi;
+pub use finder::{FinderApi, RealMacOsApi};
