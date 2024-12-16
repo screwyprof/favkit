@@ -9,7 +9,7 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{
     Favorites, FinderApi,
-    finder::{FinderError, Result},
+    finder::{FinderError, Result, SidebarItem},
     system::api::MacOsApi,
 };
 
@@ -140,7 +140,7 @@ fn should_get_empty_list_when_no_favorites() -> Result<()> {
     let finder = FinderApi::new(&favorites);
 
     let favorites = finder.get_favorites_list()?;
-    assert_eq!(favorites, Vec::<Option<String>>::new());
+    assert_eq!(favorites, Vec::<SidebarItem>::new());
 
     Ok(())
 }
@@ -164,7 +164,9 @@ fn should_get_favorite_with_display_name() -> Result<()> {
     let finder = FinderApi::new(&favorites);
 
     let favorites = finder.get_favorites_list()?;
-    assert_eq!(favorites, vec![Some(display_name.to_string())]);
+    assert_eq!(favorites, vec![SidebarItem::new(Some(
+        display_name.to_string()
+    ))]);
 
     Ok(())
 }
@@ -195,7 +197,10 @@ fn should_include_favorite_with_null_display_name() -> Result<()> {
     let finder = FinderApi::new(&favorites);
 
     let favorites = finder.get_favorites_list()?;
-    assert_eq!(favorites, vec![Some(display_name.to_string()), None]);
+    assert_eq!(favorites, vec![
+        SidebarItem::new(Some(display_name.to_string())),
+        SidebarItem::new(None)
+    ]);
 
     Ok(())
 }

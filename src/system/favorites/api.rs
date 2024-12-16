@@ -3,7 +3,7 @@ use core_services::kLSSharedFileListFavoriteItems;
 
 use crate::{
     favorites::FavoritesApi,
-    finder::{FinderError, Result},
+    finder::{FinderError, Result, SidebarItem},
     system::api::MacOsApi,
 };
 
@@ -47,22 +47,22 @@ impl<'a> Favorites<'a> {
 }
 
 impl FavoritesApi for Favorites<'_> {
-    fn list_items(&self) -> Result<Vec<Option<String>>> {
+    fn list_items(&self) -> Result<Vec<SidebarItem>> {
         unsafe {
             let list = self.list_create()?;
             let snapshot = self.copy_snapshot(list)?;
 
-            let mut names = Vec::new();
+            let mut items = Vec::new();
             for item in &snapshot {
                 let name_ref = self
                     .api
                     .ls_shared_file_list_item_copy_display_name(item.into());
                 let display_name =
                     Option::<DisplayName>::from(RawDisplayName::from(name_ref)).map(String::from);
-                names.push(display_name);
+                items.push(SidebarItem::new(display_name));
             }
 
-            Ok(names)
+            Ok(items)
         }
     }
 }
