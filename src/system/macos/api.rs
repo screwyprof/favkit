@@ -4,7 +4,7 @@ use core_foundation::{
 };
 use core_services::LSSharedFileListRef;
 
-use super::MacOsApi;
+use crate::system::api::MacOsApi;
 
 #[derive(Default)]
 pub struct RealMacOsApi;
