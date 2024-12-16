@@ -1,23 +1,36 @@
 use core_services::{LSSharedFileListRef, OpaqueLSSharedFileListRef};
 
-pub(crate) struct RawFavoritesList(*mut OpaqueLSSharedFileListRef);
+use crate::system::core_foundation::{Raw, Safe};
 
-impl From<*mut OpaqueLSSharedFileListRef> for RawFavoritesList {
-    fn from(list: *mut OpaqueLSSharedFileListRef) -> Self {
-        Self(list)
-    }
-}
-
-pub(crate) struct FavoritesList(pub(crate) LSSharedFileListRef);
-
-impl From<RawFavoritesList> for Option<FavoritesList> {
-    fn from(list: RawFavoritesList) -> Self {
-        (!list.0.is_null()).then_some(FavoritesList(list.0))
-    }
-}
+pub(crate) type RawFavoritesList = Raw<*mut OpaqueLSSharedFileListRef>;
+pub(crate) type FavoritesList = Safe<LSSharedFileListRef>;
 
 impl From<FavoritesList> for LSSharedFileListRef {
     fn from(list: FavoritesList) -> Self {
         list.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    #[test]
+    fn should_return_none_for_null_list() -> Result<()> {
+        let list_ref = std::ptr::null_mut();
+        let raw = Raw::from(list_ref);
+        assert!(Option::<FavoritesList>::from(raw).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn should_wrap_valid_list() -> Result<()> {
+        let list_ref = 1 as *mut OpaqueLSSharedFileListRef;
+        let raw = Raw::from(list_ref);
+        let list = Option::<FavoritesList>::from(raw).ok_or("Failed to create FavoritesList")?;
+        assert_eq!(LSSharedFileListRef::from(list), list_ref);
+        Ok(())
     }
 }
