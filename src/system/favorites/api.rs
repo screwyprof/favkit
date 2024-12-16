@@ -6,7 +6,7 @@ use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, kLSSharedFileL
 
 use crate::{
     favorites::FavoritesApi,
-    finder::{FinderError, ListErrorKind, Result},
+    finder::{FinderError, Result},
     system::api::MacOsApi,
 };
 
@@ -29,17 +29,20 @@ impl<'a> Favorites<'a> {
 
             (!list_ref.is_null())
                 .then_some(list_ref)
-                .ok_or(FinderError::ListError {
-                    kind: ListErrorKind::NullHandle,
-                })
+                .ok_or(FinderError::NullListHandle)
         }
     }
 
-    unsafe fn copy_snapshot(&self, list: LSSharedFileListRef) -> CFArray<LSSharedFileListItemRef> {
+    unsafe fn copy_snapshot(
+        &self,
+        list: LSSharedFileListRef,
+    ) -> Result<CFArray<LSSharedFileListItemRef>> {
         let mut seed: u32 = 0;
         unsafe {
             let array_ref = self.api.ls_shared_file_list_copy_snapshot(list, &mut seed);
-            CFArray::wrap_under_get_rule(array_ref)
+            (!array_ref.is_null())
+                .then(|| CFArray::wrap_under_get_rule(array_ref))
+                .ok_or(FinderError::NullSnapshotHandle)
         }
     }
 }
@@ -48,7 +51,7 @@ impl FavoritesApi for Favorites<'_> {
     fn list_items(&self) -> Result<Vec<String>> {
         unsafe {
             let list = self.list_create()?;
-            let _array = self.copy_snapshot(list);
+            let _array = self.copy_snapshot(list)?;
 
             Ok(vec![])
         }
