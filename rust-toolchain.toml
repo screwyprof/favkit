@@ -1,6 +1,15 @@
 [toolchain]
 channel = "nightly"
-components = [ "rustfmt", "clippy", "llvm-tools-preview" ]
-
+components = [
+    "rustc",
+    "rust-std",
+    "rust-src",
+    "rust-analyzer",
+    "rust-docs",
+    "rustfmt",
+    "cargo",
+    "clippy",
+    "llvm-tools-preview",
+]
 [unstable]
 coverage_attribute = true
