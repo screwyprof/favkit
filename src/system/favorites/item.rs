@@ -1,8 +1,9 @@
 use core_services::LSSharedFileListItemRef;
 
-use crate::system::core_foundation::LSSharedFileListItemHandle;
+use crate::system::core_foundation::RawRef;
 
-pub(crate) type SnapshotItem = LSSharedFileListItemHandle;
+pub(crate) type LSSharedFileListItem = RawRef<core_services::OpaqueLSSharedFileListItemRef>;
+pub(crate) type SnapshotItem = LSSharedFileListItem;
 
 impl From<SnapshotItem> for LSSharedFileListItemRef {
     fn from(item: SnapshotItem) -> Self {

@@ -1,8 +1,9 @@
 use core_services::LSSharedFileListRef;
 
-use crate::system::core_foundation::LSSharedFileListHandle;
+use crate::system::core_foundation::RawRef;
 
-pub(crate) type FavoritesHandle = LSSharedFileListHandle;
+pub(crate) type LSSharedFileList = RawRef<core_services::OpaqueLSSharedFileListRef>;
+pub(crate) type FavoritesHandle = LSSharedFileList;
 
 impl From<FavoritesHandle> for LSSharedFileListRef {
     fn from(handle: FavoritesHandle) -> Self {

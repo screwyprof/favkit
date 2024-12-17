@@ -86,7 +86,8 @@ mod tests {
     fn iterator_should_return_none_when_exhausted() -> Result<()> {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
-        let snapshot = Snapshot::from_ref(array.as_concrete_TypeRef()).unwrap();
+        let snapshot =
+            Snapshot::from_ref(array.as_concrete_TypeRef()).ok_or("Failed to create Snapshot")?;
         let mut iter = (&snapshot).into_iter();
         assert!(iter.next().is_some());
         assert!(iter.next().is_none());
@@ -97,7 +98,8 @@ mod tests {
     fn iterator_should_report_correct_size_hint() -> Result<()> {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
-        let snapshot = Snapshot::from_ref(array.as_concrete_TypeRef()).unwrap();
+        let snapshot =
+            Snapshot::from_ref(array.as_concrete_TypeRef()).ok_or("Failed to create Snapshot")?;
         let mut iter = (&snapshot).into_iter();
 
         assert_eq!(iter.size_hint(), (1, Some(1)));
