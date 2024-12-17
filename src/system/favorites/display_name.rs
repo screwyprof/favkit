@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_string() -> Result<()> {
         let string_ref: CFStringRef = std::ptr::null_mut();
-        assert!(DisplayName::from_ref(string_ref).as_ref().is_none());
+        assert!(DisplayName::from_ref(string_ref).is_none());
         Ok(())
     }
 
@@ -36,7 +36,7 @@ mod tests {
         let valid = CFString::new("Documents");
         let string_ref = valid.as_concrete_TypeRef();
         let display_name = DisplayName::from_ref(string_ref);
-        assert!(display_name.as_ref().is_some());
+        assert!(display_name.is_some());
         assert_eq!(format!("{}", display_name), "Documents");
         Ok(())
     }

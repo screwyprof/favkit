@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_url() -> Result<()> {
         let url_ref: CFURLRef = std::ptr::null_mut();
-        assert!(Url::from_ref(url_ref).as_ref().is_none());
+        assert!(Url::from_ref(url_ref).is_none());
         Ok(())
     }
 
@@ -38,7 +38,7 @@ mod tests {
         let valid = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let url_ref = valid.as_concrete_TypeRef();
         let url = Url::from_ref(url_ref);
-        assert!(url.as_ref().is_some());
+        assert!(url.is_some());
         assert_eq!(format!("{}", url), "file:///Users/user/Documents/");
         Ok(())
     }

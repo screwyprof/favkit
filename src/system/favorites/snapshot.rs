@@ -4,6 +4,7 @@ use core_foundation::{
     base::CFRange,
 };
 use core_services::LSSharedFileListItemRef;
+use std::ops::Deref;
 
 use super::item::SnapshotItem;
 
@@ -15,10 +16,18 @@ impl From<CFArrayRef> for Snapshot {
     }
 }
 
+// treat Snapshot as Option<CFArray<LSSharedFileListItemRef>>
+impl Deref for Snapshot {
+    type Target = Option<CFArray<LSSharedFileListItemRef>>;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
 impl Snapshot {
     fn len(&self) -> usize {
-        self.0
-            .as_ref()
+        self.as_ref()
             .map(|arr| usize::try_from(arr.len()).unwrap_or(0))
             .unwrap_or(0)
     }
@@ -26,7 +35,7 @@ impl Snapshot {
     fn get_item(&self, index: usize) -> Option<SnapshotItem> {
         let cf_index = isize::try_from(index).unwrap_or(0);
         let range = CFRange::init(cf_index, 1);
-        self.0.as_ref().and_then(|arr| {
+        self.as_ref().and_then(|arr| {
             let mut values = CFArray::get_values(arr, range);
             values
                 .pop()
@@ -83,7 +92,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_snapshot() -> Result<()> {
         let ptr: CFArrayRef = std::ptr::null();
-        assert_eq!(Snapshot::from(ptr).len(), 0);
+        assert!(Snapshot::from(ptr).is_none());
         Ok(())
     }
 
@@ -93,6 +102,7 @@ mod tests {
         let array = CFArray::from_copyable(&[item]);
         let ptr = array.as_concrete_TypeRef();
         let snapshot = Snapshot::from(ptr);
+        assert!(snapshot.is_some());
         assert_eq!(snapshot.len(), 1);
         Ok(())
     }

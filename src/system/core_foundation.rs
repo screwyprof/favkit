@@ -1,4 +1,5 @@
 use core_foundation::base::{TCFType, TCFTypeRef};
+use std::ops::Deref;
 // Generic wrapper for raw pointer types
 #[derive(Clone, Copy)]
 pub(crate) struct RawRef<T>(Option<*mut T>);
@@ -28,9 +29,13 @@ impl<T: TCFType> CFRef<T> {
     {
         Self((!raw.as_void_ptr().is_null()).then(|| unsafe { T::wrap_under_get_rule(raw) }))
     }
+}
 
-    pub(crate) fn as_ref(&self) -> Option<&T> {
-        self.0.as_ref()
+impl<T> Deref for CFRef<T> {
+    type Target = Option<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -49,7 +54,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_string() -> Result<()> {
         let ptr: CFStringRef = std::ptr::null_mut();
-        assert!(CFRef::<CFString>::from_ref(ptr).as_ref().is_none());
+        assert!(CFRef::<CFString>::from_ref(ptr).is_none());
         Ok(())
     }
 
@@ -65,7 +70,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_array() -> Result<()> {
         let ptr: CFArrayRef = std::ptr::null();
-        assert!(CFRef::<CFArray<i32>>::from_ref(ptr).as_ref().is_none());
+        assert!(CFRef::<CFArray<i32>>::from_ref(ptr).is_none());
         Ok(())
     }
 
@@ -81,7 +86,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_url() -> Result<()> {
         let ptr: CFURLRef = std::ptr::null_mut();
-        assert!(CFRef::<CFURL>::from_ref(ptr).as_ref().is_none());
+        assert!(CFRef::<CFURL>::from_ref(ptr).is_none());
         Ok(())
     }
 
