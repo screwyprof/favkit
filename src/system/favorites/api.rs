@@ -1,6 +1,5 @@
 use core_foundation::base::kCFAllocatorDefault;
 use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
-use std::ptr::NonNull;
 
 use crate::{
     favorites::FavoritesApi,
@@ -30,9 +29,7 @@ impl<'a> Favorites<'a> {
                 std::ptr::null(),
             )
         };
-        NonNull::new(ptr)
-            .map(FavoritesHandle::from)
-            .ok_or(FinderError::NullListHandle)
+        FavoritesHandle::try_from(ptr)
     }
 
     unsafe fn copy_snapshot(&self, list: FavoritesHandle) -> Result<Snapshot> {

@@ -1,5 +1,3 @@
-use std::fmt::{Display, Formatter};
-
 use core_foundation::url::{CFURL, CFURLRef};
 
 use crate::{
@@ -7,19 +5,13 @@ use crate::{
     system::core_foundation::CFRef,
 };
 
-pub(crate) struct Url(CFRef<CFURL>);
+pub(crate) type Url = CFRef<CFURL>;
 
 impl TryFrom<CFURLRef> for Url {
     type Error = FinderError;
 
     fn try_from(url_ref: CFURLRef) -> Result<Self> {
-        CFRef::from_ref(url_ref).map(Self)
-    }
-}
-
-impl Display for Url {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.get_string())
+        CFRef::try_from_ref(url_ref)
     }
 }
 

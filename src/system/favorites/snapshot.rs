@@ -19,7 +19,7 @@ impl TryFrom<CFArrayRef> for Snapshot {
     type Error = FinderError;
 
     fn try_from(array_ref: CFArrayRef) -> Result<Self> {
-        CFRef::from_ref(array_ref).map(Self)
+        CFRef::try_from_ref(array_ref).map(Self)
     }
 }
 
@@ -63,7 +63,7 @@ impl Iterator for SnapshotIterator {
     fn next(&mut self) -> Option<Self::Item> {
         self.values
             .pop()
-            .map(|ptr| NonNull::new(ptr as *mut _).expect("ptr must not be null"))
+            .and_then(|ptr| NonNull::new(ptr as *mut _))
             .map(SnapshotItem::from)
     }
 
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn should_return_error_for_null_snapshot() {
         let ptr: CFArrayRef = std::ptr::null();
-        assert!(CFRef::<CFArray<LSSharedFileListItemRef>>::from_ref(ptr).is_err());
+        assert!(CFRef::<CFArray<LSSharedFileListItemRef>>::try_from_ref(ptr).is_err());
     }
 
     #[test]

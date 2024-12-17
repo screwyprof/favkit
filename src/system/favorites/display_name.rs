@@ -1,5 +1,3 @@
-use std::fmt::{Display, Formatter};
-
 use core_foundation::string::{CFString, CFStringRef};
 
 use crate::{
@@ -7,19 +5,13 @@ use crate::{
     system::core_foundation::CFRef,
 };
 
-pub(crate) struct DisplayName(CFRef<CFString>);
+pub(crate) type DisplayName = CFRef<CFString>;
 
 impl TryFrom<CFStringRef> for DisplayName {
     type Error = FinderError;
 
     fn try_from(string_ref: CFStringRef) -> Result<Self> {
-        CFRef::from_ref(string_ref).map(Self)
-    }
-}
-
-impl Display for DisplayName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", *self.0)
+        CFRef::try_from_ref(string_ref)
     }
 }
 
