@@ -12,7 +12,7 @@ pub(crate) type Snapshot = Safe<CFArray<LSSharedFileListItemRef>>;
 
 impl Snapshot {
     fn len(&self) -> usize {
-        self.0.len().try_into().unwrap_or(0)
+        usize::try_from(self.0.len()).unwrap_or(0)
     }
 
     fn get_item(&self, index: usize) -> Option<SnapshotItem> {
@@ -43,6 +43,11 @@ impl Iterator for SnapshotIter<'_> {
         let item = self.snapshot.get_item(self.index);
         self.index += 1;
         item
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.snapshot.len().saturating_sub(self.index);
+        (remaining, Some(remaining))
     }
 }
 
@@ -92,6 +97,19 @@ mod tests {
         let mut iter = (&snapshot).into_iter();
         assert!(iter.next().is_some());
         assert!(iter.next().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn iterator_should_report_correct_size_hint() -> Result<()> {
+        let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
+        let array = CFArray::from_copyable(&[item]);
+        let snapshot = Safe(array);
+        let mut iter = (&snapshot).into_iter();
+
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+        iter.next();
+        assert_eq!(iter.size_hint(), (0, Some(0)));
         Ok(())
     }
 }
