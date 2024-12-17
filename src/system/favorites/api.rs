@@ -53,16 +53,14 @@ impl<'a> Favorites<'a> {
         }
     }
 
-    unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<String> {
+    unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<Url> {
         unsafe {
             let url_ref = self.api.ls_shared_file_list_item_copy_resolved_url(
                 item.into(),
                 LSSharedFileListResolutionFlags::default(),
                 std::ptr::null_mut(),
             );
-            Url::from_ref(url_ref)
-                .map(String::from)
-                .ok_or(FinderError::NullUrlHandle)
+            Url::from_ref(url_ref).ok_or(FinderError::NullUrlHandle)
         }
     }
 }
@@ -80,7 +78,8 @@ impl FavoritesApi for Favorites<'_> {
                         .copy_display_name(item)
                         .map(|name| name.to_string())
                         .filter(|name| !name.is_empty());
-                    let target = Target(self.copy_resolved_url(item)?);
+                    let url = self.copy_resolved_url(item)?;
+                    let target = Target(url.to_string());
                     Ok(SidebarItem::new(display_name, target))
                 })
                 .collect::<Result<Vec<_>>>()?;

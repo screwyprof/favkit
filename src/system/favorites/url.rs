@@ -1,11 +1,13 @@
+use std::fmt;
+
 use crate::system::core_foundation::CFRef;
 use core_foundation::url::CFURL;
 
 pub(crate) type Url = CFRef<CFURL>;
 
-impl From<Url> for String {
-    fn from(url: Url) -> Self {
-        url.0.get_string().to_string()
+impl fmt::Display for Url {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.get_string())
     }
 }
 
@@ -28,12 +30,12 @@ mod tests {
     }
 
     #[test]
-    fn should_convert_valid_url_to_string() -> Result<()> {
+    fn should_format_url_using_display_trait() -> Result<()> {
         let path = CFString::new("/Users/user/Documents");
         let valid = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let url_ref = valid.as_concrete_TypeRef();
         let url = Url::from_ref(url_ref).ok_or("Failed to create Url")?;
-        assert_eq!(String::from(url), "file:///Users/user/Documents/");
+        assert_eq!(format!("{}", url), "file:///Users/user/Documents/");
         Ok(())
     }
 }
