@@ -1,10 +1,10 @@
 use core_foundation::{array::CFArray, base::CFRange};
 use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
 
-use super::item::SnapshotItem;
-use crate::system::core_foundation::CFArrayHandle;
+use crate::system::core_foundation::CFRef;
+use crate::system::favorites::item::SnapshotItem;
 
-pub(crate) type Snapshot = CFArrayHandle<LSSharedFileListItemRef>;
+pub(crate) type Snapshot = CFRef<CFArray<LSSharedFileListItemRef>>;
 
 impl Snapshot {
     fn len(&self) -> usize {

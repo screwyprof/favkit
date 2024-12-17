@@ -1,35 +1,20 @@
-use core_foundation::{
-    array::{CFArray, CFArrayRef},
-    string::{CFString, CFStringRef},
-    url::{CFURL, CFURLRef},
-};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, TCFType};
+use core_foundation::base::{TCFType, TCFTypeRef};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 
-// Core Foundation handles
-pub(crate) struct CFStringHandle(pub(crate) CFString);
-pub(crate) struct CFArrayHandle<T>(pub(crate) CFArray<T>);
-pub(crate) struct CFURLHandle(pub(crate) CFURL);
+// Generic reference-counted wrapper for Core Foundation types
+pub(crate) struct CFRef<T>(pub(crate) T);
 
 // Raw pointer handles
 pub(crate) struct LSSharedFileListHandle(pub(crate) LSSharedFileListRef);
 pub(crate) struct LSSharedFileListItemHandle(pub(crate) LSSharedFileListItemRef);
 
 // Core Foundation conversions
-impl CFStringHandle {
-    pub(crate) fn from_ref(raw: CFStringRef) -> Option<Self> {
-        (!raw.is_null()).then(|| unsafe { Self(CFString::wrap_under_get_rule(raw)) })
-    }
-}
-
-impl<T> CFArrayHandle<T> {
-    pub(crate) fn from_ref(raw: CFArrayRef) -> Option<Self> {
-        (!raw.is_null()).then(|| unsafe { Self(CFArray::wrap_under_get_rule(raw)) })
-    }
-}
-
-impl CFURLHandle {
-    pub(crate) fn from_ref(raw: CFURLRef) -> Option<Self> {
-        (!raw.is_null()).then(|| unsafe { Self(CFURL::wrap_under_get_rule(raw)) })
+impl<T: TCFType> CFRef<T> {
+    pub(crate) fn from_ref(raw: T::Ref) -> Option<Self>
+    where
+        T::Ref: TCFTypeRef,
+    {
+        (!raw.as_void_ptr().is_null()).then(|| unsafe { Self(T::wrap_under_get_rule(raw)) })
     }
 }
 
@@ -48,7 +33,11 @@ impl LSSharedFileListItemHandle {
 
 #[cfg(test)]
 mod tests {
-    use core_foundation::url::kCFURLPOSIXPathStyle;
+    use core_foundation::{
+        array::{CFArray, CFArrayRef},
+        string::{CFString, CFStringRef},
+        url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
+    };
     use core_services::{OpaqueLSSharedFileListItemRef, OpaqueLSSharedFileListRef};
 
     use super::*;
@@ -58,7 +47,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_string() -> Result<()> {
         let ptr: CFStringRef = std::ptr::null_mut();
-        assert!(CFStringHandle::from_ref(ptr).is_none());
+        assert!(CFRef::<CFString>::from_ref(ptr).is_none());
         Ok(())
     }
 
@@ -66,7 +55,7 @@ mod tests {
     fn should_wrap_valid_string() -> Result<()> {
         let string = CFString::new("test");
         let ptr = string.as_concrete_TypeRef();
-        let wrapped = CFStringHandle::from_ref(ptr).ok_or("Failed to create CFStringHandle")?;
+        let wrapped: CFRef<CFString> = CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
         assert_eq!(wrapped.0.to_string(), "test");
         Ok(())
     }
@@ -106,7 +95,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_array() -> Result<()> {
         let ptr: CFArrayRef = std::ptr::null();
-        assert!(CFArrayHandle::<LSSharedFileListItemRef>::from_ref(ptr).is_none());
+        assert!(CFRef::<CFArray<LSSharedFileListItemRef>>::from_ref(ptr).is_none());
         Ok(())
     }
 
@@ -115,8 +104,8 @@ mod tests {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
         let ptr = array.as_concrete_TypeRef();
-        let wrapped = CFArrayHandle::<LSSharedFileListItemRef>::from_ref(ptr)
-            .ok_or("Failed to create CFArrayHandle")?;
+        let wrapped: CFRef<CFArray<LSSharedFileListItemRef>> =
+            CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
         assert_eq!(wrapped.0.len(), 1);
         Ok(())
     }
@@ -124,7 +113,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_url() -> Result<()> {
         let ptr: CFURLRef = std::ptr::null_mut();
-        assert!(CFURLHandle::from_ref(ptr).is_none());
+        assert!(CFRef::<CFURL>::from_ref(ptr).is_none());
         Ok(())
     }
 
@@ -133,7 +122,7 @@ mod tests {
         let path = CFString::new("/test");
         let url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let ptr = url.as_concrete_TypeRef();
-        let wrapped = CFURLHandle::from_ref(ptr).ok_or("Failed to create CFURLHandle")?;
+        let wrapped: CFRef<CFURL> = CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
         assert_eq!(wrapped.0.get_string().to_string(), "file:///test/");
         Ok(())
     }

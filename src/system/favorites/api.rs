@@ -6,10 +6,10 @@ use core_services::{
 use crate::{
     favorites::FavoritesApi,
     finder::{FinderError, Result, SidebarItem, Target},
-    system::api::MacOsApi,
+    system::{api::MacOsApi, favorites::handle::FavoritesHandle},
 };
 
-use super::{display_name::DisplayName, handle::FavoritesHandle, snapshot::Snapshot, url::Url};
+use super::{display_name::DisplayName, snapshot::Snapshot, url::Url};
 
 pub struct Favorites<'a> {
     api: &'a dyn MacOsApi,

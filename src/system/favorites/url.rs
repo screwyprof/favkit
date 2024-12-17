@@ -1,6 +1,7 @@
-use crate::system::core_foundation::CFURLHandle;
+use crate::system::core_foundation::CFRef;
+use core_foundation::url::CFURL;
 
-pub(crate) type Url = CFURLHandle;
+pub(crate) type Url = CFRef<CFURL>;
 
 impl From<Url> for String {
     fn from(url: Url) -> Self {

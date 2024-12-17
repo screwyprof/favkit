@@ -1,8 +1,9 @@
 use std::fmt;
 
-use crate::system::core_foundation::CFStringHandle;
+use crate::system::core_foundation::CFRef;
+use core_foundation::string::CFString;
 
-pub(crate) type DisplayName = CFStringHandle;
+pub(crate) type DisplayName = CFRef<CFString>;
 
 impl fmt::Display for DisplayName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
