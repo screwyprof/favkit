@@ -1,41 +1,37 @@
-use std::fmt;
+use std::fmt::{Display, Formatter};
 
-use crate::system::core_foundation::CFRef;
 use core_foundation::url::{CFURL, CFURLRef};
 
-pub(crate) type Url = CFRef<CFURL>;
+use crate::{
+    finder::{FinderError, Result},
+    system::core_foundation::CFRef,
+};
 
-impl From<CFURLRef> for Url {
-    fn from(url_ref: CFURLRef) -> Self {
-        CFRef::from_ref(url_ref)
+pub(crate) struct Url(CFRef<CFURL>);
+
+impl TryFrom<CFURLRef> for Url {
+    type Error = FinderError;
+
+    fn try_from(url_ref: CFURLRef) -> Result<Self> {
+        CFRef::from_ref(url_ref).map(Self)
     }
 }
 
-impl fmt::Display for Url {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.as_ref() {
-            Some(url) => write!(f, "{}", url.get_string()),
-            None => write!(f, "<none>"),
-        }
+impl Display for Url {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.get_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_foundation::{
-        base::TCFType,
-        string::CFString,
-        url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
-    };
-
-    type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+    use core_foundation::{base::TCFType, string::CFString, url::kCFURLPOSIXPathStyle};
 
     #[test]
-    fn should_return_none_for_null_url() -> Result<()> {
+    fn should_return_error_for_null_url() {
         let url_ref: CFURLRef = std::ptr::null_mut();
-        assert!(Url::from(url_ref).is_none());
-        Ok(())
+        assert!(Url::try_from(url_ref).is_err());
     }
 
     #[test]
@@ -43,9 +39,8 @@ mod tests {
         let path = CFString::new("/Users/user/Documents");
         let valid = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let url_ref = valid.as_concrete_TypeRef();
-        let url = Url::from(url_ref);
-        assert!(url.is_some());
-        assert_eq!(format!("{}", url), "file:///Users/user/Documents/");
+        let url = Url::try_from(url_ref)?;
+        assert_eq!(url.to_string(), "file:///Users/user/Documents/");
         Ok(())
     }
 }

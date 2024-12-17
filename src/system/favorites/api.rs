@@ -1,5 +1,6 @@
 use core_foundation::base::kCFAllocatorDefault;
 use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
+use std::ptr::NonNull;
 
 use crate::{
     favorites::FavoritesApi,
@@ -21,73 +22,64 @@ impl<'a> Favorites<'a> {
         Self { api }
     }
 
-    unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
-        unsafe {
-            let display_name = self.display_name(item);
-            let url = self.copy_resolved_url(item)?;
-            let target = Target(url.to_string());
-            Ok(SidebarItem::new(display_name, target))
-        }
-    }
-    unsafe fn display_name(&self, item: SnapshotItem) -> Option<String> {
-        unsafe {
-            self.copy_display_name(item)
-                .ok()
-                .map(|name| name.to_string())
-                .filter(|name| !name.is_empty())
-        }
-    }
-
     unsafe fn list_create(&self) -> Result<FavoritesHandle> {
-        unsafe {
-            let ptr = self.api.ls_shared_file_list_create(
+        let ptr = unsafe {
+            self.api.ls_shared_file_list_create(
                 kCFAllocatorDefault,
                 kLSSharedFileListFavoriteItems,
                 std::ptr::null(),
-            );
-            (!ptr.is_null())
-                .then_some(FavoritesHandle::from(ptr))
-                .ok_or(FinderError::NullListHandle)
-        }
+            )
+        };
+        NonNull::new(ptr)
+            .map(FavoritesHandle::from)
+            .ok_or(FinderError::NullListHandle)
     }
 
     unsafe fn copy_snapshot(&self, list: FavoritesHandle) -> Result<Snapshot> {
         let mut seed: u32 = 0;
-        unsafe {
-            let array_ref = self
-                .api
-                .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
+        let array_ref = unsafe {
+            self.api
+                .ls_shared_file_list_copy_snapshot(list.into(), &mut seed)
+        };
 
-            (!array_ref.is_null())
-                .then(|| Snapshot::from(array_ref))
-                .ok_or(FinderError::NullSnapshotHandle)
-        }
+        (!array_ref.is_null())
+            .then(|| Snapshot::try_from(array_ref))
+            .ok_or(FinderError::NullSnapshotHandle)?
     }
 
     unsafe fn copy_display_name(&self, item: SnapshotItem) -> Result<DisplayName> {
-        unsafe {
-            let name_ref = self
-                .api
-                .ls_shared_file_list_item_copy_display_name(item.into());
+        let name_ref = unsafe {
+            self.api
+                .ls_shared_file_list_item_copy_display_name(item.into())
+        };
 
-            (!name_ref.is_null())
-                .then(|| DisplayName::from(name_ref))
-                .ok_or(FinderError::NullDisplayNameHandle)
-        }
+        (!name_ref.is_null())
+            .then(|| DisplayName::try_from(name_ref))
+            .ok_or(FinderError::NullDisplayNameHandle)?
     }
 
     unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<Url> {
-        unsafe {
-            let url_ref = self.api.ls_shared_file_list_item_copy_resolved_url(
+        let url_ref = unsafe {
+            self.api.ls_shared_file_list_item_copy_resolved_url(
                 item.into(),
                 LSSharedFileListResolutionFlags::default(),
                 std::ptr::null_mut(),
-            );
+            )
+        };
 
-            (!url_ref.is_null())
-                .then(|| Url::from(url_ref))
-                .ok_or(FinderError::NullUrlHandle)
-        }
+        (!url_ref.is_null())
+            .then(|| Url::try_from(url_ref))
+            .ok_or(FinderError::NullUrlHandle)?
+    }
+
+    unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
+        let display_name = unsafe { self.copy_display_name(item.clone()) }
+            .ok()
+            .map(|name| name.to_string())
+            .filter(|name| !name.is_empty());
+        let url = unsafe { self.copy_resolved_url(item) }?;
+        let target = Target(url.to_string());
+        Ok(SidebarItem::new(display_name, target))
     }
 }
 
