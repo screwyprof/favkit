@@ -3,10 +3,7 @@ use core_foundation::{
     string::{CFString, CFStringRef},
     url::{CFURL, CFURLRef},
 };
-use core_services::{
-    LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListItemRef,
-    OpaqueLSSharedFileListRef, TCFType,
-};
+use core_services::TCFType;
 
 pub(crate) struct Raw<T>(pub(crate) T);
 
@@ -24,18 +21,6 @@ impl From<Raw<CFStringRef>> for Option<Safe<CFString>> {
     }
 }
 
-impl From<Raw<*mut OpaqueLSSharedFileListRef>> for Option<Safe<LSSharedFileListRef>> {
-    fn from(raw: Raw<*mut OpaqueLSSharedFileListRef>) -> Self {
-        (!raw.0.is_null()).then_some(Safe(raw.0))
-    }
-}
-
-impl From<Raw<*mut OpaqueLSSharedFileListItemRef>> for Option<Safe<LSSharedFileListItemRef>> {
-    fn from(raw: Raw<*mut OpaqueLSSharedFileListItemRef>) -> Self {
-        (!raw.0.is_null()).then_some(Safe(raw.0))
-    }
-}
-
 impl<T> From<Raw<CFArrayRef>> for Option<Safe<CFArray<T>>> {
     fn from(raw: Raw<CFArrayRef>) -> Self {
         (!raw.0.is_null()).then(|| unsafe { Safe(CFArray::wrap_under_get_rule(raw.0)) })
@@ -48,10 +33,30 @@ impl From<Raw<CFURLRef>> for Option<Safe<CFURL>> {
     }
 }
 
+// Generic implementation for raw pointer types that converts from Raw<*mut T> to Option<Safe<*mut T>>
+//
+// This handles cases like:
+// - OpaqueLSSharedFileListRef -> LSSharedFileListRef
+// - OpaqueLSSharedFileListItemRef -> LSSharedFileListItemRef
+//
+// The implementation returns None if the pointer is null, Some(Safe(ptr)) otherwise
+impl<T> From<Raw<*mut T>> for Option<Safe<*mut T>> {
+    fn from(raw: Raw<*mut T>) -> Self {
+        (!raw.0.is_null()).then_some(Safe(raw.0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use core_foundation::url::kCFURLPOSIXPathStyle;
+
+    use core_services::LSSharedFileListRef;
+    use core_services::OpaqueLSSharedFileListRef;
+
+    use core_services::LSSharedFileListItemRef;
+    use core_services::OpaqueLSSharedFileListItemRef;
 
     type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
