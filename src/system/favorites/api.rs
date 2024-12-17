@@ -54,7 +54,7 @@ impl<'a> Favorites<'a> {
                 .ls_shared_file_list_item_copy_display_name(item.into());
 
             (!name_ref.is_null())
-                .then(|| DisplayName::from_ref(name_ref))
+                .then(|| DisplayName::from(name_ref))
                 .ok_or(FinderError::NullDisplayNameHandle)
         }
     }
@@ -68,7 +68,7 @@ impl<'a> Favorites<'a> {
             );
 
             (!url_ref.is_null())
-                .then(|| Url::from_ref(url_ref))
+                .then(|| Url::from(url_ref))
                 .ok_or(FinderError::NullUrlHandle)
         }
     }
