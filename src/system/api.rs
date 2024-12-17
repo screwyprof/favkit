@@ -1,9 +1,13 @@
 use core_foundation::{
     array::CFArrayRef,
     base::{CFAllocatorRef, CFTypeRef},
+    error::CFErrorRef,
     string::CFStringRef,
+    url::CFURLRef,
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use core_services::{
+    LSSharedFileListItemRef, LSSharedFileListRef, LSSharedFileListResolutionFlags,
+};
 
 /// Trait for interacting with MacOS APIs.
 /// This allows us to mock the MacOS API for testing.
@@ -49,4 +53,19 @@ pub trait MacOsApi {
         &self,
         item: LSSharedFileListItemRef,
     ) -> CFStringRef;
+
+    /// Gets the resolved URL for a shared file list item.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because:
+    /// - It interacts with raw C pointers through Core Foundation API
+    /// - The caller must ensure the item reference is valid
+    /// - The returned URL reference must be properly released
+    unsafe fn ls_shared_file_list_item_copy_resolved_url(
+        &self,
+        item: LSSharedFileListItemRef,
+        flags: LSSharedFileListResolutionFlags,
+        error: *mut CFErrorRef,
+    ) -> CFURLRef;
 }

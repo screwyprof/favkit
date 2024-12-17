@@ -1,9 +1,13 @@
 use core_foundation::{
     array::CFArrayRef,
     base::{CFAllocatorRef, CFTypeRef},
+    error::CFErrorRef,
     string::CFStringRef,
+    url::CFURLRef,
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use core_services::{
+    LSSharedFileListItemRef, LSSharedFileListRef, LSSharedFileListResolutionFlags,
+};
 
 use crate::system::api::MacOsApi;
 
@@ -39,5 +43,14 @@ impl MacOsApi for RealMacOsApi {
         item: LSSharedFileListItemRef,
     ) -> CFStringRef {
         unsafe { core_services::LSSharedFileListItemCopyDisplayName(item) }
+    }
+
+    unsafe fn ls_shared_file_list_item_copy_resolved_url(
+        &self,
+        item: LSSharedFileListItemRef,
+        flags: LSSharedFileListResolutionFlags,
+        error: *mut CFErrorRef,
+    ) -> CFURLRef {
+        unsafe { core_services::LSSharedFileListItemCopyResolvedURL(item, flags, error) }
     }
 }

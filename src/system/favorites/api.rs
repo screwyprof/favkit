@@ -1,9 +1,11 @@
 use core_foundation::base::kCFAllocatorDefault;
-use core_services::{LSSharedFileListItemRef, kLSSharedFileListFavoriteItems};
+use core_services::{
+    LSSharedFileListItemRef, LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems,
+};
 
 use crate::{
     favorites::FavoritesApi,
-    finder::{FinderError, Result, SidebarItem},
+    finder::{FinderError, Result, SidebarItem, Target},
     system::api::MacOsApi,
 };
 
@@ -11,6 +13,7 @@ use super::{
     display_name::{DisplayName, RawDisplayName},
     handle::{FavoritesHandle, RawFavoritesHandle},
     snapshot::{RawSnapshot, Snapshot},
+    url::{RawUrl, Url},
 };
 
 pub struct Favorites<'a> {
@@ -51,6 +54,19 @@ impl<'a> Favorites<'a> {
             Option::<DisplayName>::from(RawDisplayName::from(name_ref)).map(String::from)
         }
     }
+
+    unsafe fn copy_resolved_url(&self, item: LSSharedFileListItemRef) -> Result<String> {
+        unsafe {
+            let url_ref = self.api.ls_shared_file_list_item_copy_resolved_url(
+                item,
+                LSSharedFileListResolutionFlags::default(),
+                std::ptr::null_mut(),
+            );
+            Option::<Url>::from(RawUrl::from(url_ref))
+                .map(String::from)
+                .ok_or(FinderError::NullUrlHandle)
+        }
+    }
 }
 
 impl FavoritesApi for Favorites<'_> {
@@ -62,10 +78,12 @@ impl FavoritesApi for Favorites<'_> {
             let items = snapshot
                 .into_iter()
                 .map(|item| {
-                    let display_name = self.copy_display_name(item.into());
-                    SidebarItem::new(display_name)
+                    let item_ref = item.into();
+                    let display_name = self.copy_display_name(item_ref);
+                    let target = Target(self.copy_resolved_url(item_ref)?);
+                    Ok(SidebarItem::new(display_name, target))
                 })
-                .collect();
+                .collect::<Result<Vec<_>>>()?;
 
             Ok(items)
         }

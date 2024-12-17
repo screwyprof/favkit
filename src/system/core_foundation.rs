@@ -1,7 +1,11 @@
-use core_foundation::array::{CFArray, CFArrayRef};
+use core_foundation::{
+    array::{CFArray, CFArrayRef},
+    string::{CFString, CFStringRef},
+    url::{CFURL, CFURLRef},
+};
 use core_services::{
-    CFString, CFStringRef, LSSharedFileListItemRef, LSSharedFileListRef,
-    OpaqueLSSharedFileListItemRef, OpaqueLSSharedFileListRef, TCFType,
+    LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListItemRef,
+    OpaqueLSSharedFileListRef, TCFType,
 };
 
 pub(crate) struct Raw<T>(pub(crate) T);
@@ -43,9 +47,16 @@ impl<T> From<Raw<CFArrayRef>> for Option<Safe<CFArray<T>>> {
     }
 }
 
+impl From<Raw<CFURLRef>> for Option<Safe<CFURL>> {
+    fn from(raw: Raw<CFURLRef>) -> Self {
+        (!raw.0.is_null()).then(|| unsafe { Safe(CFURL::wrap_under_get_rule(raw.0)) })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core_foundation::url::kCFURLPOSIXPathStyle;
 
     type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -121,6 +132,25 @@ mod tests {
         let wrapped = Option::<Safe<CFArray<LSSharedFileListItemRef>>>::from(raw)
             .ok_or("Failed to create Safe<CFArray>")?;
         assert_eq!(wrapped.0.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn should_return_none_for_null_url() -> Result<()> {
+        let ptr: CFURLRef = std::ptr::null_mut();
+        let raw = Raw::from(ptr);
+        assert!(Option::<Safe<CFURL>>::from(raw).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn should_wrap_valid_url() -> Result<()> {
+        let path = CFString::new("/test");
+        let url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
+        let ptr = url.as_concrete_TypeRef();
+        let raw = Raw::from(ptr);
+        let wrapped = Option::<Safe<CFURL>>::from(raw).ok_or("Failed to create Safe<CFURL>")?;
+        assert_eq!(wrapped.0.get_string().to_string(), "file:///test/");
         Ok(())
     }
 }

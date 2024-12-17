@@ -5,7 +5,7 @@ mod sidebar;
 use crate::favorites::FavoritesApi;
 pub use display_name::DisplayName;
 pub use errors::{FinderError, Result};
-pub use sidebar::SidebarItem;
+pub use sidebar::{SidebarItem, Target};
 
 pub struct FinderApi<'a> {
     favorites: &'a dyn FavoritesApi,
