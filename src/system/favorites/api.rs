@@ -9,12 +9,7 @@ use crate::{
     system::api::MacOsApi,
 };
 
-use super::{
-    display_name::{DisplayName, RawDisplayName},
-    handle::{FavoritesHandle, RawFavoritesHandle},
-    snapshot::{RawSnapshot, Snapshot},
-    url::{RawUrl, Url},
-};
+use super::{display_name::DisplayName, handle::FavoritesHandle, snapshot::Snapshot, url::Url};
 
 pub struct Favorites<'a> {
     api: &'a dyn MacOsApi,
@@ -33,7 +28,7 @@ impl<'a> Favorites<'a> {
                 std::ptr::null(),
             );
 
-            Option::from(RawFavoritesHandle::from(list_ref)).ok_or(FinderError::NullListHandle)
+            FavoritesHandle::from_ref(list_ref).ok_or(FinderError::NullListHandle)
         }
     }
 
@@ -44,14 +39,14 @@ impl<'a> Favorites<'a> {
                 .api
                 .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
 
-            Option::from(RawSnapshot::from(array_ref)).ok_or(FinderError::NullSnapshotHandle)
+            Snapshot::from_ref(array_ref).ok_or(FinderError::NullSnapshotHandle)
         }
     }
 
     unsafe fn copy_display_name(&self, item: LSSharedFileListItemRef) -> Option<String> {
         unsafe {
             let name_ref = self.api.ls_shared_file_list_item_copy_display_name(item);
-            Option::<DisplayName>::from(RawDisplayName::from(name_ref)).map(String::from)
+            DisplayName::from_ref(name_ref).map(String::from)
         }
     }
 
@@ -62,7 +57,7 @@ impl<'a> Favorites<'a> {
                 LSSharedFileListResolutionFlags::default(),
                 std::ptr::null_mut(),
             );
-            Option::<Url>::from(RawUrl::from(url_ref))
+            Url::from_ref(url_ref)
                 .map(String::from)
                 .ok_or(FinderError::NullUrlHandle)
         }
