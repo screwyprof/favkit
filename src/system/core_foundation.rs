@@ -1,11 +1,24 @@
 use core_foundation::base::{TCFType, TCFTypeRef};
-
-// Generic reference-counted wrapper for Core Foundation types
-pub(crate) struct CFRef<T>(pub(crate) T);
-
 // Generic wrapper for raw pointer types
 #[derive(Clone, Copy)]
-pub(crate) struct RawRef<T>(pub(crate) *mut T);
+pub(crate) struct RawRef<T>(Option<*mut T>);
+
+// From raw pointer to RawRef
+impl<T> From<*mut T> for RawRef<T> {
+    fn from(ptr: *mut T) -> Self {
+        Self((!ptr.is_null()).then_some(ptr))
+    }
+}
+
+// From RawRef to raw pointer
+impl<T> From<RawRef<T>> for *mut T {
+    fn from(raw: RawRef<T>) -> Self {
+        raw.0.unwrap_or(std::ptr::null_mut())
+    }
+}
+
+// Generic wrapper for Core Foundation types
+pub(crate) struct CFRef<T>(pub(crate) T);
 
 // Core Foundation conversions
 impl<T: TCFType> CFRef<T> {
@@ -17,10 +30,9 @@ impl<T: TCFType> CFRef<T> {
     }
 }
 
-// Raw pointer conversions
-impl<T> RawRef<T> {
-    pub(crate) fn from_ref(raw: *mut T) -> Option<Self> {
-        (!raw.is_null()).then_some(Self(raw))
+impl<T: TCFType> From<T> for CFRef<T> {
+    fn from(value: T) -> Self {
+        Self(value)
     }
 }
 
@@ -44,10 +56,18 @@ mod tests {
     }
 
     #[test]
-    fn should_wrap_valid_string() -> Result<()> {
+    fn should_convert_valid_string_ref() -> Result<()> {
         let string = CFString::new("test");
         let ptr = string.as_concrete_TypeRef();
-        let wrapped: CFRef<CFString> = CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
+        let wrapped = CFRef::<CFString>::from_ref(ptr).ok_or("Failed to create CFRef")?;
+        assert_eq!(wrapped.0.to_string(), "test");
+        Ok(())
+    }
+
+    #[test]
+    fn should_convert_cfstring_to_cfref() -> Result<()> {
+        let string = CFString::new("test");
+        let wrapped: CFRef<CFString> = string.clone().into();
         assert_eq!(wrapped.0.to_string(), "test");
         Ok(())
     }
@@ -60,10 +80,10 @@ mod tests {
     }
 
     #[test]
-    fn should_wrap_valid_array() -> Result<()> {
+    fn should_convert_valid_array_ref() -> Result<()> {
         let array = CFArray::from_copyable(&[1, 2, 3]);
         let ptr = array.as_concrete_TypeRef();
-        let wrapped: CFRef<CFArray<i32>> = CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
+        let wrapped = CFRef::<CFArray<i32>>::from_ref(ptr).ok_or("Failed to create CFRef")?;
         assert_eq!(wrapped.0.len(), 3);
         Ok(())
     }
@@ -76,28 +96,22 @@ mod tests {
     }
 
     #[test]
-    fn should_wrap_valid_url() -> Result<()> {
+    fn should_convert_valid_url_ref() -> Result<()> {
         let path = CFString::new("/test");
         let url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let ptr = url.as_concrete_TypeRef();
-        let wrapped: CFRef<CFURL> = CFRef::from_ref(ptr).ok_or("Failed to create CFRef")?;
+        let wrapped = CFRef::<CFURL>::from_ref(ptr).ok_or("Failed to create CFRef")?;
         assert_eq!(wrapped.0.get_string().to_string(), "file:///test/");
         Ok(())
     }
 
     #[test]
-    fn should_return_none_for_null_raw_pointer() -> Result<()> {
-        let ptr: *mut i32 = std::ptr::null_mut();
-        assert!(RawRef::<i32>::from_ref(ptr).is_none());
-        Ok(())
-    }
-
-    #[test]
-    fn should_wrap_valid_raw_pointer() -> Result<()> {
+    fn should_convert_rawref_to_raw_pointer() -> Result<()> {
         let mut value = 42;
         let ptr = &mut value as *mut i32;
-        let wrapped = RawRef::<i32>::from_ref(ptr).ok_or("Failed to create RawRef")?;
-        assert_eq!(wrapped.0, ptr);
+        let wrapped = RawRef::from(ptr);
+        let unwrapped: *mut i32 = wrapped.into();
+        assert_eq!(unwrapped, ptr);
         Ok(())
     }
 }

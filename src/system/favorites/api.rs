@@ -23,13 +23,14 @@ impl<'a> Favorites<'a> {
 
     unsafe fn list_create(&self) -> Result<FavoritesHandle> {
         unsafe {
-            let list_ref = self.api.ls_shared_file_list_create(
+            let ptr = self.api.ls_shared_file_list_create(
                 kCFAllocatorDefault,
                 kLSSharedFileListFavoriteItems,
                 std::ptr::null(),
             );
-
-            FavoritesHandle::from_ref(list_ref).ok_or(FinderError::NullListHandle)
+            (!ptr.is_null())
+                .then_some(FavoritesHandle::from(ptr))
+                .ok_or(FinderError::NullListHandle)
         }
     }
 
@@ -38,7 +39,7 @@ impl<'a> Favorites<'a> {
         unsafe {
             let array_ref = self
                 .api
-                .ls_shared_file_list_copy_snapshot(list.0, &mut seed);
+                .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
 
             Snapshot::from_ref(array_ref).ok_or(FinderError::NullSnapshotHandle)
         }

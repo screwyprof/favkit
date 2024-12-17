@@ -1,33 +1,52 @@
-use core_foundation::{array::CFArray, base::CFRange};
-use core_services::OpaqueLSSharedFileListItemRef;
-
 use crate::system::core_foundation::CFRef;
-use crate::system::favorites::item::SnapshotItem;
+use core_foundation::{
+    array::{CFArray, CFArrayRef},
+    base::CFRange,
+};
+use core_services::LSSharedFileListItemRef;
 
-pub(crate) type Snapshot = CFRef<CFArray<SnapshotItem>>;
+use super::item::SnapshotItem;
+
+pub(crate) struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
 
 impl Snapshot {
+    pub(crate) fn from_ref(array_ref: CFArrayRef) -> Option<Self> {
+        CFRef::from_ref(array_ref).map(Self)
+    }
+
     fn len(&self) -> usize {
-        usize::try_from(self.0.len()).unwrap_or(0)
+        usize::try_from(self.0.0.len()).unwrap_or(0)
     }
 
     fn get_item(&self, index: usize) -> Option<SnapshotItem> {
-        let cf_index = index.try_into().unwrap_or(0);
+        let cf_index = isize::try_from(index).unwrap_or(0);
         let range = CFRange::init(cf_index, 1);
-        let mut values = CFArray::get_values(&self.0, range);
+        let mut values = CFArray::get_values(&self.0.0, range);
         values
             .pop()
-            .map(|ptr| ptr as *mut OpaqueLSSharedFileListItemRef)
-            .and_then(SnapshotItem::from_ref)
+            .map(|ptr| ptr as LSSharedFileListItemRef)
+            .map(SnapshotItem::from)
     }
 }
 
-pub(crate) struct SnapshotIter<'a> {
+impl<'a> IntoIterator for &'a Snapshot {
+    type Item = SnapshotItem;
+    type IntoIter = SnapshotIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SnapshotIterator {
+            snapshot: self,
+            index: 0,
+        }
+    }
+}
+
+pub(crate) struct SnapshotIterator<'a> {
     snapshot: &'a Snapshot,
     index: usize,
 }
 
-impl Iterator for SnapshotIter<'_> {
+impl Iterator for SnapshotIterator<'_> {
     type Item = SnapshotItem;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -43,18 +62,6 @@ impl Iterator for SnapshotIter<'_> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.snapshot.len().saturating_sub(self.index);
         (remaining, Some(remaining))
-    }
-}
-
-impl<'a> IntoIterator for &'a Snapshot {
-    type Item = SnapshotItem;
-    type IntoIter = SnapshotIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        SnapshotIter {
-            snapshot: self,
-            index: 0,
-        }
     }
 }
 
