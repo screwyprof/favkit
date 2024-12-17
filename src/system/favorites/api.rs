@@ -21,6 +21,23 @@ impl<'a> Favorites<'a> {
         Self { api }
     }
 
+    unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
+        unsafe {
+            let display_name = self.display_name(item);
+            let url = self.copy_resolved_url(item)?;
+            let target = Target(url.to_string());
+            Ok(SidebarItem::new(display_name, target))
+        }
+    }
+    unsafe fn display_name(&self, item: SnapshotItem) -> Option<String> {
+        unsafe {
+            self.copy_display_name(item)
+                .ok()
+                .map(|name| name.to_string())
+                .filter(|name| !name.is_empty())
+        }
+    }
+
     unsafe fn list_create(&self) -> Result<FavoritesHandle> {
         unsafe {
             let ptr = self.api.ls_shared_file_list_create(
@@ -80,21 +97,10 @@ impl FavoritesApi for Favorites<'_> {
             let list = self.list_create()?;
             let snapshot = self.copy_snapshot(list)?;
 
-            let items = snapshot
+            snapshot
                 .into_iter()
-                .map(|item| {
-                    let display_name = self
-                        .copy_display_name(item)
-                        .ok()
-                        .map(|name| name.to_string())
-                        .filter(|name| !name.is_empty());
-                    let url = self.copy_resolved_url(item)?;
-                    let target = Target(url.to_string());
-                    Ok(SidebarItem::new(display_name, target))
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            Ok(items)
+                .map(|item| self.convert_item(item))
+                .collect::<Result<Vec<_>>>()
         }
     }
 }
