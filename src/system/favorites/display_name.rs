@@ -7,7 +7,10 @@ pub(crate) type DisplayName = CFRef<CFString>;
 
 impl fmt::Display for DisplayName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        match self.as_ref() {
+            Some(s) => write!(f, "{}", s),
+            None => write!(f, "<none>"),
+        }
     }
 }
 
@@ -24,7 +27,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_string() -> Result<()> {
         let string_ref: CFStringRef = std::ptr::null_mut();
-        assert!(DisplayName::from_ref(string_ref).is_none());
+        assert!(DisplayName::from_ref(string_ref).as_ref().is_none());
         Ok(())
     }
 
@@ -32,8 +35,8 @@ mod tests {
     fn should_format_display_name_using_display_trait() -> Result<()> {
         let valid = CFString::new("Documents");
         let string_ref = valid.as_concrete_TypeRef();
-        let display_name =
-            DisplayName::from_ref(string_ref).ok_or("Failed to create DisplayName")?;
+        let display_name = DisplayName::from_ref(string_ref);
+        assert!(display_name.as_ref().is_some());
         assert_eq!(format!("{}", display_name), "Documents");
         Ok(())
     }

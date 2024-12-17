@@ -41,7 +41,9 @@ impl<'a> Favorites<'a> {
                 .api
                 .ls_shared_file_list_copy_snapshot(list.into(), &mut seed);
 
-            Snapshot::from_ref(array_ref).ok_or(FinderError::NullSnapshotHandle)
+            (!array_ref.is_null())
+                .then(|| Snapshot::from(array_ref))
+                .ok_or(FinderError::NullSnapshotHandle)
         }
     }
 
@@ -50,7 +52,10 @@ impl<'a> Favorites<'a> {
             let name_ref = self
                 .api
                 .ls_shared_file_list_item_copy_display_name(item.into());
-            DisplayName::from_ref(name_ref).ok_or(FinderError::NullDisplayNameHandle)
+
+            (!name_ref.is_null())
+                .then(|| DisplayName::from_ref(name_ref))
+                .ok_or(FinderError::NullDisplayNameHandle)
         }
     }
 
@@ -61,7 +66,10 @@ impl<'a> Favorites<'a> {
                 LSSharedFileListResolutionFlags::default(),
                 std::ptr::null_mut(),
             );
-            Url::from_ref(url_ref).ok_or(FinderError::NullUrlHandle)
+
+            (!url_ref.is_null())
+                .then(|| Url::from_ref(url_ref))
+                .ok_or(FinderError::NullUrlHandle)
         }
     }
 }

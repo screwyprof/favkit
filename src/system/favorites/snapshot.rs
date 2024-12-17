@@ -9,23 +9,30 @@ use super::item::SnapshotItem;
 
 pub(crate) struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
 
-impl Snapshot {
-    pub(crate) fn from_ref(array_ref: CFArrayRef) -> Option<Self> {
-        CFRef::from_ref(array_ref).map(Self)
+impl From<CFArrayRef> for Snapshot {
+    fn from(array_ref: CFArrayRef) -> Self {
+        Self(CFRef::from_ref(array_ref))
     }
+}
 
+impl Snapshot {
     fn len(&self) -> usize {
-        usize::try_from(self.0.0.len()).unwrap_or(0)
+        self.0
+            .as_ref()
+            .map(|arr| usize::try_from(arr.len()).unwrap_or(0))
+            .unwrap_or(0)
     }
 
     fn get_item(&self, index: usize) -> Option<SnapshotItem> {
         let cf_index = isize::try_from(index).unwrap_or(0);
         let range = CFRange::init(cf_index, 1);
-        let mut values = CFArray::get_values(&self.0.0, range);
-        values
-            .pop()
-            .map(|ptr| ptr as LSSharedFileListItemRef)
-            .map(SnapshotItem::from)
+        self.0.as_ref().and_then(|arr| {
+            let mut values = CFArray::get_values(arr, range);
+            values
+                .pop()
+                .map(|ptr| ptr as LSSharedFileListItemRef)
+                .map(SnapshotItem::from)
+        })
     }
 }
 
@@ -76,7 +83,7 @@ mod tests {
     #[test]
     fn should_return_none_for_null_snapshot() -> Result<()> {
         let ptr: CFArrayRef = std::ptr::null();
-        assert!(Snapshot::from_ref(ptr).is_none());
+        assert_eq!(Snapshot::from(ptr).len(), 0);
         Ok(())
     }
 
@@ -85,7 +92,7 @@ mod tests {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
         let ptr = array.as_concrete_TypeRef();
-        let snapshot = Snapshot::from_ref(ptr).ok_or("Failed to create Snapshot")?;
+        let snapshot = Snapshot::from(ptr);
         assert_eq!(snapshot.len(), 1);
         Ok(())
     }
@@ -94,9 +101,8 @@ mod tests {
     fn iterator_should_return_none_when_exhausted() -> Result<()> {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
-        let snapshot =
-            Snapshot::from_ref(array.as_concrete_TypeRef()).ok_or("Failed to create Snapshot")?;
-        let mut iter = (&snapshot).into_iter();
+        let snapshot = Snapshot::from(array.as_concrete_TypeRef());
+        let mut iter = snapshot.into_iter();
         assert!(iter.next().is_some());
         assert!(iter.next().is_none());
         Ok(())
@@ -106,9 +112,8 @@ mod tests {
     fn iterator_should_report_correct_size_hint() -> Result<()> {
         let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
         let array = CFArray::from_copyable(&[item]);
-        let snapshot =
-            Snapshot::from_ref(array.as_concrete_TypeRef()).ok_or("Failed to create Snapshot")?;
-        let mut iter = (&snapshot).into_iter();
+        let snapshot = Snapshot::from(array.as_concrete_TypeRef());
+        let mut iter = snapshot.into_iter();
 
         assert_eq!(iter.size_hint(), (1, Some(1)));
         iter.next();
