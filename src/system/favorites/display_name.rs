@@ -11,12 +11,6 @@ impl fmt::Display for DisplayName {
     }
 }
 
-impl From<DisplayName> for String {
-    fn from(name: DisplayName) -> Self {
-        name.0.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38,7 +32,7 @@ mod tests {
         let string_ref = valid.as_concrete_TypeRef();
         let display_name =
             DisplayName::from_ref(string_ref).ok_or("Failed to create DisplayName")?;
-        assert_eq!(display_name.0.to_string(), "Documents");
+        assert_eq!(display_name.to_string(), "Documents");
         Ok(())
     }
 
