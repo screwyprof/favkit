@@ -1,3 +1,4 @@
+use core_foundation::array::{CFArray, CFArrayRef};
 use core_services::{
     CFString, CFStringRef, LSSharedFileListItemRef, LSSharedFileListRef,
     OpaqueLSSharedFileListItemRef, OpaqueLSSharedFileListRef, TCFType,
@@ -33,6 +34,12 @@ impl From<Raw<*mut OpaqueLSSharedFileListRef>> for Option<Safe<LSSharedFileListR
 impl From<Raw<*mut OpaqueLSSharedFileListItemRef>> for Option<Safe<LSSharedFileListItemRef>> {
     fn from(raw: Raw<*mut OpaqueLSSharedFileListItemRef>) -> Self {
         (!raw.0.is_null()).then_some(Safe(raw.0))
+    }
+}
+
+impl<T> From<Raw<CFArrayRef>> for Option<Safe<CFArray<T>>> {
+    fn from(raw: Raw<CFArrayRef>) -> Self {
+        (!raw.0.is_null()).then(|| unsafe { Safe(CFArray::wrap_under_get_rule(raw.0)) })
     }
 }
 
@@ -94,6 +101,26 @@ mod tests {
         let wrapped = Option::<Safe<LSSharedFileListItemRef>>::from(raw)
             .ok_or("Failed to create Safe<LSSharedFileListItemRef>")?;
         assert_eq!(wrapped.0, item_ref);
+        Ok(())
+    }
+
+    #[test]
+    fn should_return_none_for_null_array() -> Result<()> {
+        let ptr: CFArrayRef = std::ptr::null();
+        let raw = Raw::from(ptr);
+        assert!(Option::<Safe<CFArray<LSSharedFileListItemRef>>>::from(raw).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn should_wrap_valid_array() -> Result<()> {
+        let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
+        let array = CFArray::from_copyable(&[item]);
+        let ptr = array.as_concrete_TypeRef();
+        let raw = Raw::from(ptr);
+        let wrapped = Option::<Safe<CFArray<LSSharedFileListItemRef>>>::from(raw)
+            .ok_or("Failed to create Safe<CFArray>")?;
+        assert_eq!(wrapped.0.len(), 1);
         Ok(())
     }
 }
