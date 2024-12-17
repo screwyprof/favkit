@@ -20,12 +20,7 @@ pub(crate) struct Safe<T>(pub(crate) T);
 
 impl From<Raw<CFStringRef>> for Option<Safe<CFString>> {
     fn from(raw: Raw<CFStringRef>) -> Self {
-        if raw.0.is_null() {
-            None
-        } else {
-            // SAFETY: We've checked that the pointer is not null
-            Some(Safe(unsafe { CFString::wrap_under_get_rule(raw.0) }))
-        }
+        (!raw.0.is_null()).then(|| unsafe { Safe(CFString::wrap_under_get_rule(raw.0)) })
     }
 }
 

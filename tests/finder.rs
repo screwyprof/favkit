@@ -250,3 +250,41 @@ fn should_include_favorite_with_null_display_name() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn should_handle_airdrop_item() -> Result<()> {
+    // Create a mock item (using a non-null pointer)
+    let item: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
+    let items = vec![item];
+
+    // Create a URL for AirDrop
+    let url = "nwnode://domain-AirDrop";
+    let cf_path = CFString::new(url);
+    let cf_url = CFURL::from_file_system_path(cf_path, kCFURLPOSIXPathStyle, false);
+
+    // Create an empty display name (this is what macOS returns for AirDrop)
+    let empty_name = CFString::new("");
+
+    let mock_api = MockMacOsApi::new()
+        .with_items(items)
+        .with_list_create(|| 1 as LSSharedFileListRef)
+        .with_display_name(move |_| empty_name.as_concrete_TypeRef())
+        .with_resolved_url(move |_| cf_url.as_concrete_TypeRef());
+
+    let favorites = Favorites::new(&mock_api);
+    let finder = FinderApi::new(&favorites);
+
+    let favorites = finder.get_favorites_list()?;
+    assert_eq!(favorites, vec![SidebarItem::new(
+        None,
+        Target("nwnode://domain-AirDrop".to_string())
+    ),]);
+
+    // Also verify the string representation
+    assert_eq!(
+        format!("{}", favorites[0]),
+        "<no name> -> nwnode://domain-AirDrop"
+    );
+
+    Ok(())
+}

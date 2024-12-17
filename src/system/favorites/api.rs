@@ -79,7 +79,9 @@ impl FavoritesApi for Favorites<'_> {
                 .into_iter()
                 .map(|item| {
                     let item_ref = item.into();
-                    let display_name = self.copy_display_name(item_ref);
+                    let display_name = self
+                        .copy_display_name(item_ref)
+                        .filter(|name| !name.is_empty());
                     let target = Target(self.copy_resolved_url(item_ref)?);
                     Ok(SidebarItem::new(display_name, target))
                 })
