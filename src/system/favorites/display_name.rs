@@ -1,13 +1,20 @@
 use core_services::{CFString, CFStringRef};
+use std::fmt;
 
 use crate::system::core_foundation::{Raw, Safe};
 
 pub(crate) type RawDisplayName = Raw<CFStringRef>;
 pub(crate) type DisplayName = Safe<CFString>;
 
+impl fmt::Display for DisplayName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl From<DisplayName> for String {
     fn from(name: DisplayName) -> Self {
-        name.0.to_string()
+        name.to_string()
     }
 }
 
@@ -28,6 +35,14 @@ mod tests {
         let valid = CFString::new("Documents");
         let string_ref = valid.as_concrete_TypeRef();
         let display_name = Option::<DisplayName>::from(Raw::from(string_ref)).unwrap();
-        assert_eq!(String::from(display_name), "Documents");
+        assert_eq!(display_name.to_string(), "Documents");
+    }
+
+    #[test]
+    fn should_format_display_name_using_display_trait() {
+        let valid = CFString::new("Documents");
+        let string_ref = valid.as_concrete_TypeRef();
+        let display_name = Option::<DisplayName>::from(Raw::from(string_ref)).unwrap();
+        assert_eq!(format!("{}", display_name), "Documents");
     }
 }
