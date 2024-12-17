@@ -44,12 +44,12 @@ impl<'a> Favorites<'a> {
         }
     }
 
-    unsafe fn copy_display_name(&self, item: SnapshotItem) -> Option<DisplayName> {
+    unsafe fn copy_display_name(&self, item: SnapshotItem) -> Result<DisplayName> {
         unsafe {
             let name_ref = self
                 .api
                 .ls_shared_file_list_item_copy_display_name(item.into());
-            DisplayName::from_ref(name_ref)
+            DisplayName::from_ref(name_ref).ok_or(FinderError::NullDisplayNameHandle)
         }
     }
 
@@ -76,6 +76,7 @@ impl FavoritesApi for Favorites<'_> {
                 .map(|item| {
                     let display_name = self
                         .copy_display_name(item)
+                        .ok()
                         .map(|name| name.to_string())
                         .filter(|name| !name.is_empty());
                     let url = self.copy_resolved_url(item)?;

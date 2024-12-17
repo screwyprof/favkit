@@ -8,6 +8,8 @@ pub enum FinderError {
     NullSnapshotHandle,
     #[error("failed to resolve URL: null handle")]
     NullUrlHandle,
+    #[error("failed to get display name: null handle")]
+    NullDisplayNameHandle,
 }
 
 pub type Result<T> = std::result::Result<T, FinderError>;

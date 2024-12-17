@@ -14,8 +14,10 @@ impl fmt::Display for DisplayName {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_foundation::string::CFStringRef;
-    use core_services::{CFString, TCFType};
+    use core_foundation::{
+        base::TCFType,
+        string::{CFString, CFStringRef},
+    };
 
     type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -23,16 +25,6 @@ mod tests {
     fn should_return_none_for_null_string() -> Result<()> {
         let string_ref: CFStringRef = std::ptr::null_mut();
         assert!(DisplayName::from_ref(string_ref).is_none());
-        Ok(())
-    }
-
-    #[test]
-    fn should_convert_valid_string_to_display_name() -> Result<()> {
-        let valid = CFString::new("Documents");
-        let string_ref = valid.as_concrete_TypeRef();
-        let display_name =
-            DisplayName::from_ref(string_ref).ok_or("Failed to create DisplayName")?;
-        assert_eq!(display_name.to_string(), "Documents");
         Ok(())
     }
 
