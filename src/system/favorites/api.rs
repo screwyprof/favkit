@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     display_name::{DisplayName, RawDisplayName},
-    list::{FavoritesList, RawFavoritesList},
+    handle::{FavoritesHandle, RawFavoritesHandle},
     snapshot::{RawSnapshot, Snapshot},
 };
 
@@ -22,7 +22,7 @@ impl<'a> Favorites<'a> {
         Self { api }
     }
 
-    unsafe fn list_create(&self) -> Result<FavoritesList> {
+    unsafe fn list_create(&self) -> Result<FavoritesHandle> {
         unsafe {
             let list_ref = self.api.ls_shared_file_list_create(
                 kCFAllocatorDefault,
@@ -30,11 +30,11 @@ impl<'a> Favorites<'a> {
                 std::ptr::null(),
             );
 
-            Option::from(RawFavoritesList::from(list_ref)).ok_or(FinderError::NullListHandle)
+            Option::from(RawFavoritesHandle::from(list_ref)).ok_or(FinderError::NullListHandle)
         }
     }
 
-    unsafe fn copy_snapshot(&self, list: FavoritesList) -> Result<Snapshot> {
+    unsafe fn copy_snapshot(&self, list: FavoritesHandle) -> Result<Snapshot> {
         let mut seed: u32 = 0;
         unsafe {
             let array_ref = self

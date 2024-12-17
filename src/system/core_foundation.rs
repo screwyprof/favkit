@@ -1,5 +1,6 @@
 use core_services::{
-    CFString, CFStringRef, LSSharedFileListRef, OpaqueLSSharedFileListRef, TCFType,
+    CFString, CFStringRef, LSSharedFileListItemRef, LSSharedFileListRef,
+    OpaqueLSSharedFileListItemRef, OpaqueLSSharedFileListRef, TCFType,
 };
 
 pub(crate) struct Raw<T>(pub(crate) T);
@@ -25,6 +26,12 @@ impl From<Raw<CFStringRef>> for Option<Safe<CFString>> {
 
 impl From<Raw<*mut OpaqueLSSharedFileListRef>> for Option<Safe<LSSharedFileListRef>> {
     fn from(raw: Raw<*mut OpaqueLSSharedFileListRef>) -> Self {
+        (!raw.0.is_null()).then_some(Safe(raw.0))
+    }
+}
+
+impl From<Raw<*mut OpaqueLSSharedFileListItemRef>> for Option<Safe<LSSharedFileListItemRef>> {
+    fn from(raw: Raw<*mut OpaqueLSSharedFileListItemRef>) -> Self {
         (!raw.0.is_null()).then_some(Safe(raw.0))
     }
 }
@@ -69,6 +76,24 @@ mod tests {
         let wrapped = Option::<Safe<LSSharedFileListRef>>::from(raw)
             .ok_or("Failed to create Safe<LSSharedFileListRef>")?;
         assert_eq!(wrapped.0, list_ref);
+        Ok(())
+    }
+
+    #[test]
+    fn should_return_none_for_null_item() -> Result<()> {
+        let ptr = std::ptr::null_mut();
+        let raw = Raw::from(ptr);
+        assert!(Option::<Safe<LSSharedFileListItemRef>>::from(raw).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn should_wrap_valid_item() -> Result<()> {
+        let item_ref = 1 as *mut OpaqueLSSharedFileListItemRef;
+        let raw = Raw::from(item_ref);
+        let wrapped = Option::<Safe<LSSharedFileListItemRef>>::from(raw)
+            .ok_or("Failed to create Safe<LSSharedFileListItemRef>")?;
+        assert_eq!(wrapped.0, item_ref);
         Ok(())
     }
 }
