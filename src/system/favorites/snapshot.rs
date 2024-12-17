@@ -1,10 +1,10 @@
 use core_foundation::{array::CFArray, base::CFRange};
-use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
+use core_services::OpaqueLSSharedFileListItemRef;
 
 use crate::system::core_foundation::CFRef;
 use crate::system::favorites::item::SnapshotItem;
 
-pub(crate) type Snapshot = CFRef<CFArray<LSSharedFileListItemRef>>;
+pub(crate) type Snapshot = CFRef<CFArray<SnapshotItem>>;
 
 impl Snapshot {
     fn len(&self) -> usize {
@@ -62,6 +62,7 @@ impl<'a> IntoIterator for &'a Snapshot {
 mod tests {
     use super::*;
     use core_foundation::{array::CFArrayRef, base::TCFType};
+    use core_services::LSSharedFileListItemRef;
 
     type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
