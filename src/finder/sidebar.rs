@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::DisplayName;
 
 #[derive(Debug, PartialEq)]
@@ -18,6 +20,15 @@ impl SidebarItem {
     }
 }
 
+impl fmt::Display for SidebarItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.display_name {
+            Some(name) => write!(f, "{} -> {}", name, self.target.0),
+            None => write!(f, "<no name> -> {}", self.target.0),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28,14 +39,15 @@ mod tests {
             Some("Documents".to_string()),
             Target("file:///Users/user/Documents".to_string()),
         );
-        assert_eq!(item.display_name, Some("Documents".to_string()));
-        assert_eq!(item.target.0, "file:///Users/user/Documents".to_string());
+        assert_eq!(
+            format!("{}", item),
+            "Documents -> file:///Users/user/Documents"
+        );
     }
 
     #[test]
     fn should_create_sidebar_item_with_null_display_name() {
-        let item = SidebarItem::new(None, Target("file:///Users/user/Documents".to_string()));
-        assert_eq!(item.display_name, None);
-        assert_eq!(item.target.0, "file:///Users/user/Documents".to_string());
+        let item = SidebarItem::new(None, Target("nwnode://domain-AirDrop".to_string()));
+        assert_eq!(format!("{}", item), "<no name> -> nwnode://domain-AirDrop");
     }
 }
