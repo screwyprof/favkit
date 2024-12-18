@@ -1,18 +1,17 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use favkit::finder::FinderApi;
+use favkit::Finder;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() {
-    let finder = FinderApi::default();
+    let finder = Finder::default();
 
     match finder.get_favorites_list() {
         Ok(items) => {
-            println!("Found {} favorites:", items.len());
             for item in items {
-                println!("  {}", item);
+                println!("{}", item);
             }
         }
-        Err(e) => eprintln!("Error: {}", e),
+        Err(err) => eprintln!("Error: {}", err),
     }
 }

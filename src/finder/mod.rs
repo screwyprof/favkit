@@ -11,12 +11,12 @@ pub use sidebar::{SidebarItem, Target};
 use crate::system::{RealMacOsApi, api::MacOsApi, favorites::Favorites};
 use favorites::FavoritesApi;
 
-pub struct FinderApi {
+pub struct Finder {
     favorites: Favorites,
 }
 
-impl FinderApi {
-    /// Creates a new FinderApi with the provided MacOS API implementation.
+impl Finder {
+    /// Creates a new Finder with the provided MacOS API implementation.
     pub fn new(api: impl MacOsApi + 'static) -> Self {
         Self {
             favorites: Favorites::new(api),
@@ -28,7 +28,7 @@ impl FinderApi {
     }
 }
 
-impl Default for FinderApi {
+impl Default for Finder {
     fn default() -> Self {
         Self::new(RealMacOsApi::new())
     }

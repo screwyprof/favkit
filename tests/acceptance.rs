@@ -1,12 +1,12 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use coverage_helper::test;
-use favkit::FinderApi;
+use favkit::Finder;
 
 #[test]
 fn should_get_favorites_list() {
     // Given I have Finder with MacOS API
-    let finder = FinderApi::default();
+    let finder = Finder::default();
 
     // When I list favorites
     let result = finder.get_favorites_list();
