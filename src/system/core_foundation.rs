@@ -1,10 +1,14 @@
-use crate::finder::FinderError;
-use core_foundation::{
-    base::{TCFType, TCFTypeRef},
-    string::CFString,
-    url::CFURL,
-};
+use core_foundation::base::{TCFType, TCFTypeRef};
 use std::{fmt, ops::Deref, ptr::NonNull};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("null pointer encountered")]
+    NullPointer,
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 // RawRef for C-style raw pointers
 #[derive(Clone, Copy)]
@@ -23,17 +27,18 @@ impl<T> From<RawRef<T>> for *mut T {
 }
 
 // CFRef for Core Foundation types
+#[derive(Debug)]
 pub(crate) struct CFRef<T: TCFType>(T);
 
 impl<T: TCFType> CFRef<T> {
-    pub(crate) fn try_from_ref(raw: T::Ref) -> Result<Self, FinderError>
+    pub(crate) fn try_from_ref(raw: T::Ref) -> Result<Self>
     where
         T::Ref: TCFTypeRef,
     {
         (!raw.as_void_ptr().is_null())
             .then(|| unsafe { T::wrap_under_get_rule(raw) })
             .map(Self)
-            .ok_or(FinderError::NullListHandle)
+            .ok_or(Error::NullPointer)
     }
 }
 
@@ -46,13 +51,13 @@ impl<T: TCFType> Deref for CFRef<T> {
 }
 
 // Display implementations for specific Core Foundation types
-impl fmt::Display for CFRef<CFString> {
+impl fmt::Display for CFRef<core_foundation::string::CFString> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl fmt::Display for CFRef<CFURL> {
+impl fmt::Display for CFRef<core_foundation::url::CFURL> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.get_string())
     }
@@ -67,12 +72,14 @@ mod tests {
     };
 
     use super::*;
-    use crate::finder::Result;
 
     #[test]
     fn should_return_error_for_null_string() {
         let ptr: CFStringRef = std::ptr::null_mut();
-        assert!(CFRef::<CFString>::try_from_ref(ptr).is_err());
+        assert!(matches!(
+            CFRef::<CFString>::try_from_ref(ptr).unwrap_err(),
+            Error::NullPointer
+        ));
     }
 
     #[test]
@@ -87,7 +94,10 @@ mod tests {
     #[test]
     fn should_return_error_for_null_array() {
         let ptr: CFArrayRef = std::ptr::null();
-        assert!(CFRef::<CFArray<i32>>::try_from_ref(ptr).is_err());
+        assert!(matches!(
+            CFRef::<CFArray<i32>>::try_from_ref(ptr).unwrap_err(),
+            Error::NullPointer
+        ));
     }
 
     #[test]
@@ -102,7 +112,10 @@ mod tests {
     #[test]
     fn should_return_error_for_null_url() {
         let ptr: CFURLRef = std::ptr::null_mut();
-        assert!(CFRef::<CFURL>::try_from_ref(ptr).is_err());
+        assert!(matches!(
+            CFRef::<CFURL>::try_from_ref(ptr).unwrap_err(),
+            Error::NullPointer
+        ));
     }
 
     #[test]
@@ -111,7 +124,7 @@ mod tests {
         let url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
         let ptr = url.as_concrete_TypeRef();
         let wrapped = CFRef::<CFURL>::try_from_ref(ptr)?;
-        assert_eq!(wrapped.get_string().to_string(), "file:///test/");
+        assert_eq!(wrapped.to_string(), "file:///test/");
         Ok(())
     }
 

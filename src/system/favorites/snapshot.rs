@@ -6,9 +6,9 @@ use core_foundation::{
 };
 use core_services::LSSharedFileListItemRef;
 
-use crate::{
-    finder::{FinderError, Result},
-    system::core_foundation::CFRef,
+use crate::system::{
+    core_foundation::CFRef,
+    favorites::errors::{FavoritesError, Result},
 };
 
 use super::snapshot_item::SnapshotItem;
@@ -16,12 +16,12 @@ use super::snapshot_item::SnapshotItem;
 pub(crate) struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
 
 impl TryFrom<CFArrayRef> for Snapshot {
-    type Error = FinderError;
+    type Error = FavoritesError;
 
     fn try_from(array_ref: CFArrayRef) -> Result<Self> {
-        (!array_ref.is_null())
-            .then(|| CFRef::try_from_ref(array_ref).map(Self))
-            .ok_or(FinderError::NullSnapshotHandle)?
+        CFRef::try_from_ref(array_ref)
+            .map(Self)
+            .map_err(|_| FavoritesError::NullSnapshotHandle)
     }
 }
 

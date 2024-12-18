@@ -1,19 +1,17 @@
 use core_foundation::url::{CFURL, CFURLRef};
 
-use crate::{
-    finder::{FinderError, Result},
-    system::core_foundation::CFRef,
+use crate::system::{
+    core_foundation::CFRef,
+    favorites::errors::{FavoritesError, Result},
 };
 
 pub(crate) type Url = CFRef<CFURL>;
 
 impl TryFrom<CFURLRef> for Url {
-    type Error = FinderError;
+    type Error = FavoritesError;
 
     fn try_from(url_ref: CFURLRef) -> Result<Self> {
-        (!url_ref.is_null())
-            .then(|| CFRef::try_from_ref(url_ref))
-            .ok_or(FinderError::NullUrlHandle)?
+        CFRef::try_from_ref(url_ref).map_err(|_| FavoritesError::NullUrlHandle)
     }
 }
 

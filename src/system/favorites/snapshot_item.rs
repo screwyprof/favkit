@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
-use crate::{
-    finder::{FinderError, Result},
-    system::core_foundation::RawRef,
+use crate::system::{
+    core_foundation::RawRef,
+    favorites::errors::{FavoritesError, Result},
 };
 use core_services::OpaqueLSSharedFileListItemRef;
 
@@ -16,12 +16,12 @@ impl From<NonNull<OpaqueLSSharedFileListItemRef>> for SnapshotItem {
 }
 
 impl TryFrom<*mut OpaqueLSSharedFileListItemRef> for SnapshotItem {
-    type Error = FinderError;
+    type Error = FavoritesError;
 
     fn try_from(ptr: *mut OpaqueLSSharedFileListItemRef) -> Result<Self> {
         NonNull::new(ptr)
             .map(Self::from)
-            .ok_or(FinderError::NullListHandle)
+            .ok_or(FavoritesError::NullListHandle)
     }
 }
 

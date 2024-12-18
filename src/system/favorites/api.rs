@@ -29,7 +29,7 @@ impl<'a> Favorites<'a> {
                 std::ptr::null(),
             )
         };
-        FavoritesHandle::try_from(ptr)
+        Ok(FavoritesHandle::try_from(ptr)?)
     }
 
     unsafe fn copy_snapshot(&self, list: FavoritesHandle) -> Result<Snapshot> {
@@ -38,7 +38,7 @@ impl<'a> Favorites<'a> {
             self.api
                 .ls_shared_file_list_copy_snapshot(list.into(), &mut seed)
         };
-        Snapshot::try_from(array_ref)
+        Ok(Snapshot::try_from(array_ref)?)
     }
 
     unsafe fn copy_display_name(&self, item: SnapshotItem) -> Result<DisplayName> {
@@ -46,7 +46,7 @@ impl<'a> Favorites<'a> {
             self.api
                 .ls_shared_file_list_item_copy_display_name(item.into())
         };
-        DisplayName::try_from(name_ref)
+        Ok(DisplayName::try_from(name_ref)?)
     }
 
     unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<Url> {
@@ -57,7 +57,7 @@ impl<'a> Favorites<'a> {
                 std::ptr::null_mut(),
             )
         };
-        Url::try_from(url_ref)
+        Ok(Url::try_from(url_ref)?)
     }
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {

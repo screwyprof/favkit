@@ -1,19 +1,15 @@
 use core_foundation::string::{CFString, CFStringRef};
 
-use crate::{
-    finder::{FinderError, Result},
-    system::core_foundation::CFRef,
-};
+use crate::system::core_foundation::CFRef;
+use crate::system::favorites::errors::{FavoritesError, Result};
 
 pub(crate) type DisplayName = CFRef<CFString>;
 
 impl TryFrom<CFStringRef> for DisplayName {
-    type Error = FinderError;
+    type Error = FavoritesError;
 
     fn try_from(string_ref: CFStringRef) -> Result<Self> {
-        (!string_ref.is_null())
-            .then(|| CFRef::try_from_ref(string_ref))
-            .ok_or(FinderError::NullDisplayNameHandle)?
+        CFRef::try_from_ref(string_ref).map_err(|_| FavoritesError::NullDisplayNameHandle)
     }
 }
 

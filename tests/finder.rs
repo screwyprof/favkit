@@ -11,7 +11,7 @@ use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{
     Favorites, FinderApi,
     finder::{FinderError, Result, SidebarItem, Target},
-    system::api::MacOsApi,
+    system::{api::MacOsApi, favorites::errors::FavoritesError},
 };
 
 type ListCreateFn = Box<dyn Fn() -> LSSharedFileListRef>;
@@ -131,7 +131,10 @@ fn should_return_error_when_list_handle_is_null() -> Result<()> {
 
     let result = finder.get_favorites_list();
 
-    assert!(matches!(result, Err(FinderError::NullListHandle)));
+    assert!(matches!(
+        result,
+        Err(FinderError::AccessError(FavoritesError::NullListHandle))
+    ));
     Ok(())
 }
 
@@ -146,7 +149,10 @@ fn should_return_error_when_snapshot_handle_is_null() -> Result<()> {
 
     let result = finder.get_favorites_list();
 
-    assert!(matches!(result, Err(FinderError::NullSnapshotHandle)));
+    assert!(matches!(
+        result,
+        Err(FinderError::AccessError(FavoritesError::NullSnapshotHandle))
+    ));
     Ok(())
 }
 

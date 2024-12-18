@@ -1,20 +1,20 @@
 use std::ptr::NonNull;
 
-use crate::{
-    finder::{FinderError, Result},
-    system::core_foundation::RawRef,
+use crate::system::{
+    core_foundation::RawRef,
+    favorites::errors::{FavoritesError, Result},
 };
 use core_services::OpaqueLSSharedFileListRef;
 
 pub(crate) struct FavoritesHandle(RawRef<OpaqueLSSharedFileListRef>);
 
 impl TryFrom<*mut OpaqueLSSharedFileListRef> for FavoritesHandle {
-    type Error = FinderError;
+    type Error = FavoritesError;
 
     fn try_from(ptr: *mut OpaqueLSSharedFileListRef) -> Result<Self> {
         NonNull::new(ptr)
             .map(|ptr| Self(RawRef::new(ptr)))
-            .ok_or(FinderError::NullListHandle)
+            .ok_or(FavoritesError::NullListHandle)
     }
 }
 
