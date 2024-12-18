@@ -1,4 +1,4 @@
-use crate::system::favorites::errors::FavoritesError;
+use crate::system::favorites::FavoritesError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

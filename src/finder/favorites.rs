@@ -1,4 +1,4 @@
-use crate::finder::{Result, SidebarItem};
+use super::{Result, SidebarItem};
 
 /// Provides access to Finder favorites
 pub trait FavoritesApi {

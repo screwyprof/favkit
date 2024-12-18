@@ -9,9 +9,9 @@ use core_foundation::{
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{
-    Favorites, FinderApi,
+    FinderApi,
     finder::{FinderError, Result, SidebarItem, Target},
-    system::{api::MacOsApi, favorites::errors::FavoritesError},
+    system::{api::MacOsApi, favorites::FavoritesError},
 };
 
 type ListCreateFn = Box<dyn Fn() -> LSSharedFileListRef>;
@@ -125,9 +125,7 @@ impl MacOsApi for MockMacOsApi {
 #[test]
 fn should_return_error_when_list_handle_is_null() -> Result<()> {
     let mock_api = MockMacOsApi::new().with_list_create(std::ptr::null_mut);
-
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let result = finder.get_favorites_list();
 
@@ -144,8 +142,7 @@ fn should_return_error_when_snapshot_handle_is_null() -> Result<()> {
         .with_list_create(|| 1 as LSSharedFileListRef)
         .with_snapshot(|_| std::ptr::null_mut());
 
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let result = finder.get_favorites_list();
 
@@ -163,8 +160,7 @@ fn should_get_empty_list_when_no_favorites() -> Result<()> {
         .with_items(items)
         .with_list_create(|| 1 as LSSharedFileListRef);
 
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let favorites = finder.get_favorites_list()?;
     assert_eq!(favorites, Vec::<SidebarItem>::new());
@@ -193,8 +189,7 @@ fn should_get_favorite_with_display_name_and_url() -> Result<()> {
         .with_display_name(move |_| cf_string.as_concrete_TypeRef())
         .with_resolved_url(move |_| cf_url.as_concrete_TypeRef());
 
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let favorites = finder.get_favorites_list()?;
     assert_eq!(favorites, vec![SidebarItem::new(
@@ -242,8 +237,7 @@ fn should_include_favorite_with_null_display_name() -> Result<()> {
             }
         });
 
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let favorites = finder.get_favorites_list()?;
     assert_eq!(favorites, vec![
@@ -277,8 +271,7 @@ fn should_handle_airdrop_item() -> Result<()> {
         .with_display_name(move |_| empty_name.as_concrete_TypeRef())
         .with_resolved_url(move |_| cf_url.as_concrete_TypeRef());
 
-    let favorites = Favorites::new(&mock_api);
-    let finder = FinderApi::new(&favorites);
+    let finder = FinderApi::new(mock_api);
 
     let favorites = finder.get_favorites_list()?;
     assert_eq!(favorites, vec![SidebarItem::new(
