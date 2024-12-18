@@ -23,15 +23,23 @@
 //! Working with raw pointers using `RawRef`:
 //! ```
 //! use std::ptr::NonNull;
-//! # use favkit::system::core_foundation::RawRef;
+//! # use favkit::system::core_foundation::{RawRef, Error};
 //!
+//! // Creating from NonNull (when you know the pointer is valid)
 //! let mut value = 42;
 //! let ptr = NonNull::new(&mut value as *mut i32).unwrap();
 //! let raw = RawRef::new(ptr);
+//!
+//! // Creating from raw pointer (with null check)
+//! let ptr = &mut value as *mut i32;
+//! let raw = RawRef::try_from(ptr)?;
+//!
+//! // Converting back to raw pointer
 //! let back_ptr: *mut i32 = raw.into();
 //! unsafe {
 //!     assert_eq!(*back_ptr, 42);
 //! }
+//! # Ok::<(), Error>(())
 //! ```
 
 use core_foundation::base::{TCFType, TCFTypeRef};
@@ -58,15 +66,23 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// ```
 /// use std::ptr::NonNull;
-/// # use favkit::system::core_foundation::RawRef;
+/// # use favkit::system::core_foundation::{RawRef, Error};
 ///
+/// // Safe creation from NonNull
 /// let mut value = 42;
 /// let ptr = NonNull::new(&mut value as *mut i32).unwrap();
 /// let raw = RawRef::new(ptr);
+///
+/// // Fallible creation from raw pointer
+/// let ptr = &mut value as *mut i32;
+/// let raw = RawRef::try_from(ptr)?;
+///
+/// // Converting back to raw pointer
 /// let back_ptr: *mut i32 = raw.into();
 /// unsafe {
 ///     assert_eq!(*back_ptr, 42);
 /// }
+/// # Ok::<(), Error>(())
 /// ```
 #[derive(Clone, Copy)]
 pub struct RawRef<T>(NonNull<T>);
@@ -78,6 +94,44 @@ impl<T> RawRef<T> {
     }
 }
 
+/// Attempts to create a `RawRef` from a raw pointer.
+///
+/// Returns `Error::NullPointer` if the pointer is null.
+///
+/// # Examples
+///
+/// ```
+/// # use favkit::system::core_foundation::{RawRef, Error};
+/// let mut value = 42;
+/// let ptr = &mut value as *mut i32;
+/// let raw = RawRef::try_from(ptr)?;
+/// # Ok::<(), Error>(())
+/// ```
+impl<T> TryFrom<*mut T> for RawRef<T> {
+    type Error = Error;
+
+    fn try_from(ptr: *mut T) -> Result<Self> {
+        NonNull::new(ptr).map(Self::new).ok_or(Error::NullPointer)
+    }
+}
+
+/// Converts a `RawRef` back into a raw pointer.
+///
+/// The resulting pointer is guaranteed to be non-null.
+///
+/// # Examples
+///
+/// ```
+/// # use std::ptr::NonNull;
+/// # use favkit::system::core_foundation::RawRef;
+/// let mut value = 42;
+/// let ptr = NonNull::new(&mut value as *mut i32).unwrap();
+/// let raw = RawRef::new(ptr);
+/// let back_ptr: *mut i32 = raw.into();
+/// unsafe {
+///     assert_eq!(*back_ptr, 42);
+/// }
+/// ```
 impl<T> From<RawRef<T>> for *mut T {
     fn from(raw: RawRef<T>) -> Self {
         raw.0.as_ptr()

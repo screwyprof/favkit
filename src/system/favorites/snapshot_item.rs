@@ -19,9 +19,9 @@ impl TryFrom<*mut OpaqueLSSharedFileListItemRef> for SnapshotItem {
     type Error = FavoritesError;
 
     fn try_from(ptr: *mut OpaqueLSSharedFileListItemRef) -> Result<Self> {
-        NonNull::new(ptr)
-            .map(Self::from)
-            .ok_or(FavoritesError::NullListHandle)
+        RawRef::try_from(ptr)
+            .map(Self)
+            .map_err(|_| FavoritesError::NullListHandle)
     }
 }
 

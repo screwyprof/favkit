@@ -1,5 +1,3 @@
-use std::ptr::NonNull;
-
 use crate::system::{
     core_foundation::RawRef,
     favorites::errors::{FavoritesError, Result},
@@ -12,9 +10,9 @@ impl TryFrom<*mut OpaqueLSSharedFileListRef> for FavoritesHandle {
     type Error = FavoritesError;
 
     fn try_from(ptr: *mut OpaqueLSSharedFileListRef) -> Result<Self> {
-        NonNull::new(ptr)
-            .map(|ptr| Self(RawRef::new(ptr)))
-            .ok_or(FavoritesError::NullListHandle)
+        RawRef::try_from(ptr)
+            .map(Self)
+            .map_err(|_| FavoritesError::NullListHandle)
     }
 }
 
@@ -27,7 +25,7 @@ impl From<FavoritesHandle> for *mut OpaqueLSSharedFileListRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use std::ptr::NonNull;
     const FAVORITES_REF: *mut OpaqueLSSharedFileListRef = 42 as *mut _;
 
     #[test]
