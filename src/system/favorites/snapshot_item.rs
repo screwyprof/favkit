@@ -25,8 +25,8 @@ impl TryFrom<*mut OpaqueLSSharedFileListItemRef> for SnapshotItem {
     }
 }
 
-impl From<SnapshotItem> for *mut OpaqueLSSharedFileListItemRef {
-    fn from(item: SnapshotItem) -> Self {
+impl From<&SnapshotItem> for *mut OpaqueLSSharedFileListItemRef {
+    fn from(item: &SnapshotItem) -> Self {
         item.0.into()
     }
 }
@@ -66,7 +66,7 @@ mod tests {
         let snapshot_item = SnapshotItem::from(ptr);
 
         // Act
-        let unwrapped: *mut OpaqueLSSharedFileListItemRef = snapshot_item.into();
+        let unwrapped: *mut OpaqueLSSharedFileListItemRef = (&snapshot_item).into();
 
         // Assert
         assert_eq!(unwrapped, snapshot_item_ref);

@@ -41,7 +41,7 @@ impl<'a> Favorites<'a> {
         Ok(Snapshot::try_from(array_ref)?)
     }
 
-    unsafe fn copy_display_name(&self, item: SnapshotItem) -> Result<DisplayName> {
+    unsafe fn copy_display_name(&self, item: &SnapshotItem) -> Result<DisplayName> {
         let name_ref = unsafe {
             self.api
                 .ls_shared_file_list_item_copy_display_name(item.into())
@@ -49,7 +49,7 @@ impl<'a> Favorites<'a> {
         Ok(DisplayName::try_from(name_ref)?)
     }
 
-    unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<Url> {
+    unsafe fn copy_resolved_url(&self, item: &SnapshotItem) -> Result<Url> {
         let url_ref = unsafe {
             self.api.ls_shared_file_list_item_copy_resolved_url(
                 item.into(),
@@ -61,11 +61,11 @@ impl<'a> Favorites<'a> {
     }
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
-        let display_name = unsafe { self.copy_display_name(item.clone()) }
+        let display_name = unsafe { self.copy_display_name(&item) }
             .ok()
             .map(|name| name.to_string())
-            .filter(|name| !name.is_empty());
-        let url = unsafe { self.copy_resolved_url(item) }?;
+            .and_then(|name| (!name.is_empty()).then_some(name));
+        let url = unsafe { self.copy_resolved_url(&item) }?;
         let target = Target(url.to_string());
         Ok(SidebarItem::new(display_name, target))
     }
