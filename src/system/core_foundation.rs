@@ -1,21 +1,79 @@
+//! Core Foundation type wrappers and utilities.
+//!
+//! This module provides safe wrappers around Core Foundation types and raw pointers.
+//! It ensures proper memory management and null pointer handling.
+//!
+//! # Examples
+//!
+//! Working with Core Foundation types using `CFRef`:
+//! ```no_run
+//! use core_foundation::{
+//!     base::TCFType,
+//!     string::{CFString, CFStringRef}
+//! };
+//! # use favkit::system::core_foundation::{CFRef, Error};
+//!
+//! let cf_str = CFString::new("example");
+//! let ptr = cf_str.as_concrete_TypeRef();
+//! let wrapped = CFRef::<CFString>::try_from_ref(ptr)?;
+//! assert_eq!(wrapped.to_string(), "example");
+//! # Ok::<(), Error>(())
+//! ```
+//!
+//! Working with raw pointers using `RawRef`:
+//! ```
+//! use std::ptr::NonNull;
+//! # use favkit::system::core_foundation::RawRef;
+//!
+//! let mut value = 42;
+//! let ptr = NonNull::new(&mut value as *mut i32).unwrap();
+//! let raw = RawRef::new(ptr);
+//! let back_ptr: *mut i32 = raw.into();
+//! unsafe {
+//!     assert_eq!(*back_ptr, 42);
+//! }
+//! ```
+
 use core_foundation::base::{TCFType, TCFTypeRef};
 use std::{ops::Deref, ptr::NonNull};
 use thiserror::Error;
 
+/// Errors that can occur when working with Core Foundation types.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Returned when a null pointer is encountered where a valid pointer was expected.
     #[error("null pointer encountered")]
     NullPointer,
 }
 
+/// Specialized Result type for Core Foundation operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-// RawRef for C-style raw pointers
+/// A safe wrapper around non-null raw pointers.
+///
+/// This type guarantees that the pointer is non-null and properly aligned.
+/// It's primarily used for passing pointers to and from C APIs.
+///
+/// # Examples
+///
+/// ```
+/// use std::ptr::NonNull;
+/// # use favkit::system::core_foundation::RawRef;
+///
+/// let mut value = 42;
+/// let ptr = NonNull::new(&mut value as *mut i32).unwrap();
+/// let raw = RawRef::new(ptr);
+/// let back_ptr: *mut i32 = raw.into();
+/// unsafe {
+///     assert_eq!(*back_ptr, 42);
+/// }
+/// ```
 #[derive(Clone, Copy)]
-pub(crate) struct RawRef<T>(NonNull<T>);
+pub struct RawRef<T>(NonNull<T>);
 
 impl<T> RawRef<T> {
-    pub(crate) fn new(ptr: NonNull<T>) -> Self {
+    /// Creates a new `RawRef` from a non-null pointer.
+    pub fn new(ptr: NonNull<T>) -> Self {
         Self(ptr)
     }
 }
@@ -26,12 +84,58 @@ impl<T> From<RawRef<T>> for *mut T {
     }
 }
 
-// CFRef for Core Foundation types
+/// A safe wrapper around Core Foundation types.
+///
+/// This type ensures proper reference counting and memory management for Core Foundation objects.
+/// It automatically releases the wrapped object when dropped.
+///
+/// # Type Parameters
+///
+/// * `T` - A Core Foundation type that implements `TCFType`
+///
+/// # Examples
+///
+/// ```no_run
+/// use core_foundation::{
+///     base::TCFType,
+///     array::{CFArray, CFArrayRef}
+/// };
+/// # use favkit::system::core_foundation::{CFRef, Error};
+///
+/// let array = CFArray::from_copyable(&[1, 2, 3]);
+/// let ptr = array.as_concrete_TypeRef();
+/// let wrapped = CFRef::<CFArray<i32>>::try_from_ref(ptr)?;
+/// assert_eq!(wrapped.len(), 3);
+/// # Ok::<(), Error>(())
+/// ```
 #[derive(Debug)]
-pub(crate) struct CFRef<T: TCFType>(T);
+pub struct CFRef<T: TCFType>(T);
 
 impl<T: TCFType> CFRef<T> {
-    pub(crate) fn try_from_ref(raw: T::Ref) -> Result<Self>
+    /// Attempts to create a `CFRef` from a Core Foundation type reference.
+    ///
+    /// Returns `Error::NullPointer` if the reference is null.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use core_foundation::{
+    ///     base::TCFType,
+    ///     string::CFString,
+    ///     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle}
+    /// };
+    /// # use favkit::system::core_foundation::{CFRef, Error};
+    ///
+    /// let url = CFURL::from_file_system_path(
+    ///     CFString::new("/test"),
+    ///     kCFURLPOSIXPathStyle,
+    ///     true
+    /// );
+    /// let ptr = url.as_concrete_TypeRef();
+    /// let wrapped = CFRef::<CFURL>::try_from_ref(ptr)?;
+    /// # Ok::<(), Error>(())
+    /// ```
+    pub fn try_from_ref(raw: T::Ref) -> Result<Self>
     where
         T::Ref: TCFTypeRef,
     {
