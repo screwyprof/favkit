@@ -3,13 +3,13 @@ use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteIt
 
 use crate::{
     favorites::FavoritesApi,
-    finder::{FinderError, Result, SidebarItem, Target},
+    finder::{Result, SidebarItem, Target},
     system::api::MacOsApi,
 };
 
 use super::{
-    display_name::DisplayName, handle::FavoritesHandle, item::SnapshotItem, snapshot::Snapshot,
-    url::Url,
+    display_name::DisplayName, handle::FavoritesHandle, snapshot::Snapshot,
+    snapshot_item::SnapshotItem, url::Url,
 };
 
 pub struct Favorites<'a> {
@@ -38,10 +38,7 @@ impl<'a> Favorites<'a> {
             self.api
                 .ls_shared_file_list_copy_snapshot(list.into(), &mut seed)
         };
-
-        (!array_ref.is_null())
-            .then(|| Snapshot::try_from(array_ref))
-            .ok_or(FinderError::NullSnapshotHandle)?
+        Snapshot::try_from(array_ref)
     }
 
     unsafe fn copy_display_name(&self, item: SnapshotItem) -> Result<DisplayName> {
@@ -49,10 +46,7 @@ impl<'a> Favorites<'a> {
             self.api
                 .ls_shared_file_list_item_copy_display_name(item.into())
         };
-
-        (!name_ref.is_null())
-            .then(|| DisplayName::try_from(name_ref))
-            .ok_or(FinderError::NullDisplayNameHandle)?
+        DisplayName::try_from(name_ref)
     }
 
     unsafe fn copy_resolved_url(&self, item: SnapshotItem) -> Result<Url> {
@@ -63,10 +57,7 @@ impl<'a> Favorites<'a> {
                 std::ptr::null_mut(),
             )
         };
-
-        (!url_ref.is_null())
-            .then(|| Url::try_from(url_ref))
-            .ok_or(FinderError::NullUrlHandle)?
+        Url::try_from(url_ref)
     }
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {

@@ -28,18 +28,38 @@ impl From<FavoritesHandle> for *mut OpaqueLSSharedFileListRef {
 mod tests {
     use super::*;
 
+    const FAVORITES_REF: *mut OpaqueLSSharedFileListRef = 42 as *mut _;
+
     #[test]
-    fn should_return_error_for_null_handle() {
-        let handle_ref = std::ptr::null_mut();
-        assert!(FavoritesHandle::try_from(handle_ref).is_err());
+    fn should_fail_when_handle_is_null() {
+        // Arrange
+        let favorites_ref = std::ptr::null_mut();
+
+        // Act & Assert
+        assert!(FavoritesHandle::try_from(favorites_ref).is_err());
     }
 
     #[test]
-    fn should_convert_raw_pointer_to_handle() -> Result<()> {
-        const FAVORITES_REF: *mut OpaqueLSSharedFileListRef = 42 as *mut _;
-        let handle = FavoritesHandle::try_from(FAVORITES_REF)?;
-        let unwrapped: *mut OpaqueLSSharedFileListRef = handle.into();
-        assert_eq!(unwrapped, FAVORITES_REF);
+    fn should_wrap_handle() -> Result<()> {
+        // Arrange
+        let favorites_ref = FAVORITES_REF;
+
+        // Act & Assert
+        let _handle = FavoritesHandle::try_from(favorites_ref)?;
         Ok(())
+    }
+
+    #[test]
+    fn should_unwrap_handle() {
+        // Arrange
+        let favorites_ref = FAVORITES_REF;
+        let ptr = NonNull::new(favorites_ref).unwrap();
+        let handle = FavoritesHandle(RawRef::new(ptr));
+
+        // Act
+        let unwrapped: *mut OpaqueLSSharedFileListRef = handle.into();
+
+        // Assert
+        assert_eq!(unwrapped, favorites_ref);
     }
 }

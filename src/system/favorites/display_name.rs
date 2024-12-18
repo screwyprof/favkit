@@ -11,7 +11,9 @@ impl TryFrom<CFStringRef> for DisplayName {
     type Error = FinderError;
 
     fn try_from(string_ref: CFStringRef) -> Result<Self> {
-        CFRef::try_from_ref(string_ref)
+        (!string_ref.is_null())
+            .then(|| CFRef::try_from_ref(string_ref))
+            .ok_or(FinderError::NullDisplayNameHandle)?
     }
 }
 
@@ -21,17 +23,40 @@ mod tests {
     use core_foundation::base::TCFType;
 
     #[test]
-    fn should_return_error_for_null_string() {
-        let string_ref: CFStringRef = std::ptr::null_mut();
-        assert!(DisplayName::try_from(string_ref).is_err());
+    fn should_fail_when_display_name_is_null() {
+        // Arrange
+        let display_name_ref: CFStringRef = std::ptr::null_mut();
+
+        // Act & Assert
+        assert!(DisplayName::try_from(display_name_ref).is_err());
     }
 
     #[test]
-    fn should_format_display_name_using_display_trait() -> Result<()> {
-        let valid = CFString::new("Documents");
-        let string_ref = valid.as_concrete_TypeRef();
-        let display_name = DisplayName::try_from(string_ref)?;
-        assert_eq!(display_name.to_string(), "Documents");
+    fn should_wrap_display_name() -> Result<()> {
+        // Arrange
+        let display_name = CFString::new("Documents");
+        let display_name_ref = display_name.as_concrete_TypeRef();
+
+        // Act
+        let _display_name = DisplayName::try_from(display_name_ref)?;
+
+        // Assert
+        Ok(())
+    }
+
+    #[test]
+    fn should_convert_to_string() -> Result<()> {
+        // Arrange
+        let expected_name = "Documents";
+        let display_name = CFString::new(expected_name);
+        let display_name_ref = display_name.as_concrete_TypeRef();
+        let display_name = DisplayName::try_from(display_name_ref)?;
+
+        // Act
+        let result = display_name.to_string();
+
+        // Assert
+        assert_eq!(result, expected_name);
         Ok(())
     }
 }
