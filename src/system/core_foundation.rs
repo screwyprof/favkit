@@ -1,5 +1,5 @@
 use core_foundation::base::{TCFType, TCFTypeRef};
-use std::{fmt, ops::Deref, ptr::NonNull};
+use std::{ops::Deref, ptr::NonNull};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -50,91 +50,150 @@ impl<T: TCFType> Deref for CFRef<T> {
     }
 }
 
-// Display implementations for specific Core Foundation types
-impl fmt::Display for CFRef<core_foundation::string::CFString> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl fmt::Display for CFRef<core_foundation::url::CFURL> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.get_string())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use core_foundation::{
         array::{CFArray, CFArrayRef},
         string::{CFString, CFStringRef},
-        url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
+        url::{CFURL, CFURLRef},
     };
 
     use super::*;
 
-    #[test]
-    fn should_return_error_for_null_string() {
-        let ptr: CFStringRef = std::ptr::null_mut();
-        assert!(matches!(
-            CFRef::<CFString>::try_from_ref(ptr).unwrap_err(),
-            Error::NullPointer
-        ));
+    mod wrapping {
+        use super::*;
+
+        #[test]
+        fn should_return_error_for_null_string() {
+            // Arrange
+            let ptr: CFStringRef = std::ptr::null_mut();
+
+            // Act
+            let result = CFRef::<CFString>::try_from_ref(ptr);
+
+            // Assert
+            assert!(matches!(result.unwrap_err(), Error::NullPointer));
+        }
+
+        #[test]
+        fn should_return_error_for_null_array() {
+            // Arrange
+            let ptr: CFArrayRef = std::ptr::null();
+
+            // Act
+            let result = CFRef::<CFArray<i32>>::try_from_ref(ptr);
+
+            // Assert
+            assert!(matches!(result.unwrap_err(), Error::NullPointer));
+        }
+
+        #[test]
+        fn should_return_error_for_null_url() {
+            // Arrange
+            let ptr: CFURLRef = std::ptr::null_mut();
+
+            // Act
+            let result = CFRef::<CFURL>::try_from_ref(ptr);
+
+            // Assert
+            assert!(matches!(result.unwrap_err(), Error::NullPointer));
+        }
+
+        #[test]
+        fn should_wrap_string_ref() -> Result<()> {
+            // Arrange
+            let string = CFString::new("test");
+            let ptr = string.as_concrete_TypeRef();
+
+            // Act
+            let wrapped = CFRef::<CFString>::try_from_ref(ptr)?;
+
+            // Assert
+            assert!(!wrapped.as_concrete_TypeRef().is_null());
+            Ok(())
+        }
+
+        #[test]
+        fn should_wrap_array_ref() -> Result<()> {
+            // Arrange
+            let array = CFArray::from_copyable(&[1, 2, 3]);
+            let ptr = array.as_concrete_TypeRef();
+
+            // Act
+            let wrapped = CFRef::<CFArray<i32>>::try_from_ref(ptr)?;
+
+            // Assert
+            assert!(!wrapped.as_concrete_TypeRef().is_null());
+            Ok(())
+        }
+
+        #[test]
+        fn should_wrap_url_ref() -> Result<()> {
+            // Arrange
+            let url = CFURL::from_file_system_path(
+                CFString::new("/test"),
+                core_foundation::url::kCFURLPOSIXPathStyle,
+                true,
+            );
+            let ptr = url.as_concrete_TypeRef();
+
+            // Act
+            let wrapped = CFRef::<CFURL>::try_from_ref(ptr)?;
+
+            // Assert
+            assert!(!wrapped.as_concrete_TypeRef().is_null());
+            Ok(())
+        }
     }
 
-    #[test]
-    fn should_convert_valid_string_ref() -> Result<()> {
-        let string = CFString::new("test");
-        let ptr = string.as_concrete_TypeRef();
-        let wrapped = CFRef::<CFString>::try_from_ref(ptr)?;
-        assert_eq!(wrapped.to_string(), "test");
-        Ok(())
+    mod raw_pointer {
+        use super::*;
+
+        #[test]
+        fn should_convert_raw_pointer() -> Result<()> {
+            // Arrange
+            let mut value = 42;
+            let ptr = NonNull::new(&mut value as *mut i32).unwrap();
+
+            // Act
+            let raw = RawRef::new(ptr);
+            let back_ptr: *mut i32 = raw.into();
+
+            // Assert
+            assert_eq!(back_ptr, ptr.as_ptr());
+            Ok(())
+        }
     }
 
-    #[test]
-    fn should_return_error_for_null_array() {
-        let ptr: CFArrayRef = std::ptr::null();
-        assert!(matches!(
-            CFRef::<CFArray<i32>>::try_from_ref(ptr).unwrap_err(),
-            Error::NullPointer
-        ));
-    }
+    mod dereferencing {
+        use super::*;
 
-    #[test]
-    fn should_convert_valid_array_ref() -> Result<()> {
-        let array = CFArray::from_copyable(&[1, 2, 3]);
-        let ptr = array.as_concrete_TypeRef();
-        let wrapped = CFRef::<CFArray<i32>>::try_from_ref(ptr)?;
-        assert_eq!(wrapped.len(), 3);
-        Ok(())
-    }
+        #[test]
+        fn should_deref_string() -> Result<()> {
+            // Arrange
+            let string = CFString::new("test");
+            let wrapped = CFRef::<CFString>::try_from_ref(string.as_concrete_TypeRef())?;
 
-    #[test]
-    fn should_return_error_for_null_url() {
-        let ptr: CFURLRef = std::ptr::null_mut();
-        assert!(matches!(
-            CFRef::<CFURL>::try_from_ref(ptr).unwrap_err(),
-            Error::NullPointer
-        ));
-    }
+            // Act
+            let derefed: &CFString = &wrapped;
 
-    #[test]
-    fn should_convert_valid_url_ref() -> Result<()> {
-        let path = CFString::new("/test");
-        let url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
-        let ptr = url.as_concrete_TypeRef();
-        let wrapped = CFRef::<CFURL>::try_from_ref(ptr)?;
-        assert_eq!(wrapped.to_string(), "file:///test/");
-        Ok(())
-    }
+            // Assert
+            assert_eq!(derefed.to_string(), "test");
+            Ok(())
+        }
 
-    #[test]
-    fn should_convert_raw_pointer() -> Result<()> {
-        let mut value = 42;
-        let ptr = NonNull::new(&mut value as *mut i32).unwrap();
-        let raw = RawRef::new(ptr);
-        let back_ptr: *mut i32 = raw.into();
-        assert_eq!(back_ptr, ptr.as_ptr());
-        Ok(())
+        #[test]
+        fn should_deref_array() -> Result<()> {
+            // Arrange
+            let array = CFArray::from_copyable(&[1, 2, 3]);
+            let wrapped = CFRef::<CFArray<i32>>::try_from_ref(array.as_concrete_TypeRef())?;
+
+            // Act
+            let derefed: &CFArray<i32> = &wrapped;
+
+            // Assert
+            assert_eq!(derefed.len(), 3);
+            Ok(())
+        }
     }
 }

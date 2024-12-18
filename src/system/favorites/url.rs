@@ -1,17 +1,27 @@
 use core_foundation::url::{CFURL, CFURLRef};
+use std::fmt;
 
 use crate::system::{
     core_foundation::CFRef,
     favorites::errors::{FavoritesError, Result},
 };
 
-pub(crate) type Url = CFRef<CFURL>;
+#[derive(Debug)]
+pub(crate) struct Url(CFRef<CFURL>);
 
 impl TryFrom<CFURLRef> for Url {
     type Error = FavoritesError;
 
     fn try_from(url_ref: CFURLRef) -> Result<Self> {
-        CFRef::try_from_ref(url_ref).map_err(|_| FavoritesError::NullUrlHandle)
+        CFRef::try_from_ref(url_ref)
+            .map(Self)
+            .map_err(|_| FavoritesError::NullUrlHandle)
+    }
+}
+
+impl fmt::Display for Url {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.get_string())
     }
 }
 

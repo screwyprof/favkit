@@ -1,15 +1,27 @@
 use core_foundation::string::{CFString, CFStringRef};
+use std::fmt;
 
-use crate::system::core_foundation::CFRef;
-use crate::system::favorites::errors::{FavoritesError, Result};
+use crate::system::{
+    core_foundation::CFRef,
+    favorites::errors::{FavoritesError, Result},
+};
 
-pub(crate) type DisplayName = CFRef<CFString>;
+#[derive(Debug)]
+pub(crate) struct DisplayName(CFRef<CFString>);
 
 impl TryFrom<CFStringRef> for DisplayName {
     type Error = FavoritesError;
 
     fn try_from(string_ref: CFStringRef) -> Result<Self> {
-        CFRef::try_from_ref(string_ref).map_err(|_| FavoritesError::NullDisplayNameHandle)
+        CFRef::try_from_ref(string_ref)
+            .map(Self)
+            .map_err(|_| FavoritesError::NullDisplayNameHandle)
+    }
+}
+
+impl fmt::Display for DisplayName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
