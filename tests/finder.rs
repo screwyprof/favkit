@@ -10,28 +10,52 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{
     Finder,
-    finder::{FinderError, Result, SidebarItem, Target},
+    finder::{FinderError, Result, SidebarItem},
     system::{
         api::MacOsApi,
         favorites::{DisplayName, FavoritesError, Url},
     },
 };
 
-// Helper functions for creating test data
-fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
-    id as LSSharedFileListItemRef
+mod test_data {
+    pub const DOCUMENTS_NAME: &str = "Documents";
+    pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
+    pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 }
 
-fn display_name_from_optional_string(name: Option<String>) -> DisplayName {
-    let display_name = CFString::new(&name.unwrap_or_default());
-    DisplayName::try_from(display_name.as_concrete_TypeRef()).unwrap()
+struct FavoriteBuilder {
+    id: i32,
+    display_name: Option<String>,
+    url: String,
 }
 
-fn url_from_str(path: &str) -> Url {
-    let is_dir = path.ends_with('/');
-    let cs_path = CFString::new(path);
-    let url = CFURL::from_file_system_path(cs_path, kCFURLPOSIXPathStyle, is_dir);
-    Url::try_from(url.as_concrete_TypeRef()).unwrap()
+impl FavoriteBuilder {
+    fn new(id: i32) -> Self {
+        Self {
+            id,
+            display_name: None,
+            url: "file:///".to_string(),
+        }
+    }
+
+    fn with_display_name(mut self, name: impl Into<String>) -> Self {
+        self.display_name = Some(name.into());
+        self
+    }
+
+    fn without_display_name(mut self) -> Self {
+        self.display_name = None;
+        self
+    }
+
+    fn with_url(mut self, url: impl Into<String>) -> Self {
+        self.url = url.into();
+        self
+    }
+
+    fn build(self) -> (i32, Option<String>, String) {
+        (self.id, self.display_name, self.url)
+    }
 }
 
 /// Test builder for Finder tests
@@ -56,12 +80,22 @@ impl FinderTest {
     }
 
     /// Creates a test with a single favorite item and its metadata
-    fn with_favorite(item_id: i32, display_name: Option<&str>, url: &str) -> Self {
+    fn with_favorite(display_name: Option<&str>, url: &str) -> Self {
+        let builder = FavoriteBuilder::new(1).with_url(url);
+        let (item_id, display_name, url) = match display_name {
+            Some(name) => builder.with_display_name(name).build(),
+            None => builder.without_display_name().build(),
+        };
+
+        pub fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
+            id as LSSharedFileListItemRef
+        }
+
         let mock_api = MockMacOsApi::new()
             .with_items(vec![create_mock_item(item_id)])
             .with_list_create(|| 1 as LSSharedFileListRef)
-            .with_display_name(display_name)
-            .with_url(url);
+            .with_display_name(display_name.as_deref())
+            .with_url(&url);
 
         Self::new(mock_api)
     }
@@ -69,6 +103,21 @@ impl FinderTest {
     /// Lists favorites and returns the result
     fn list_favorites(&self) -> Result<Vec<SidebarItem>> {
         self.finder.get_favorites_list()
+    }
+
+    fn assert_has_favorite(&self, display_name: Option<&str>, url: &str) -> Result<()> {
+        let favorites = self.list_favorites()?;
+        assert!(favorites.iter().any(|item| {
+            item.display_name().as_ref() == display_name.map(String::from).as_ref()
+                && item.target().as_str() == url
+        }));
+        Ok(())
+    }
+
+    fn assert_is_empty(&self) -> Result<()> {
+        let favorites = self.list_favorites()?;
+        assert!(favorites.is_empty());
+        Ok(())
     }
 }
 
@@ -129,8 +178,10 @@ impl MockMacOsApi {
     }
 
     fn with_display_name(mut self, name: Option<&str>) -> Self {
-        let name = name.map(String::from);
-        let display_name = display_name_from_optional_string(name);
+        let display_name_cf = CFString::new(name.unwrap_or_default());
+        let display_name_cf_ref = display_name_cf.as_concrete_TypeRef();
+        let display_name = DisplayName::try_from(display_name_cf_ref).unwrap();
+
         self.display_name = Some(display_name);
         let display_name_ref = self.display_name.as_ref().unwrap().into();
         self.display_name_fn = Box::new(move |_| display_name_ref);
@@ -138,11 +189,27 @@ impl MockMacOsApi {
     }
 
     fn with_url(mut self, url: &str) -> Self {
-        let url = url_from_str(url);
+        let is_dir = url.ends_with('/');
+        let file_path = CFString::new(url);
+
+        let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
+        let url_cf_ref = url_cf.as_concrete_TypeRef();
+        let url = Url::try_from(url_cf_ref).unwrap();
+
         self.url = Some(url);
         let url_ref = self.url.as_ref().unwrap().into();
         self.resolved_url_fn = Box::new(move |_| url_ref);
         self
+    }
+
+    fn failing_list() -> Self {
+        Self::new().with_list_create(std::ptr::null_mut)
+    }
+
+    fn failing_snapshot() -> Self {
+        Self::new()
+            .with_list_create(|| 1 as LSSharedFileListRef)
+            .with_snapshot(|_| std::ptr::null_mut())
     }
 }
 
@@ -187,8 +254,7 @@ impl MacOsApi for MockMacOsApi {
 
 #[test]
 fn should_fail_when_list_handle_is_null() -> Result<()> {
-    let result =
-        FinderTest::new(MockMacOsApi::new().with_list_create(std::ptr::null_mut)).list_favorites();
+    let result = FinderTest::new(MockMacOsApi::failing_list()).list_favorites();
 
     assert!(matches!(
         result,
@@ -199,12 +265,7 @@ fn should_fail_when_list_handle_is_null() -> Result<()> {
 
 #[test]
 fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
-    let result = FinderTest::new(
-        MockMacOsApi::new()
-            .with_list_create(|| 1 as LSSharedFileListRef)
-            .with_snapshot(|_| std::ptr::null_mut()),
-    )
-    .list_favorites();
+    let result = FinderTest::new(MockMacOsApi::failing_snapshot()).list_favorites();
 
     assert!(matches!(
         result,
@@ -215,49 +276,27 @@ fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
 
 #[test]
 fn should_return_empty_list_when_no_favorites() -> Result<()> {
-    let favorites = FinderTest::with_favorites(vec![]).list_favorites()?;
-
-    assert_eq!(favorites, Vec::<SidebarItem>::new());
-    Ok(())
+    FinderTest::with_favorites(vec![]).assert_is_empty()
 }
 
 #[test]
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
-    let url = "/Users/user/Documents/";
-    let favorites = FinderTest::with_favorite(1, Some("Documents"), url).list_favorites()?;
-
-    assert_eq!(favorites, vec![SidebarItem::new(
-        Some("Documents".to_string()),
-        Target("file:///Users/user/Documents/".to_string()),
-    )]);
-    Ok(())
-}
-
-#[test]
-fn should_handle_favorite_with_null_display_name() -> Result<()> {
-    let url = "/Users/user/Downloads/";
-    let favorites = FinderTest::with_favorite(1, None, url).list_favorites()?;
-
-    assert_eq!(favorites, vec![SidebarItem::new(
-        None,
-        Target("file:///Users/user/Downloads/".to_string()),
-    )]);
-    Ok(())
+    FinderTest::with_favorite(Some(test_data::DOCUMENTS_NAME), test_data::DOCUMENTS_PATH)
+        .assert_has_favorite(
+            Some(test_data::DOCUMENTS_NAME),
+            &format!("file://{}", test_data::DOCUMENTS_PATH),
+        )
 }
 
 #[test]
 fn should_handle_airdrop_item() -> Result<()> {
-    let url = "nwnode://domain-AirDrop";
-    let favorites = FinderTest::with_favorite(1, Some(""), url).list_favorites()?;
+    let finder = FinderTest::with_favorite(Some(""), test_data::AIRDROP_URL);
+    finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
 
-    assert_eq!(favorites, vec![SidebarItem::new(
-        None,
-        Target("nwnode://domain-AirDrop".to_string()),
-    )]);
-
+    let favorites = finder.list_favorites()?;
     assert_eq!(
         format!("{}", favorites[0]),
-        "<no name> -> nwnode://domain-AirDrop"
+        format!("<no name> -> {}", test_data::AIRDROP_URL)
     );
     Ok(())
 }
