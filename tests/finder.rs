@@ -182,32 +182,51 @@ mod mock_api {
             Self::default()
         }
 
+        fn get_display_name(
+            display_names: &[DisplayName],
+            item_ref: LSSharedFileListItemRef,
+        ) -> CFStringRef {
+            let idx: ItemIndex = item_ref.into();
+            (&display_names[idx.0]).into()
+        }
+
+        fn get_url(urls: &[Url], item_ref: LSSharedFileListItemRef) -> CFURLRef {
+            let idx: ItemIndex = item_ref.into();
+            (&urls[idx.0]).into()
+        }
+
         fn with_list_handle(mut self, handle: ListHandle) -> Self {
             self.list_create_fn = Some(Box::new(move || handle));
             self
         }
 
-        pub fn with_favorites(mut self, favorites: Favorites) -> Self {
-            let raw_list = 1 as ListHandle;
-            self = self.with_list_handle(raw_list);
-
-            let snapshot = Rc::clone(&favorites.snapshot);
+        fn with_snapshot_handle(mut self, snapshot: Rc<Option<Snapshot>>) -> Self {
             self.snapshot_fn = Some(Box::new(move |_| {
                 let snapshot = snapshot.as_ref().as_ref().unwrap();
                 snapshot.into()
             }));
+            self
+        }
 
-            let display_names = Rc::clone(&favorites.display_names);
+        fn with_display_names(mut self, display_names: Rc<Vec<DisplayName>>) -> Self {
             self.display_name_fn = Some(Box::new(move |item_ref| {
-                let idx: ItemIndex = item_ref.into();
-                (&display_names[idx.0]).into()
+                Self::get_display_name(&display_names, item_ref)
             }));
+            self
+        }
 
-            let urls = Rc::clone(&favorites.urls);
-            self.resolved_url_fn = Some(Box::new(move |item_ref| {
-                let idx: ItemIndex = item_ref.into();
-                (&urls[idx.0]).into()
-            }));
+        fn with_urls(mut self, urls: Rc<Vec<Url>>) -> Self {
+            self.resolved_url_fn = Some(Box::new(move |item_ref| Self::get_url(&urls, item_ref)));
+            self
+        }
+
+        pub fn with_favorites(mut self, favorites: Favorites) -> Self {
+            let raw_list = 1 as ListHandle;
+            self = self
+                .with_list_handle(raw_list)
+                .with_snapshot_handle(Rc::clone(&favorites.snapshot))
+                .with_display_names(Rc::clone(&favorites.display_names))
+                .with_urls(Rc::clone(&favorites.urls));
 
             self.favorites = Some(favorites);
             self
