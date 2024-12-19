@@ -163,16 +163,14 @@ impl MockMacOsApi {
             .map(Self::create_mock_item)
             .collect::<Vec<_>>();
 
-        // Set up items
+        // Set up items and snapshot
         let array = CFArray::from_copyable(&items);
+        let items_ref = array.as_concrete_TypeRef();
         self.items = Some(array);
+        self.snapshot_fn = Box::new(move |_| items_ref);
 
         // Set up list creation
         self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
-
-        // Set up snapshot to return our items
-        let items_ref = self.items.as_ref().unwrap().as_concrete_TypeRef();
-        self.snapshot_fn = Box::new(move |_| items_ref);
 
         self
     }
@@ -222,11 +220,7 @@ impl MacOsApi for MockMacOsApi {
         list: LSSharedFileListRef,
         _seed: *mut u32,
     ) -> CFArrayRef {
-        if let Some(array) = &self.items {
-            array.as_concrete_TypeRef()
-        } else {
-            (self.snapshot_fn)(list)
-        }
+        (self.snapshot_fn)(list)
     }
 
     unsafe fn ls_shared_file_list_item_copy_display_name(
