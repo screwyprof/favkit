@@ -7,7 +7,7 @@ use crate::system::{
 use core_services::OpaqueLSSharedFileListItemRef;
 
 #[derive(Clone)]
-pub(crate) struct SnapshotItem(RawRef<OpaqueLSSharedFileListItemRef>);
+pub struct SnapshotItem(RawRef<OpaqueLSSharedFileListItemRef>);
 
 impl From<NonNull<OpaqueLSSharedFileListItemRef>> for SnapshotItem {
     fn from(ptr: NonNull<OpaqueLSSharedFileListItemRef>) -> Self {

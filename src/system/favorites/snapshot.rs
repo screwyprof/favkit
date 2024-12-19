@@ -5,6 +5,7 @@ use core_foundation::{
     base::CFRange,
 };
 use core_services::LSSharedFileListItemRef;
+use core_services::TCFType;
 
 use crate::system::{
     core_foundation::CFRef,
@@ -13,7 +14,7 @@ use crate::system::{
 
 use super::snapshot_item::SnapshotItem;
 
-pub(crate) struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
+pub struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
 
 impl TryFrom<CFArrayRef> for Snapshot {
     type Error = FavoritesError;
@@ -22,6 +23,12 @@ impl TryFrom<CFArrayRef> for Snapshot {
         CFRef::try_from_ref(array_ref)
             .map(Self)
             .map_err(|_| FavoritesError::NullSnapshotHandle)
+    }
+}
+
+impl From<&Snapshot> for CFArrayRef {
+    fn from(snapshot: &Snapshot) -> Self {
+        snapshot.0.as_concrete_TypeRef()
     }
 }
 
@@ -42,7 +49,7 @@ impl IntoIterator for Snapshot {
     }
 }
 
-pub(crate) struct SnapshotIterator {
+pub struct SnapshotIterator {
     values: Vec<LSSharedFileListItemRef>,
 }
 
@@ -101,6 +108,21 @@ mod tests {
         let _snapshot = Snapshot::try_from(snapshot_ref)?;
 
         // Assert
+        Ok(())
+    }
+
+    #[test]
+    fn should_unwrap_snapshot() -> Result<()> {
+        // Arrange
+        let snapshot_array = CFArray::from_copyable(&[ITEM_REF]);
+        let snapshot_ref = snapshot_array.as_concrete_TypeRef();
+        let snapshot = Snapshot::try_from(snapshot_ref)?;
+
+        // Act
+        let unwrapped: CFArrayRef = (&snapshot).into();
+
+        // Assert
+        assert_eq!(unwrapped, snapshot_ref);
         Ok(())
     }
 

@@ -7,15 +7,16 @@ use core_foundation::{
     string::{CFString, CFStringRef},
     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
 };
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListItemRef};
 use favkit::{
     Finder,
     finder::{FinderError, Result, SidebarItem, Target},
     system::{
         api::MacOsApi,
-        favorites::{DisplayName, FavoritesError, Url},
+        favorites::{DisplayName, FavoritesError, Snapshot, SnapshotItem, Url},
     },
 };
+use std::rc::Rc;
 
 mod test_data {
     pub const DOCUMENTS_NAME: &str = "Documents";
@@ -42,8 +43,7 @@ impl MockBuilder {
         let favorites = self
             .items
             .iter()
-            .enumerate()
-            .map(|(id, (name, url))| FavoriteItem::new(id as i32 + 1, *name, url))
+            .map(|(name, url)| FavoriteItem::new(*name, url))
             .collect();
         MockMacOsApi::new().with_favorites(favorites)
     }
@@ -56,13 +56,12 @@ type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
 
 /// Represents a favorite item with its Core Foundation data
 struct FavoriteItem {
-    id: i32,
     display_name: DisplayName,
     url: Url,
 }
 
 impl FavoriteItem {
-    fn new(id: i32, display_name: Option<&str>, url: &str) -> Self {
+    fn new(display_name: Option<&str>, url: &str) -> Self {
         let display_name = {
             let name = display_name.unwrap_or_default();
             let cf_string = CFString::new(name);
@@ -76,69 +75,93 @@ impl FavoriteItem {
             Url::try_from(url_cf.as_concrete_TypeRef()).unwrap()
         };
 
-        Self {
-            id,
-            display_name,
-            url,
-        }
+        Self { display_name, url }
     }
 }
 
 struct MockMacOsApi {
+    display_names: Rc<Vec<DisplayName>>,
+    urls: Rc<Vec<Url>>,
+    item_refs: Vec<SnapshotItem>,
+    snapshot: Option<Snapshot>,
     list_create_fn: ListCreateFn,
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
-    item_refs: Vec<LSSharedFileListItemRef>,
-    display_names: Vec<DisplayName>,
-    urls: Vec<Url>,
-    snapshot_items: Option<CFArray<LSSharedFileListItemRef>>,
 }
 
 impl Default for MockMacOsApi {
     fn default() -> Self {
         Self {
+            display_names: Rc::new(Vec::new()),
+            urls: Rc::new(Vec::new()),
+            item_refs: Vec::new(),
+            snapshot: None,
             list_create_fn: Box::new(std::ptr::null_mut),
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             display_name_fn: Box::new(|_| std::ptr::null_mut()),
             resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-            item_refs: Vec::new(),
-            display_names: Vec::new(),
-            urls: Vec::new(),
-            snapshot_items: None,
         }
     }
 }
 
 impl MockMacOsApi {
     fn new() -> Self {
-        Self::default()
+        Self {
+            display_names: Rc::new(Vec::new()),
+            urls: Rc::new(Vec::new()),
+            item_refs: Vec::new(),
+            snapshot: None,
+            list_create_fn: Box::new(std::ptr::null_mut),
+            snapshot_fn: Box::new(|_| std::ptr::null()),
+            display_name_fn: Box::new(|_| std::ptr::null()),
+            resolved_url_fn: Box::new(|_| std::ptr::null()),
+        }
     }
 
     fn with_favorites(mut self, favorites: Vec<FavoriteItem>) -> Self {
-        // Store everything in one pass
-        for item in favorites {
-            self.item_refs.push(Self::to_list_item_ref(item.id));
-            self.display_names.push(item.display_name);
-            self.urls.push(item.url);
-        }
+        // Create everything in one pass
+        let (item_refs, rest): (Vec<_>, Vec<_>) = favorites
+            .into_iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let raw_item = ((i + 1) as i32) as LSSharedFileListItemRef;
+                let ptr = std::ptr::NonNull::new(raw_item).unwrap();
+                let snapshot_item = SnapshotItem::from(ptr);
+                (snapshot_item, (item.display_name, item.url))
+            })
+            .unzip();
 
-        let array = CFArray::from_copyable(&self.item_refs);
-        let items_ref = array.as_concrete_TypeRef();
+        let (display_names, urls) = rest.into_iter().unzip();
 
-        self.snapshot_items = Some(array);
+        self.display_names = Rc::new(display_names);
+        self.urls = Rc::new(urls);
+        self.item_refs = item_refs;
 
-        self.snapshot_fn = Box::new(move |_| items_ref);
-        self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
+        // Create snapshot from item refs
+        let raw_refs: Vec<*mut OpaqueLSSharedFileListItemRef> =
+            self.item_refs.iter().map(Into::into).collect();
+        let array = CFArray::from_copyable(&raw_refs);
+        let array_ref = array.as_concrete_TypeRef();
+        self.snapshot = Snapshot::try_from(array_ref).ok();
 
-        let display_names = std::mem::take(&mut self.display_names);
-        let urls = std::mem::take(&mut self.urls);
+        // 1. Mock ls_shared_file_list_create
+        let raw_list = 1 as LSSharedFileListRef;
+        self.list_create_fn = Box::new(move || raw_list);
 
+        // 2. Mock ls_shared_file_list_copy_snapshot
+        let snapshot_ref = self.snapshot.as_ref().map(Into::into).unwrap();
+        self.snapshot_fn = Box::new(move |_| snapshot_ref);
+
+        // 3. Mock ls_shared_file_list_item_copy_display_name
+        let display_names = Rc::clone(&self.display_names);
         self.display_name_fn = Box::new(move |item_ref| {
             let idx = (item_ref as i32 - 1) as usize;
             (&display_names[idx]).into()
         });
 
+        // 4. Mock ls_shared_file_list_item_copy_resolved_url
+        let urls = Rc::clone(&self.urls);
         self.resolved_url_fn = Box::new(move |item_ref| {
             let idx = (item_ref as i32 - 1) as usize;
             (&urls[idx]).into()
@@ -147,22 +170,29 @@ impl MockMacOsApi {
         self
     }
 
-    fn to_list_item_ref(id: i32) -> LSSharedFileListItemRef {
-        id as LSSharedFileListItemRef
-    }
-
     fn failing_list() -> Self {
         Self {
+            display_names: Rc::new(Vec::new()),
+            urls: Rc::new(Vec::new()),
+            item_refs: Vec::new(),
+            snapshot: None,
             list_create_fn: Box::new(std::ptr::null_mut),
-            ..Default::default()
+            snapshot_fn: Box::new(|_| std::ptr::null()),
+            display_name_fn: Box::new(|_| std::ptr::null()),
+            resolved_url_fn: Box::new(|_| std::ptr::null()),
         }
     }
 
     fn failing_snapshot() -> Self {
         Self {
+            display_names: Rc::new(Vec::new()),
+            urls: Rc::new(Vec::new()),
+            item_refs: Vec::new(),
+            snapshot: None,
             list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
-            snapshot_fn: Box::new(|_| std::ptr::null_mut()),
-            ..Default::default()
+            snapshot_fn: Box::new(|_| std::ptr::null()),
+            display_name_fn: Box::new(|_| std::ptr::null()),
+            resolved_url_fn: Box::new(|_| std::ptr::null()),
         }
     }
 }

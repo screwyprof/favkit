@@ -8,8 +8,8 @@ mod url;
 pub use display_name::DisplayName;
 pub use errors::FavoritesError;
 pub use handle::FavoritesHandle;
-use snapshot::Snapshot;
-use snapshot_item::SnapshotItem;
+pub use snapshot::Snapshot;
+pub use snapshot_item::SnapshotItem;
 pub use url::Url;
 
 use core_foundation::base::kCFAllocatorDefault;
