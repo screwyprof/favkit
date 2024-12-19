@@ -10,7 +10,7 @@ use core_foundation::{
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::{
     Finder,
-    finder::{FinderError, Result, SidebarItem},
+    finder::{FinderError, Result, SidebarItem, Target},
     system::{
         api::MacOsApi,
         favorites::{DisplayName, FavoritesError, Url},
@@ -23,48 +23,29 @@ mod test_data {
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 }
 
-/// Test builder for Finder tests
-struct FinderTest {
-    finder: Finder,
+/// Test builder for mock API
+struct MockBuilder {
+    items: Vec<(Option<&'static str>, &'static str)>,
 }
 
-impl FinderTest {
-    /// Creates a new test with custom mock API
-    fn new(mock_api: MockMacOsApi) -> Self {
-        Self {
-            finder: Finder::new(mock_api),
-        }
+impl MockBuilder {
+    fn new() -> Self {
+        Self { items: Vec::new() }
     }
 
-    /// Creates a test with favorite items
-    fn with_favorites(items: Vec<(Option<&str>, &str)>) -> Self {
-        let mock_items = items
-            .into_iter()
+    fn with_items(mut self, items: Vec<(Option<&'static str>, &'static str)>) -> Self {
+        self.items = items;
+        self
+    }
+
+    fn build(&self) -> MockMacOsApi {
+        let mock_items = self
+            .items
+            .iter()
             .enumerate()
-            .map(|(id, (name, url))| MockItem::new(id as i32 + 1, name, url))
+            .map(|(id, (name, url))| MockItem::new(id as i32 + 1, *name, url))
             .collect();
-        let mock_api = MockMacOsApi::new().with_items(mock_items);
-        Self::new(mock_api)
-    }
-
-    /// Lists favorites and returns the result
-    fn list_favorites(&self) -> Result<Vec<SidebarItem>> {
-        self.finder.get_favorites_list()
-    }
-
-    fn assert_has_favorite(&self, display_name: Option<&str>, url: &str) -> Result<()> {
-        let favorites = self.list_favorites()?;
-        assert!(favorites.iter().any(|item| {
-            item.display_name().as_ref() == display_name.map(String::from).as_ref()
-                && item.target().as_str() == url
-        }));
-        Ok(())
-    }
-
-    fn assert_is_empty(&self) -> Result<()> {
-        let favorites = self.list_favorites()?;
-        assert!(favorites.is_empty());
-        Ok(())
+        MockMacOsApi::new().with_items(mock_items)
     }
 }
 
@@ -261,66 +242,119 @@ impl MacOsApi for MockMacOsApi {
 
 #[test]
 fn should_fail_when_list_handle_is_null() -> Result<()> {
-    let result = FinderTest::new(MockMacOsApi::failing_list()).list_favorites();
+    // Arrange
+    let expected_error = Err(FinderError::AccessError(FavoritesError::NullListHandle));
+    let mock_api = MockMacOsApi::failing_list();
+    let finder = Finder::new(mock_api);
 
-    assert!(matches!(
-        result,
-        Err(FinderError::AccessError(FavoritesError::NullListHandle))
-    ));
+    // Act
+    let result = finder.get_favorites_list();
+
+    // Assert
+    assert_eq!(result, expected_error);
     Ok(())
 }
 
 #[test]
 fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
-    let result = FinderTest::new(MockMacOsApi::failing_snapshot()).list_favorites();
+    // Arrange
+    let expected_error = Err(FinderError::AccessError(FavoritesError::NullSnapshotHandle));
+    let mock_api = MockMacOsApi::failing_snapshot();
+    let finder = Finder::new(mock_api);
 
-    assert!(matches!(
-        result,
-        Err(FinderError::AccessError(FavoritesError::NullSnapshotHandle))
-    ));
+    // Act
+    let result = finder.get_favorites_list();
+
+    // Assert
+    assert_eq!(result, expected_error);
     Ok(())
 }
 
 #[test]
 fn should_return_empty_list_when_no_favorites() -> Result<()> {
-    FinderTest::with_favorites(vec![]).assert_is_empty()
+    // Arrange
+    let expected_result: Vec<SidebarItem> = vec![];
+    let mock_api = MockBuilder::new().with_items(vec![]).build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
 }
 
 #[test]
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
-    FinderTest::with_favorites(vec![(
-        Some(test_data::DOCUMENTS_NAME),
-        test_data::DOCUMENTS_PATH,
-    )])
-    .assert_has_favorite(
-        Some(test_data::DOCUMENTS_NAME),
-        &format!("file://{}", test_data::DOCUMENTS_PATH),
-    )
+    // Arrange
+    let expected_result = vec![SidebarItem::new(
+        Some(test_data::DOCUMENTS_NAME.to_string()),
+        Target(format!("file://{}", test_data::DOCUMENTS_PATH)),
+    )];
+    let mock_api = MockBuilder::new()
+        .with_items(vec![(
+            Some(test_data::DOCUMENTS_NAME),
+            test_data::DOCUMENTS_PATH,
+        )])
+        .build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
 }
 
 #[test]
 fn should_handle_airdrop_item() -> Result<()> {
-    let finder = FinderTest::with_favorites(vec![(None, test_data::AIRDROP_URL)]);
-    finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
+    // Arrange
+    let expected_result = vec![SidebarItem::new(
+        None,
+        Target(test_data::AIRDROP_URL.to_string()),
+    )];
+    let mock_api = MockBuilder::new()
+        .with_items(vec![(None, test_data::AIRDROP_URL)])
+        .build();
+    let finder = Finder::new(mock_api);
 
-    let favorites = finder.list_favorites()?;
-    assert_eq!(
-        format!("{}", favorites[0]),
-        format!("<no name> -> {}", test_data::AIRDROP_URL)
-    );
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
     Ok(())
 }
 
 #[test]
 fn should_handle_multiple_favorites() -> Result<()> {
-    let finder = FinderTest::with_favorites(vec![
-        (None, test_data::AIRDROP_URL),
-        (Some("Applications"), "/Applications/"),
-        (Some("Downloads"), "/Users/user/Downloads/"),
-    ]);
+    // Arrange
+    let expected_result = vec![
+        SidebarItem::new(None, Target(test_data::AIRDROP_URL.to_string())),
+        SidebarItem::new(
+            Some("Applications".to_string()),
+            Target("file:///Applications/".to_string()),
+        ),
+        SidebarItem::new(
+            Some("Downloads".to_string()),
+            Target("file:///Users/user/Downloads/".to_string()),
+        ),
+    ];
+    let mock_api = MockBuilder::new()
+        .with_items(vec![
+            (None, test_data::AIRDROP_URL),
+            (Some("Applications"), "/Applications/"),
+            (Some("Downloads"), "/Users/user/Downloads/"),
+        ])
+        .build();
+    let finder = Finder::new(mock_api);
 
-    finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
-    finder.assert_has_favorite(Some("Applications"), "file:///Applications/")?;
-    finder.assert_has_favorite(Some("Downloads"), "file:///Users/user/Downloads/")?;
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
     Ok(())
 }

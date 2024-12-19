@@ -1,7 +1,7 @@
 use crate::system::favorites::FavoritesError;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum FinderError {
     #[error("failed to access Finder favorites: {0}")]
     AccessError(#[from] FavoritesError),

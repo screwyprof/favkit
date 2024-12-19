@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum FavoritesError {
     #[error("failed to create favorites list: null handle")]
     NullListHandle,

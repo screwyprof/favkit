@@ -18,14 +18,6 @@ impl SidebarItem {
             target,
         }
     }
-
-    pub fn display_name(&self) -> &DisplayName {
-        &self.display_name
-    }
-
-    pub fn target(&self) -> &Target {
-        &self.target
-    }
 }
 
 impl fmt::Display for SidebarItem {
@@ -34,12 +26,6 @@ impl fmt::Display for SidebarItem {
             Some(name) => write!(f, "{} -> {}", name, self.target.0),
             None => write!(f, "<no name> -> {}", self.target.0),
         }
-    }
-}
-
-impl Target {
-    pub fn as_str(&self) -> &str {
-        &self.0
     }
 }
 
