@@ -16,8 +16,6 @@ use favkit::{
         favorites::{DisplayName, FavoritesError, Snapshot, Url},
     },
 };
-use std::rc::Rc;
-
 mod test_data {
     pub const DOCUMENTS_NAME: &str = "Documents";
     pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
@@ -80,9 +78,9 @@ impl FavoriteItem {
 }
 
 struct MockMacOsApi {
-    display_names: Rc<Vec<DisplayName>>,
-    urls: Rc<Vec<Url>>,
+    favorites: Vec<FavoriteItem>, // Keep original items to keep their CF objects alive
     snapshot: Option<Snapshot>,
+
     list_create_fn: ListCreateFn,
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
@@ -92,8 +90,7 @@ struct MockMacOsApi {
 impl Default for MockMacOsApi {
     fn default() -> Self {
         Self {
-            display_names: Rc::new(Vec::new()),
-            urls: Rc::new(Vec::new()),
+            favorites: Vec::new(),
             snapshot: None,
             list_create_fn: Box::new(std::ptr::null_mut),
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
@@ -106,8 +103,7 @@ impl Default for MockMacOsApi {
 impl MockMacOsApi {
     fn new() -> Self {
         Self {
-            display_names: Rc::new(Vec::new()),
-            urls: Rc::new(Vec::new()),
+            favorites: Vec::new(),
             snapshot: None,
             list_create_fn: Box::new(std::ptr::null_mut),
             snapshot_fn: Box::new(|_| std::ptr::null()),
@@ -117,26 +113,32 @@ impl MockMacOsApi {
     }
 
     fn with_favorites(mut self, favorites: Vec<FavoriteItem>) -> Self {
-        // Create everything in one pass
-        let (raw_refs, rest): (Vec<_>, Vec<_>) = favorites
-            .into_iter()
-            .enumerate()
-            .map(|(i, item)| {
-                let raw_ref = ((i + 1) as i32) as *mut OpaqueLSSharedFileListItemRef;
-                (raw_ref, (item.display_name, item.url))
-            })
-            .unzip();
+        // Store original items to keep their CF objects alive
+        self.favorites = favorites;
 
-        let (display_names, urls) = rest.into_iter().unzip();
-
-        // Store display names and urls
-        self.display_names = Rc::new(display_names);
-        self.urls = Rc::new(urls);
+        // Create raw refs for snapshot
+        let raw_refs: Vec<_> = (1..=self.favorites.len())
+            .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
+            .collect();
 
         // Create snapshot
-        let array = CFArray::from_copyable(&raw_refs);
-        let array_ref = array.as_concrete_TypeRef();
-        self.snapshot = Snapshot::try_from(array_ref).ok();
+        let snapshot = CFArray::from_copyable(&raw_refs);
+        let snapshot_ref = snapshot.as_concrete_TypeRef();
+        self.snapshot = Snapshot::try_from(snapshot_ref).ok();
+
+        // Pre-create display names to avoid cloning
+        let display_names: Vec<_> = self
+            .favorites
+            .iter()
+            .map(|item| (&item.display_name).into())
+            .collect();
+
+        // Pre-create urls to avoid cloning
+        let urls: Vec<_> = self
+            .favorites
+            .iter()
+            .map(|item| (&item.url).into())
+            .collect();
 
         // 1. Mock ls_shared_file_list_create
         let raw_list = 1 as LSSharedFileListRef;
@@ -147,17 +149,15 @@ impl MockMacOsApi {
         self.snapshot_fn = Box::new(move |_| snapshot_ref);
 
         // 3. Mock ls_shared_file_list_item_copy_display_name
-        let display_names = Rc::clone(&self.display_names);
         self.display_name_fn = Box::new(move |item_ref| {
             let idx = (item_ref as i32 - 1) as usize;
-            (&display_names[idx]).into()
+            display_names[idx]
         });
 
         // 4. Mock ls_shared_file_list_item_copy_resolved_url
-        let urls = Rc::clone(&self.urls);
         self.resolved_url_fn = Box::new(move |item_ref| {
             let idx = (item_ref as i32 - 1) as usize;
-            (&urls[idx]).into()
+            urls[idx]
         });
 
         self
@@ -165,8 +165,7 @@ impl MockMacOsApi {
 
     fn failing_list() -> Self {
         Self {
-            display_names: Rc::new(Vec::new()),
-            urls: Rc::new(Vec::new()),
+            favorites: Vec::new(),
             snapshot: None,
             list_create_fn: Box::new(std::ptr::null_mut),
             snapshot_fn: Box::new(|_| std::ptr::null()),
@@ -177,8 +176,7 @@ impl MockMacOsApi {
 
     fn failing_snapshot() -> Self {
         Self {
-            display_names: Rc::new(Vec::new()),
-            urls: Rc::new(Vec::new()),
+            favorites: Vec::new(),
             snapshot: None,
             list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
             snapshot_fn: Box::new(|_| std::ptr::null()),
