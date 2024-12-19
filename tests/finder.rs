@@ -58,21 +58,24 @@ type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
 /// Represents a favorite item with its Core Foundation data
 struct FavoriteItem {
     id: i32,
-    display_name: Option<DisplayName>,
+    display_name: DisplayName,
     url: Url,
 }
 
 impl FavoriteItem {
     fn new(id: i32, display_name: Option<&str>, url: &str) -> Self {
-        let display_name = display_name.map(|name| {
+        let display_name = {
+            let name = display_name.unwrap_or_default();
             let cf_string = CFString::new(name);
             DisplayName::try_from(cf_string.as_concrete_TypeRef()).unwrap()
-        });
+        };
 
-        let is_dir = url.ends_with('/');
-        let file_path = CFString::new(url);
-        let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
-        let url = Url::try_from(url_cf.as_concrete_TypeRef()).unwrap();
+        let url = {
+            let is_dir = url.ends_with('/');
+            let file_path = CFString::new(url);
+            let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
+            Url::try_from(url_cf.as_concrete_TypeRef()).unwrap()
+        };
 
         Self {
             id,
@@ -88,7 +91,7 @@ struct MockMacOsApi {
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
     snapshot_array: Option<CFArray<LSSharedFileListItemRef>>,
-    display_names: Vec<Option<DisplayName>>,
+    display_names: Vec<DisplayName>,
     urls: Vec<Url>,
 }
 
@@ -126,14 +129,7 @@ impl MockMacOsApi {
 
         // Then build lookup data using references to stored objects
         for (i, id) in item_refs.iter().enumerate() {
-            lookup_data.push((
-                *id as i32,
-                display_names[i]
-                    .as_ref()
-                    .map(|name| name.into())
-                    .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef()),
-                (&urls[i]).into(),
-            ));
+            lookup_data.push((*id as i32, (&display_names[i]).into(), (&urls[i]).into()));
         }
 
         let array = CFArray::from_copyable(&item_refs);
