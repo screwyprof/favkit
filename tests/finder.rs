@@ -67,10 +67,8 @@ impl FinderTest {
     }
 
     /// Creates a test with a list of favorite items
-    fn with_favorites(items: Vec<LSSharedFileListItemRef>) -> Self {
-        let mock_api = MockMacOsApi::new()
-            .with_items(items)
-            .with_list_create(|| 1 as LSSharedFileListRef);
+    fn with_favorites(items: Vec<i32>) -> Self {
+        let mock_api = MockMacOsApi::new().with_items(items);
         Self::new(mock_api)
     }
 
@@ -81,13 +79,8 @@ impl FinderTest {
             .with_display_name(display_name);
         let (item_id, display_name, url) = builder.build();
 
-        pub fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
-            id as LSSharedFileListItemRef
-        }
-
         let mock_api = MockMacOsApi::new()
-            .with_items(vec![create_mock_item(item_id)])
-            .with_list_create(|| 1 as LSSharedFileListRef)
+            .with_items(vec![item_id])
             .with_display_name(display_name.as_deref())
             .with_url(&url);
 
@@ -133,7 +126,7 @@ struct MockMacOsApi {
 impl Default for MockMacOsApi {
     fn default() -> Self {
         Self {
-            list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
+            list_create_fn: Box::new(std::ptr::null_mut),
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             display_name_fn: Box::new(|_| std::ptr::null_mut()),
             resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
@@ -149,26 +142,43 @@ impl MockMacOsApi {
         Self::default()
     }
 
-    fn with_items(mut self, items: Vec<LSSharedFileListItemRef>) -> Self {
+    fn failing_list() -> Self {
+        Self {
+            list_create_fn: Box::new(std::ptr::null_mut),
+            ..Default::default()
+        }
+    }
+
+    fn failing_snapshot() -> Self {
+        Self {
+            list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
+            snapshot_fn: Box::new(|_| std::ptr::null_mut()),
+            ..Default::default()
+        }
+    }
+
+    fn with_items(mut self, ids: Vec<i32>) -> Self {
+        let items = ids
+            .into_iter()
+            .map(Self::create_mock_item)
+            .collect::<Vec<_>>();
+
+        // Set up items
         let array = CFArray::from_copyable(&items);
         self.items = Some(array);
+
+        // Set up list creation
+        self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
+
+        // Set up snapshot to return our items
+        let items_ref = self.items.as_ref().unwrap().as_concrete_TypeRef();
+        self.snapshot_fn = Box::new(move |_| items_ref);
+
         self
     }
 
-    fn with_list_create<F>(mut self, f: F) -> Self
-    where
-        F: Fn() -> LSSharedFileListRef + 'static,
-    {
-        self.list_create_fn = Box::new(f);
-        self
-    }
-
-    fn with_snapshot<F>(mut self, f: F) -> Self
-    where
-        F: Fn(LSSharedFileListRef) -> CFArrayRef + 'static,
-    {
-        self.snapshot_fn = Box::new(f);
-        self
+    fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
+        id as LSSharedFileListItemRef
     }
 
     fn with_display_name(mut self, name: Option<&str>) -> Self {
@@ -194,16 +204,6 @@ impl MockMacOsApi {
         let url_ref = self.url.as_ref().unwrap().into();
         self.resolved_url_fn = Box::new(move |_| url_ref);
         self
-    }
-
-    fn failing_list() -> Self {
-        Self::new().with_list_create(std::ptr::null_mut)
-    }
-
-    fn failing_snapshot() -> Self {
-        Self::new()
-            .with_list_create(|| 1 as LSSharedFileListRef)
-            .with_snapshot(|_| std::ptr::null_mut())
     }
 }
 
