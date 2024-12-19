@@ -24,8 +24,8 @@ mod test_data {
 #[derive(Debug, Clone, Copy)]
 struct ItemIndex(usize);
 
-impl ItemIndex {
-    fn from_raw(raw: LSSharedFileListItemRef) -> Self {
+impl From<LSSharedFileListItemRef> for ItemIndex {
+    fn from(raw: LSSharedFileListItemRef) -> Self {
         Self((raw as i32 - 1) as usize)
     }
 }
@@ -130,7 +130,6 @@ type DisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
 type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
 
 /// Builder for creating mock API implementations
-#[derive(Default)]
 struct MockMacOsApiBuilder {
     favorites: Option<Favorites>,
     list_create_fn: Option<ListCreateFn>,
@@ -139,8 +138,8 @@ struct MockMacOsApiBuilder {
     resolved_url_fn: Option<ResolvedUrlFn>,
 }
 
-impl MockMacOsApiBuilder {
-    fn new() -> Self {
+impl Default for MockMacOsApiBuilder {
+    fn default() -> Self {
         let raw_list = 1 as LSSharedFileListRef;
         let empty_snapshot =
             CFArray::from_copyable(&Vec::<*mut OpaqueLSSharedFileListItemRef>::new());
@@ -159,6 +158,12 @@ impl MockMacOsApiBuilder {
             resolved_url_fn: None,
         }
     }
+}
+
+impl MockMacOsApiBuilder {
+    fn new() -> Self {
+        Self::default()
+    }
 
     fn with_favorites(mut self, favorites: Favorites) -> Self {
         let raw_list = 1 as LSSharedFileListRef;
@@ -173,13 +178,13 @@ impl MockMacOsApiBuilder {
 
         let display_names = Rc::clone(&favorites.display_names);
         self.display_name_fn = Some(Box::new(move |item_ref| {
-            let idx = ItemIndex::from_raw(item_ref);
+            let idx: ItemIndex = item_ref.into();
             (&display_names[idx.0]).into()
         }));
 
         let urls = Rc::clone(&favorites.urls);
         self.resolved_url_fn = Some(Box::new(move |item_ref| {
-            let idx = ItemIndex::from_raw(item_ref);
+            let idx: ItemIndex = item_ref.into();
             (&urls[idx.0]).into()
         }));
 
