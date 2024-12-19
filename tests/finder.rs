@@ -146,16 +146,22 @@ mod mock_api {
     }
     use handlers::*;
 
+    /// State markers
+    pub struct Uninitialized;
+    pub struct WithList;
+    pub struct WithNullList;
+    pub struct WithNullSnapshot;
+
     /// Builder for creating mock API implementations
-    pub struct MockMacOsApiBuilder {
-        favorites: Option<Favorites>,
+    pub struct MockMacOsApiBuilder<State = Uninitialized> {
         list_create_fn: Option<CreateListFn>,
         snapshot_fn: Option<GetSnapshotFn>,
         display_name_fn: Option<GetDisplayNameFn>,
         resolved_url_fn: Option<GetUrlFn>,
+        _state: std::marker::PhantomData<State>,
     }
 
-    impl Default for MockMacOsApiBuilder {
+    impl Default for MockMacOsApiBuilder<Uninitialized> {
         fn default() -> Self {
             let raw_list = 1 as ListHandle;
             let empty_snapshot =
@@ -165,7 +171,6 @@ mod mock_api {
             ));
 
             Self {
-                favorites: None,
                 list_create_fn: Some(Box::new(move || raw_list)),
                 snapshot_fn: Some(Box::new(move |_| {
                     let snapshot = snapshot.as_ref().as_ref().unwrap();
@@ -173,11 +178,12 @@ mod mock_api {
                 })),
                 display_name_fn: None,
                 resolved_url_fn: None,
+                _state: std::marker::PhantomData,
             }
         }
     }
 
-    impl MockMacOsApiBuilder {
+    impl MockMacOsApiBuilder<Uninitialized> {
         pub fn new() -> Self {
             Self::default()
         }
@@ -195,57 +201,51 @@ mod mock_api {
             (&urls[idx.0]).into()
         }
 
-        fn with_list_handle(mut self, handle: ListHandle) -> Self {
-            self.list_create_fn = Some(Box::new(move || handle));
-            self
-        }
-
-        fn with_snapshot_handle(mut self, snapshot: Rc<Option<Snapshot>>) -> Self {
-            self.snapshot_fn = Some(Box::new(move |_| {
-                let snapshot = snapshot.as_ref().as_ref().unwrap();
-                snapshot.into()
-            }));
-            self
-        }
-
-        fn with_display_names(mut self, display_names: Rc<Vec<DisplayName>>) -> Self {
-            self.display_name_fn = Some(Box::new(move |item_ref| {
-                Self::get_display_name(&display_names, item_ref)
-            }));
-            self
-        }
-
-        fn with_urls(mut self, urls: Rc<Vec<Url>>) -> Self {
-            self.resolved_url_fn = Some(Box::new(move |item_ref| Self::get_url(&urls, item_ref)));
-            self
-        }
-
-        pub fn with_favorites(mut self, favorites: Favorites) -> Self {
+        pub fn with_favorites(self, favorites: Favorites) -> MockMacOsApiBuilder<WithList> {
             let raw_list = 1 as ListHandle;
-            self = self
-                .with_list_handle(raw_list)
-                .with_snapshot_handle(Rc::clone(&favorites.snapshot))
-                .with_display_names(Rc::clone(&favorites.display_names))
-                .with_urls(Rc::clone(&favorites.urls));
+            let snapshot = Rc::clone(&favorites.snapshot);
+            let display_names = Rc::clone(&favorites.display_names);
+            let urls = Rc::clone(&favorites.urls);
 
-            self.favorites = Some(favorites);
-            self
+            MockMacOsApiBuilder {
+                list_create_fn: Some(Box::new(move || raw_list)),
+                snapshot_fn: Some(Box::new(move |_| {
+                    let snapshot = snapshot.as_ref().as_ref().unwrap();
+                    snapshot.into()
+                })),
+                display_name_fn: Some(Box::new(move |item_ref| {
+                    Self::get_display_name(&display_names, item_ref)
+                })),
+                resolved_url_fn: Some(Box::new(move |item_ref| Self::get_url(&urls, item_ref))),
+                _state: std::marker::PhantomData,
+            }
         }
 
-        pub fn with_null_list(self) -> Self {
-            self.with_list_handle(std::ptr::null_mut())
+        pub fn with_null_list(self) -> MockMacOsApiBuilder<WithNullList> {
+            MockMacOsApiBuilder {
+                list_create_fn: Some(Box::new(std::ptr::null_mut)),
+                snapshot_fn: None,
+                display_name_fn: None,
+                resolved_url_fn: None,
+                _state: std::marker::PhantomData,
+            }
         }
 
-        pub fn with_null_snapshot(mut self) -> Self {
+        pub fn with_null_snapshot(self) -> MockMacOsApiBuilder<WithNullSnapshot> {
             let raw_list = 1 as ListHandle;
-            self = self.with_list_handle(raw_list);
-            self.snapshot_fn = Some(Box::new(|_| std::ptr::null()));
-            self
+            MockMacOsApiBuilder {
+                list_create_fn: Some(Box::new(move || raw_list)),
+                snapshot_fn: Some(Box::new(|_| std::ptr::null())),
+                display_name_fn: None,
+                resolved_url_fn: None,
+                _state: std::marker::PhantomData,
+            }
         }
+    }
 
+    // Implement build() for each final state
+    impl<State> MockMacOsApiBuilder<State> {
         pub fn build(self) -> MockMacOsApi {
-            let _favorites = self.favorites.unwrap_or_default();
-
             MockMacOsApi {
                 list_create_fn: self
                     .list_create_fn
