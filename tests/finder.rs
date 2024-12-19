@@ -36,14 +36,7 @@ impl FinderTest {
         }
     }
 
-    /// Creates a test with a single favorite item and its metadata
-    fn with_favorite(display_name: Option<&str>, url: &str) -> Self {
-        let mock_item = MockItem::new(1, display_name, url);
-        let mock_api = MockMacOsApi::new().with_items(vec![mock_item]);
-        Self::new(mock_api)
-    }
-
-    /// Creates a test with multiple favorite items
+    /// Creates a test with favorite items
     fn with_favorites(items: Vec<(Option<&str>, &str)>) -> Self {
         let mock_items = items
             .into_iter()
@@ -295,16 +288,19 @@ fn should_return_empty_list_when_no_favorites() -> Result<()> {
 
 #[test]
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
-    FinderTest::with_favorite(Some(test_data::DOCUMENTS_NAME), test_data::DOCUMENTS_PATH)
-        .assert_has_favorite(
-            Some(test_data::DOCUMENTS_NAME),
-            &format!("file://{}", test_data::DOCUMENTS_PATH),
-        )
+    FinderTest::with_favorites(vec![(
+        Some(test_data::DOCUMENTS_NAME),
+        test_data::DOCUMENTS_PATH,
+    )])
+    .assert_has_favorite(
+        Some(test_data::DOCUMENTS_NAME),
+        &format!("file://{}", test_data::DOCUMENTS_PATH),
+    )
 }
 
 #[test]
 fn should_handle_airdrop_item() -> Result<()> {
-    let finder = FinderTest::with_favorite(None, test_data::AIRDROP_URL);
+    let finder = FinderTest::with_favorites(vec![(None, test_data::AIRDROP_URL)]);
     finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
 
     let favorites = finder.list_favorites()?;
