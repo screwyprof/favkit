@@ -7,7 +7,7 @@ use crate::system::{
     favorites::errors::{FavoritesError, Result},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DisplayName(CFRef<CFString>);
 
 impl TryFrom<CFStringRef> for DisplayName {

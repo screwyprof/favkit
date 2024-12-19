@@ -14,6 +14,7 @@ use crate::system::{
 
 use super::snapshot_item::SnapshotItem;
 
+#[derive(Debug)]
 pub struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
 
 impl TryFrom<CFArrayRef> for Snapshot {

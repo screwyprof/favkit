@@ -162,7 +162,7 @@ impl<T> From<RawRef<T>> for *mut T {
 /// assert_eq!(wrapped.len(), 3);
 /// # Ok::<(), Error>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CFRef<T: TCFType>(T);
 
 impl<T: TCFType> CFRef<T> {

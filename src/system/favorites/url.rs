@@ -8,7 +8,7 @@ use crate::system::{
     favorites::errors::{FavoritesError, Result},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Url(CFRef<CFURL>);
 
 impl TryFrom<CFURLRef> for Url {
