@@ -23,36 +23,6 @@ mod test_data {
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 }
 
-struct FavoriteBuilder {
-    id: i32,
-    display_name: Option<String>,
-    url: String,
-}
-
-impl FavoriteBuilder {
-    fn new(id: i32) -> Self {
-        Self {
-            id,
-            display_name: None,
-            url: "file:///".to_string(),
-        }
-    }
-
-    fn with_display_name(mut self, name: Option<impl Into<String>>) -> Self {
-        self.display_name = name.map(|n| n.into());
-        self
-    }
-
-    fn with_url(mut self, url: impl Into<String>) -> Self {
-        self.url = url.into();
-        self
-    }
-
-    fn build(self) -> (i32, Option<String>, String) {
-        (self.id, self.display_name, self.url)
-    }
-}
-
 /// Test builder for Finder tests
 struct FinderTest {
     finder: Finder,
@@ -66,24 +36,21 @@ impl FinderTest {
         }
     }
 
-    /// Creates a test with a list of favorite items
-    fn with_favorites(items: Vec<i32>) -> Self {
-        let mock_api = MockMacOsApi::new().with_items(items);
+    /// Creates a test with a single favorite item and its metadata
+    fn with_favorite(display_name: Option<&str>, url: &str) -> Self {
+        let mock_item = MockItem::new(1, display_name, url);
+        let mock_api = MockMacOsApi::new().with_items(vec![mock_item]);
         Self::new(mock_api)
     }
 
-    /// Creates a test with a single favorite item and its metadata
-    fn with_favorite(display_name: Option<&str>, url: &str) -> Self {
-        let builder = FavoriteBuilder::new(1)
-            .with_url(url)
-            .with_display_name(display_name);
-        let (item_id, display_name, url) = builder.build();
-
-        let mock_api = MockMacOsApi::new()
-            .with_items(vec![item_id])
-            .with_display_name(display_name.as_deref())
-            .with_url(&url);
-
+    /// Creates a test with multiple favorite items
+    fn with_favorites(items: Vec<(Option<&str>, &str)>) -> Self {
+        let mock_items = items
+            .into_iter()
+            .enumerate()
+            .map(|(id, (name, url))| MockItem::new(id as i32 + 1, name, url))
+            .collect();
+        let mock_api = MockMacOsApi::new().with_items(mock_items);
         Self::new(mock_api)
     }
 
@@ -113,14 +80,41 @@ type SnapshotFn = Box<dyn Fn(LSSharedFileListRef) -> CFArrayRef>;
 type DisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
 type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
 
+struct MockItem {
+    id: i32,
+    display_name: Option<DisplayName>,
+    url: Url,
+}
+
+impl MockItem {
+    fn new(id: i32, display_name: Option<&str>, url: &str) -> Self {
+        let display_name = display_name.map(|name| {
+            let cf_string = CFString::new(name);
+            DisplayName::try_from(cf_string.as_concrete_TypeRef()).unwrap()
+        });
+
+        let is_dir = url.ends_with('/');
+        let file_path = CFString::new(url);
+        let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
+        let url = Url::try_from(url_cf.as_concrete_TypeRef()).unwrap();
+
+        Self {
+            id,
+            display_name,
+            url,
+        }
+    }
+}
+
 struct MockMacOsApi {
     list_create_fn: ListCreateFn,
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
     items: Option<CFArray<LSSharedFileListItemRef>>,
-    display_name: Option<DisplayName>,
-    url: Option<Url>,
+    mock_items: Vec<MockItem>,
+    display_names: Vec<CFString>,
+    urls: Vec<CFURL>,
 }
 
 impl Default for MockMacOsApi {
@@ -131,8 +125,9 @@ impl Default for MockMacOsApi {
             display_name_fn: Box::new(|_| std::ptr::null_mut()),
             resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
             items: None,
-            display_name: None,
-            url: None,
+            mock_items: Vec::new(),
+            display_names: Vec::new(),
+            urls: Vec::new(),
         }
     }
 }
@@ -140,6 +135,84 @@ impl Default for MockMacOsApi {
 impl MockMacOsApi {
     fn new() -> Self {
         Self::default()
+    }
+
+    fn with_items(mut self, mock_items: Vec<MockItem>) -> Self {
+        let ids: Vec<_> = mock_items.iter().map(|item| item.id).collect();
+        let items = ids
+            .into_iter()
+            .map(Self::create_mock_item)
+            .collect::<Vec<_>>();
+
+        // Set up items and snapshot
+        let array = CFArray::from_copyable(&items);
+        let items_ref = array.as_concrete_TypeRef();
+        self.items = Some(array);
+        self.snapshot_fn = Box::new(move |_| items_ref);
+
+        // Set up list creation
+        self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
+
+        // Store mock items for display name and URL lookups
+        self.mock_items = mock_items;
+
+        // Set up display name function
+        let mut display_names = Vec::new();
+        let mock_items = self
+            .mock_items
+            .iter()
+            .map(|item| {
+                let name_str = item
+                    .display_name
+                    .as_ref()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                let cf_string = CFString::new(&name_str);
+                display_names.push(cf_string.clone());
+                (item.id, cf_string.as_concrete_TypeRef())
+            })
+            .collect::<Vec<_>>();
+
+        self.display_names = display_names;
+        self.display_name_fn = Box::new(move |item_ref| {
+            let id = item_ref as i32;
+            mock_items
+                .iter()
+                .find(|(item_id, _)| *item_id == id)
+                .map(|(_, name_ref)| *name_ref)
+                .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef())
+        });
+
+        // Set up URL function
+        let mut urls = Vec::new();
+        let mock_items = self
+            .mock_items
+            .iter()
+            .map(|item| {
+                let url_str = item.url.to_string();
+                let is_dir = url_str.ends_with('/');
+                let file_path = CFString::new(&url_str);
+                let url = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
+                urls.push(url.clone());
+                (item.id, url.as_concrete_TypeRef())
+            })
+            .collect::<Vec<_>>();
+
+        self.urls = urls;
+        self.resolved_url_fn = Box::new(move |item_ref| {
+            let id = item_ref as i32;
+            mock_items
+                .iter()
+                .find(|(item_id, _)| *item_id == id)
+                .map(|(_, url_ref)| *url_ref)
+                .unwrap_or_else(std::ptr::null)
+        });
+
+        self
+    }
+
+    fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
+        id as LSSharedFileListItemRef
     }
 
     fn failing_list() -> Self {
@@ -155,53 +228,6 @@ impl MockMacOsApi {
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             ..Default::default()
         }
-    }
-
-    fn with_items(mut self, ids: Vec<i32>) -> Self {
-        let items = ids
-            .into_iter()
-            .map(Self::create_mock_item)
-            .collect::<Vec<_>>();
-
-        // Set up items and snapshot
-        let array = CFArray::from_copyable(&items);
-        let items_ref = array.as_concrete_TypeRef();
-        self.items = Some(array);
-        self.snapshot_fn = Box::new(move |_| items_ref);
-
-        // Set up list creation
-        self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
-
-        self
-    }
-
-    fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
-        id as LSSharedFileListItemRef
-    }
-
-    fn with_display_name(mut self, name: Option<&str>) -> Self {
-        let display_name_cf = CFString::new(name.unwrap_or_default());
-        let display_name_cf_ref = display_name_cf.as_concrete_TypeRef();
-        let display_name = DisplayName::try_from(display_name_cf_ref).unwrap();
-
-        self.display_name = Some(display_name);
-        let display_name_ref = self.display_name.as_ref().unwrap().into();
-        self.display_name_fn = Box::new(move |_| display_name_ref);
-        self
-    }
-
-    fn with_url(mut self, url: &str) -> Self {
-        let is_dir = url.ends_with('/');
-        let file_path = CFString::new(url);
-
-        let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
-        let url_cf_ref = url_cf.as_concrete_TypeRef();
-        let url = Url::try_from(url_cf_ref).unwrap();
-
-        self.url = Some(url);
-        let url_ref = self.url.as_ref().unwrap().into();
-        self.resolved_url_fn = Box::new(move |_| url_ref);
-        self
     }
 }
 
@@ -286,5 +312,19 @@ fn should_handle_airdrop_item() -> Result<()> {
         format!("{}", favorites[0]),
         format!("<no name> -> {}", test_data::AIRDROP_URL)
     );
+    Ok(())
+}
+
+#[test]
+fn should_handle_multiple_favorites() -> Result<()> {
+    let finder = FinderTest::with_favorites(vec![
+        (None, test_data::AIRDROP_URL),
+        (Some("Applications"), "/Applications/"),
+        (Some("Downloads"), "/Users/user/Downloads/"),
+    ]);
+
+    finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
+    finder.assert_has_favorite(Some("Applications"), "file:///Applications/")?;
+    finder.assert_has_favorite(Some("Downloads"), "file:///Users/user/Downloads/")?;
     Ok(())
 }
