@@ -38,13 +38,8 @@ impl FavoriteBuilder {
         }
     }
 
-    fn with_display_name(mut self, name: impl Into<String>) -> Self {
-        self.display_name = Some(name.into());
-        self
-    }
-
-    fn without_display_name(mut self) -> Self {
-        self.display_name = None;
+    fn with_display_name(mut self, name: Option<impl Into<String>>) -> Self {
+        self.display_name = name.map(|n| n.into());
         self
     }
 
@@ -81,11 +76,10 @@ impl FinderTest {
 
     /// Creates a test with a single favorite item and its metadata
     fn with_favorite(display_name: Option<&str>, url: &str) -> Self {
-        let builder = FavoriteBuilder::new(1).with_url(url);
-        let (item_id, display_name, url) = match display_name {
-            Some(name) => builder.with_display_name(name).build(),
-            None => builder.without_display_name().build(),
-        };
+        let builder = FavoriteBuilder::new(1)
+            .with_url(url)
+            .with_display_name(display_name);
+        let (item_id, display_name, url) = builder.build();
 
         pub fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
             id as LSSharedFileListItemRef
@@ -290,7 +284,7 @@ fn should_return_favorite_with_display_name_and_url() -> Result<()> {
 
 #[test]
 fn should_handle_airdrop_item() -> Result<()> {
-    let finder = FinderTest::with_favorite(Some(""), test_data::AIRDROP_URL);
+    let finder = FinderTest::with_favorite(None, test_data::AIRDROP_URL);
     finder.assert_has_favorite(None, test_data::AIRDROP_URL)?;
 
     let favorites = finder.list_favorites()?;
