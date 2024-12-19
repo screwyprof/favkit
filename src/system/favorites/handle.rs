@@ -4,7 +4,7 @@ use crate::system::{
 };
 use core_services::OpaqueLSSharedFileListRef;
 
-pub(crate) struct FavoritesHandle(RawRef<OpaqueLSSharedFileListRef>);
+pub struct FavoritesHandle(RawRef<OpaqueLSSharedFileListRef>);
 
 impl TryFrom<*mut OpaqueLSSharedFileListRef> for FavoritesHandle {
     type Error = FavoritesError;

@@ -1,13 +1,15 @@
 use core_foundation::url::{CFURL, CFURLRef};
 use std::fmt;
 
+use core_foundation::base::TCFType;
+
 use crate::system::{
     core_foundation::CFRef,
     favorites::errors::{FavoritesError, Result},
 };
 
 #[derive(Debug)]
-pub(crate) struct Url(CFRef<CFURL>);
+pub struct Url(CFRef<CFURL>);
 
 impl TryFrom<CFURLRef> for Url {
     type Error = FavoritesError;
@@ -16,6 +18,12 @@ impl TryFrom<CFURLRef> for Url {
         CFRef::try_from_ref(url_ref)
             .map(Self)
             .map_err(|_| FavoritesError::NullUrlHandle)
+    }
+}
+
+impl From<&Url> for CFURLRef {
+    fn from(url: &Url) -> Self {
+        url.0.as_concrete_TypeRef()
     }
 }
 
@@ -30,43 +38,60 @@ mod tests {
     use super::*;
     use core_foundation::{base::TCFType, string::CFString, url::kCFURLPOSIXPathStyle};
 
+    const EXAMPLE_URL: &str = "file:///Users/user/Documents";
+
     #[test]
-    fn should_fail_when_resolved_url_is_null() {
+    fn should_fail_when_url_is_null() {
         // Arrange
-        let resolved_url_ref: CFURLRef = std::ptr::null_mut();
+        let cf_url_ref: CFURLRef = std::ptr::null_mut();
 
         // Act & Assert
-        assert!(Url::try_from(resolved_url_ref).is_err());
+        assert!(Url::try_from(cf_url_ref).is_err());
     }
 
     #[test]
-    fn should_wrap_resolved_url() -> Result<()> {
+    fn should_wrap_url() -> Result<()> {
         // Arrange
-        let path = CFString::new("/Users/user/Documents");
-        let resolved_url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
-        let resolved_url_ref = resolved_url.as_concrete_TypeRef();
+        let cf_string = CFString::new(EXAMPLE_URL);
+        let cf_url = CFURL::from_file_system_path(cf_string, kCFURLPOSIXPathStyle, false);
+        let cf_url_ref = cf_url.as_concrete_TypeRef();
 
         // Act
-        let _url = Url::try_from(resolved_url_ref)?;
+        let _url = Url::try_from(cf_url_ref)?;
 
         // Assert
         Ok(())
     }
 
     #[test]
+    fn should_unwrap_url() -> Result<()> {
+        // Arrange
+        let cf_string = CFString::new(EXAMPLE_URL);
+        let cf_url = CFURL::from_file_system_path(cf_string, kCFURLPOSIXPathStyle, false);
+        let cf_url_ref = cf_url.as_concrete_TypeRef();
+        let url = Url::try_from(cf_url_ref)?;
+
+        // Act
+        let result_ref: CFURLRef = (&url).into();
+
+        // Assert
+        assert!(!result_ref.is_null());
+        Ok(())
+    }
+
+    #[test]
     fn should_convert_to_string() -> Result<()> {
         // Arrange
-        let expected_url = "file:///Users/user/Documents/";
-        let path = CFString::new("/Users/user/Documents");
-        let resolved_url = CFURL::from_file_system_path(path, kCFURLPOSIXPathStyle, true);
-        let resolved_url_ref = resolved_url.as_concrete_TypeRef();
-        let url = Url::try_from(resolved_url_ref)?;
+        let cf_string = CFString::new(EXAMPLE_URL);
+        let cf_url = CFURL::from_file_system_path(cf_string, kCFURLPOSIXPathStyle, false);
+        let cf_url_ref = cf_url.as_concrete_TypeRef();
+        let url = Url::try_from(cf_url_ref)?;
 
         // Act
         let result = url.to_string();
 
         // Assert
-        assert_eq!(result, expected_url);
+        assert_eq!(result, EXAMPLE_URL);
         Ok(())
     }
 }

@@ -5,13 +5,12 @@ mod snapshot;
 mod snapshot_item;
 mod url;
 
+pub use display_name::DisplayName;
 pub use errors::FavoritesError;
-
-use display_name::DisplayName;
-use handle::FavoritesHandle;
+pub use handle::FavoritesHandle;
 use snapshot::Snapshot;
 use snapshot_item::SnapshotItem;
-use url::Url;
+pub use url::Url;
 
 use core_foundation::base::kCFAllocatorDefault;
 use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
