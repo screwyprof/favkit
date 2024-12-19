@@ -16,7 +16,6 @@ use favkit::{
         favorites::{DisplayName, FavoritesError, Url},
     },
 };
-use std::rc::Rc;
 
 mod test_data {
     pub const DOCUMENTS_NAME: &str = "Documents";
@@ -90,9 +89,10 @@ struct MockMacOsApi {
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
-    snapshot_array: Option<CFArray<LSSharedFileListItemRef>>,
+    item_refs: Vec<LSSharedFileListItemRef>,
     display_names: Vec<DisplayName>,
     urls: Vec<Url>,
+    snapshot_items: Option<CFArray<LSSharedFileListItemRef>>,
 }
 
 impl Default for MockMacOsApi {
@@ -102,9 +102,10 @@ impl Default for MockMacOsApi {
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             display_name_fn: Box::new(|_| std::ptr::null_mut()),
             resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-            snapshot_array: None,
+            item_refs: Vec::new(),
             display_names: Vec::new(),
             urls: Vec::new(),
+            snapshot_items: None,
         }
     }
 }
@@ -115,40 +116,33 @@ impl MockMacOsApi {
     }
 
     fn with_favorites(mut self, favorites: Vec<FavoriteItem>) -> Self {
-        let mut item_refs = Vec::new();
-        let mut display_names = Vec::new();
-        let mut urls = Vec::new();
-        let mut lookup_data = Vec::new();
-
-        // First, store all domain objects
+        // Store everything in one pass
         for item in favorites {
-            item_refs.push(Self::to_list_item_ref(item.id));
-            display_names.push(item.display_name);
-            urls.push(item.url);
+            self.item_refs.push(Self::to_list_item_ref(item.id));
+            self.display_names.push(item.display_name);
+            self.urls.push(item.url);
         }
 
-        // Then build lookup data using references to stored objects
-        for (i, id) in item_refs.iter().enumerate() {
-            lookup_data.push((*id as i32, (&display_names[i]).into(), (&urls[i]).into()));
-        }
-
-        let array = CFArray::from_copyable(&item_refs);
+        let array = CFArray::from_copyable(&self.item_refs);
         let items_ref = array.as_concrete_TypeRef();
 
-        self.snapshot_array = Some(array);
+        self.snapshot_items = Some(array);
+
         self.snapshot_fn = Box::new(move |_| items_ref);
         self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
-        self.display_names = display_names;
-        self.urls = urls;
 
-        let lookup_data = Rc::new(lookup_data);
-        let lookup_data_clone = Rc::clone(&lookup_data);
+        let display_names = std::mem::take(&mut self.display_names);
+        let urls = std::mem::take(&mut self.urls);
 
-        self.display_name_fn =
-            Box::new(move |item_ref| Self::lookup_display_name_ref(&lookup_data, item_ref as i32));
+        self.display_name_fn = Box::new(move |item_ref| {
+            let idx = (item_ref as i32 - 1) as usize;
+            (&display_names[idx]).into()
+        });
 
-        self.resolved_url_fn =
-            Box::new(move |item_ref| Self::lookup_url_ref(&lookup_data_clone, item_ref as i32));
+        self.resolved_url_fn = Box::new(move |item_ref| {
+            let idx = (item_ref as i32 - 1) as usize;
+            (&urls[idx]).into()
+        });
 
         self
     }
@@ -170,25 +164,6 @@ impl MockMacOsApi {
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             ..Default::default()
         }
-    }
-
-    fn lookup_display_name_ref(
-        lookup_data: &[(i32, CFStringRef, CFURLRef)],
-        id: i32,
-    ) -> CFStringRef {
-        lookup_data
-            .iter()
-            .find(|(item_id, _, _)| *item_id == id)
-            .map(|(_, name_ref, _)| *name_ref)
-            .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef())
-    }
-
-    fn lookup_url_ref(lookup_data: &[(i32, CFStringRef, CFURLRef)], id: i32) -> CFURLRef {
-        lookup_data
-            .iter()
-            .find(|(item_id, _, _)| *item_id == id)
-            .map(|(_, _, url_ref)| *url_ref)
-            .unwrap_or_else(std::ptr::null)
     }
 }
 
