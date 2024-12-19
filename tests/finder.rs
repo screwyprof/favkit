@@ -39,13 +39,13 @@ impl MockBuilder {
     }
 
     fn build(&self) -> MockMacOsApi {
-        let mock_items = self
+        let favorites = self
             .items
             .iter()
             .enumerate()
-            .map(|(id, (name, url))| MockItem::new(id as i32 + 1, *name, url))
+            .map(|(id, (name, url))| FavoriteItem::new(id as i32 + 1, *name, url))
             .collect();
-        MockMacOsApi::new().with_items(mock_items)
+        MockMacOsApi::new().with_favorites(favorites)
     }
 }
 
@@ -54,13 +54,14 @@ type SnapshotFn = Box<dyn Fn(LSSharedFileListRef) -> CFArrayRef>;
 type DisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
 type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
 
-struct MockItem {
+/// Represents a favorite item with its Core Foundation data
+struct FavoriteItem {
     id: i32,
     display_name: Option<DisplayName>,
     url: Url,
 }
 
-impl MockItem {
+impl FavoriteItem {
     fn new(id: i32, display_name: Option<&str>, url: &str) -> Self {
         let display_name = display_name.map(|name| {
             let cf_string = CFString::new(name);
@@ -85,8 +86,7 @@ struct MockMacOsApi {
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
-    items: Option<CFArray<LSSharedFileListItemRef>>,
-    mock_items: Vec<MockItem>,
+    snapshot_array: Option<CFArray<LSSharedFileListItemRef>>,
     display_names: Vec<CFString>,
     urls: Vec<CFURL>,
 }
@@ -98,8 +98,7 @@ impl Default for MockMacOsApi {
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             display_name_fn: Box::new(|_| std::ptr::null_mut()),
             resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-            items: None,
-            mock_items: Vec::new(),
+            snapshot_array: None,
             display_names: Vec::new(),
             urls: Vec::new(),
         }
@@ -111,29 +110,23 @@ impl MockMacOsApi {
         Self::default()
     }
 
-    fn with_items(mut self, mock_items: Vec<MockItem>) -> Self {
-        let ids: Vec<_> = mock_items.iter().map(|item| item.id).collect();
-        let items = ids
-            .into_iter()
-            .map(Self::create_mock_item)
-            .collect::<Vec<_>>();
-
+    fn with_favorites(mut self, favorites: Vec<FavoriteItem>) -> Self {
         // Set up items and snapshot
-        let array = CFArray::from_copyable(&items);
+        let item_refs: Vec<_> = favorites
+            .iter()
+            .map(|item| Self::create_list_item_ref(item.id))
+            .collect();
+        let array = CFArray::from_copyable(&item_refs);
         let items_ref = array.as_concrete_TypeRef();
-        self.items = Some(array);
+        self.snapshot_array = Some(array);
         self.snapshot_fn = Box::new(move |_| items_ref);
 
         // Set up list creation
         self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
 
-        // Store mock items for display name and URL lookups
-        self.mock_items = mock_items;
-
         // Set up display name function
         let mut display_names = Vec::new();
-        let mock_items = self
-            .mock_items
+        let display_name_refs = favorites
             .iter()
             .map(|item| {
                 let name_str = item
@@ -150,7 +143,7 @@ impl MockMacOsApi {
         self.display_names = display_names;
         self.display_name_fn = Box::new(move |item_ref| {
             let id = item_ref as i32;
-            mock_items
+            display_name_refs
                 .iter()
                 .find(|(item_id, _)| *item_id == id)
                 .map(|(_, name_ref)| *name_ref)
@@ -159,8 +152,7 @@ impl MockMacOsApi {
 
         // Set up URL function
         let mut urls = Vec::new();
-        let mock_items = self
-            .mock_items
+        let url_refs = favorites
             .iter()
             .map(|item| {
                 let url_str = item.url.to_string();
@@ -175,7 +167,7 @@ impl MockMacOsApi {
         self.urls = urls;
         self.resolved_url_fn = Box::new(move |item_ref| {
             let id = item_ref as i32;
-            mock_items
+            url_refs
                 .iter()
                 .find(|(item_id, _)| *item_id == id)
                 .map(|(_, url_ref)| *url_ref)
@@ -185,7 +177,7 @@ impl MockMacOsApi {
         self
     }
 
-    fn create_mock_item(id: i32) -> LSSharedFileListItemRef {
+    fn create_list_item_ref(id: i32) -> LSSharedFileListItemRef {
         id as LSSharedFileListItemRef
     }
 
