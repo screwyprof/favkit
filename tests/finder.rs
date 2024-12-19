@@ -1,6 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-use coverage_helper::test;
-
 use core_foundation::{
     array::{CFArray, CFArrayRef},
     base::{CFAllocatorRef, CFTypeRef, TCFType},
@@ -9,99 +6,58 @@ use core_foundation::{
 };
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListItemRef};
 use favkit::{
-    Finder,
-    finder::{FinderError, Result, SidebarItem, Target},
+    finder::{Finder, FinderError, Result, SidebarItem, Target},
     system::{
-        api::MacOsApi,
+        MacOsApi,
         favorites::{DisplayName, FavoritesError, Snapshot, Url},
     },
 };
 use std::rc::Rc;
+
 mod test_data {
     pub const DOCUMENTS_NAME: &str = "Documents";
     pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 }
 
-/// Test builder for mock API
-struct MockBuilder {
+/// Index type for safer array access
+#[derive(Debug, Clone, Copy)]
+struct ItemIndex(usize);
+
+impl ItemIndex {
+    fn from_raw(raw: LSSharedFileListItemRef) -> Self {
+        Self((raw as i32 - 1) as usize)
+    }
+}
+
+/// Builder for creating test data
+#[derive(Default)]
+struct FavoritesBuilder {
     items: Vec<(Option<&'static str>, &'static str)>,
 }
 
-impl MockBuilder {
+impl FavoritesBuilder {
     fn new() -> Self {
-        Self { items: Vec::new() }
+        Self::default()
     }
 
-    fn with_items(mut self, items: Vec<(Option<&'static str>, &'static str)>) -> Self {
-        self.items = items;
+    fn add_item(mut self, name: Option<&'static str>, url: &'static str) -> Self {
+        self.items.push((name, url));
         self
     }
 
-    fn build(&self) -> MockMacOsApi {
-        let favorites = self
+    fn build(self) -> Favorites {
+        let items = self
             .items
-            .iter()
-            .map(|(name, url)| FavoriteItem::new(*name, url))
+            .into_iter()
+            .map(|(name, url)| FavoriteItem::new(name, url))
             .collect();
-        MockMacOsApi::new().with_favorites(favorites)
-    }
-}
-
-/// Type aliases for closure types
-type ListCreateFn = Box<dyn Fn() -> LSSharedFileListRef>;
-type SnapshotFn = Box<dyn Fn(LSSharedFileListRef) -> CFArrayRef>;
-type DisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
-type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
-
-/// Represents a collection of favorite items with their snapshot
-#[allow(dead_code)]
-struct Favorites {
-    items: Rc<Vec<FavoriteItem>>,
-    snapshot: Rc<Option<Snapshot>>,
-    display_names: Rc<Vec<DisplayName>>,
-    urls: Rc<Vec<Url>>,
-}
-
-impl Default for Favorites {
-    fn default() -> Self {
-        Self {
-            items: Rc::new(Vec::new()),
-            snapshot: Rc::new(None),
-            display_names: Rc::new(Vec::new()),
-            urls: Rc::new(Vec::new()),
-        }
-    }
-}
-
-impl Favorites {
-    fn new(items: Vec<FavoriteItem>) -> Self {
-        let items = Rc::new(items);
-
-        // Create snapshot items
-        let snapshot_items: Vec<_> = (1..=items.len())
-            .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
-            .collect();
-
-        // Create snapshot
-        let snapshot_array = CFArray::from_copyable(&snapshot_items);
-        let snapshot_array_ref = snapshot_array.as_concrete_TypeRef();
-        let snapshot = Rc::new(Snapshot::try_from(snapshot_array_ref).ok());
-
-        // Pre-create display names and urls
-        let display_names = Rc::new(items.iter().map(|item| item.display_name.clone()).collect());
-        let urls = Rc::new(items.iter().map(|item| item.url.clone()).collect());
-
-        Self {
-            items,
-            snapshot,
-            display_names,
-            urls,
-        }
+        Favorites::new(items)
     }
 }
 
 /// Represents a favorite item with its Core Foundation data
+#[derive(Debug)]
 struct FavoriteItem {
     display_name: DisplayName,
     url: Url,
@@ -126,88 +82,149 @@ impl FavoriteItem {
     }
 }
 
+/// Collection of favorite items with their snapshot
+#[derive(Debug)]
+struct Favorites {
+    snapshot: Rc<Option<Snapshot>>,
+    display_names: Rc<Vec<DisplayName>>,
+    urls: Rc<Vec<Url>>,
+}
+
+impl Default for Favorites {
+    fn default() -> Self {
+        Self {
+            snapshot: Rc::new(None),
+            display_names: Rc::new(Vec::new()),
+            urls: Rc::new(Vec::new()),
+        }
+    }
+}
+
+impl Favorites {
+    fn new(items: Vec<FavoriteItem>) -> Self {
+        let snapshot = {
+            let snapshot_items: Vec<_> = (1..=items.len())
+                .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
+                .collect();
+            let array = CFArray::from_copyable(&snapshot_items);
+            Rc::new(Some(
+                Snapshot::try_from(array.as_concrete_TypeRef()).unwrap(),
+            ))
+        };
+
+        let display_names = Rc::new(items.iter().map(|item| item.display_name.clone()).collect());
+        let urls = Rc::new(items.iter().map(|item| item.url.clone()).collect());
+
+        Self {
+            snapshot,
+            display_names,
+            urls,
+        }
+    }
+}
+
+/// Type aliases for closure types
+type ListCreateFn = Box<dyn Fn() -> LSSharedFileListRef>;
+type SnapshotFn = Box<dyn Fn(LSSharedFileListRef) -> CFArrayRef>;
+type DisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
+type ResolvedUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
+
+/// Builder for creating mock API implementations
+#[derive(Default)]
+struct MockMacOsApiBuilder {
+    favorites: Option<Favorites>,
+    list_create_fn: Option<ListCreateFn>,
+    snapshot_fn: Option<SnapshotFn>,
+    display_name_fn: Option<DisplayNameFn>,
+    resolved_url_fn: Option<ResolvedUrlFn>,
+}
+
+impl MockMacOsApiBuilder {
+    fn new() -> Self {
+        let raw_list = 1 as LSSharedFileListRef;
+        let empty_snapshot =
+            CFArray::from_copyable(&Vec::<*mut OpaqueLSSharedFileListItemRef>::new());
+        let snapshot = Rc::new(Some(
+            Snapshot::try_from(empty_snapshot.as_concrete_TypeRef()).unwrap(),
+        ));
+
+        Self {
+            favorites: None,
+            list_create_fn: Some(Box::new(move || raw_list)),
+            snapshot_fn: Some(Box::new(move |_| {
+                let snapshot = snapshot.as_ref().as_ref().unwrap();
+                snapshot.into()
+            })),
+            display_name_fn: None,
+            resolved_url_fn: None,
+        }
+    }
+
+    fn with_favorites(mut self, favorites: Favorites) -> Self {
+        let raw_list = 1 as LSSharedFileListRef;
+
+        self.list_create_fn = Some(Box::new(move || raw_list));
+
+        let snapshot = Rc::clone(&favorites.snapshot);
+        self.snapshot_fn = Some(Box::new(move |_| {
+            let snapshot = snapshot.as_ref().as_ref().unwrap();
+            snapshot.into()
+        }));
+
+        let display_names = Rc::clone(&favorites.display_names);
+        self.display_name_fn = Some(Box::new(move |item_ref| {
+            let idx = ItemIndex::from_raw(item_ref);
+            (&display_names[idx.0]).into()
+        }));
+
+        let urls = Rc::clone(&favorites.urls);
+        self.resolved_url_fn = Some(Box::new(move |item_ref| {
+            let idx = ItemIndex::from_raw(item_ref);
+            (&urls[idx.0]).into()
+        }));
+
+        self.favorites = Some(favorites);
+        self
+    }
+
+    fn with_null_list(mut self) -> Self {
+        self.list_create_fn = Some(Box::new(std::ptr::null_mut));
+        self
+    }
+
+    fn with_null_snapshot(mut self) -> Self {
+        let raw_list = 1 as LSSharedFileListRef;
+        self.list_create_fn = Some(Box::new(move || raw_list));
+        self.snapshot_fn = Some(Box::new(|_| std::ptr::null()));
+        self
+    }
+
+    fn build(self) -> MockMacOsApi {
+        let _favorites = self.favorites.unwrap_or_default();
+
+        MockMacOsApi {
+            list_create_fn: self
+                .list_create_fn
+                .unwrap_or_else(|| Box::new(std::ptr::null_mut)),
+            snapshot_fn: self
+                .snapshot_fn
+                .unwrap_or_else(|| Box::new(|_| std::ptr::null())),
+            display_name_fn: self
+                .display_name_fn
+                .unwrap_or_else(|| Box::new(|_| std::ptr::null_mut())),
+            resolved_url_fn: self
+                .resolved_url_fn
+                .unwrap_or_else(|| Box::new(|_| std::ptr::null_mut())),
+        }
+    }
+}
+
+/// Mock implementation of MacOsApi for testing
 struct MockMacOsApi {
-    favorites: Favorites,
     list_create_fn: ListCreateFn,
     snapshot_fn: SnapshotFn,
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
-}
-
-impl Default for MockMacOsApi {
-    fn default() -> Self {
-        Self {
-            favorites: Favorites::default(),
-            list_create_fn: Box::new(std::ptr::null_mut),
-            snapshot_fn: Box::new(|_| std::ptr::null()),
-            display_name_fn: Box::new(|_| std::ptr::null_mut()),
-            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-        }
-    }
-}
-
-impl MockMacOsApi {
-    fn new() -> Self {
-        Self {
-            favorites: Favorites::default(),
-            list_create_fn: Box::new(std::ptr::null_mut),
-            snapshot_fn: Box::new(|_| std::ptr::null()),
-            display_name_fn: Box::new(|_| std::ptr::null_mut()),
-            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-        }
-    }
-
-    fn with_favorites(mut self, items: Vec<FavoriteItem>) -> Self {
-        // Create favorites with snapshot and CF objects
-        self.favorites = Favorites::new(items);
-
-        // 1. Mock ls_shared_file_list_create
-        let raw_list = 1 as LSSharedFileListRef;
-        self.list_create_fn = Box::new(move || raw_list);
-
-        // 2. Mock ls_shared_file_list_copy_snapshot
-        let snapshot = Rc::clone(&self.favorites.snapshot);
-        self.snapshot_fn = Box::new(move |_| {
-            let snapshot = snapshot.as_ref().as_ref().unwrap();
-            snapshot.into()
-        });
-
-        // 3. Mock ls_shared_file_list_item_copy_display_name
-        let display_names = Rc::clone(&self.favorites.display_names);
-        self.display_name_fn = Box::new(move |item_ref| {
-            let idx = (item_ref as i32 - 1) as usize;
-            (&display_names[idx]).into()
-        });
-
-        // 4. Mock ls_shared_file_list_item_copy_resolved_url
-        let urls = Rc::clone(&self.favorites.urls);
-        self.resolved_url_fn = Box::new(move |item_ref| {
-            let idx = (item_ref as i32 - 1) as usize;
-            (&urls[idx]).into()
-        });
-
-        self
-    }
-
-    fn failing_list() -> Self {
-        Self {
-            favorites: Favorites::default(),
-            list_create_fn: Box::new(std::ptr::null_mut),
-            snapshot_fn: Box::new(|_| std::ptr::null()),
-            display_name_fn: Box::new(|_| std::ptr::null_mut()),
-            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-        }
-    }
-
-    fn failing_snapshot() -> Self {
-        Self {
-            favorites: Favorites::default(),
-            list_create_fn: Box::new(|| 1 as LSSharedFileListRef),
-            snapshot_fn: Box::new(|_| std::ptr::null()),
-            display_name_fn: Box::new(|_| std::ptr::null_mut()),
-            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
-        }
-    }
 }
 
 impl MacOsApi for MockMacOsApi {
@@ -222,10 +239,10 @@ impl MacOsApi for MockMacOsApi {
 
     unsafe fn ls_shared_file_list_copy_snapshot(
         &self,
-        list: LSSharedFileListRef,
+        _list: LSSharedFileListRef,
         _seed: *mut u32,
     ) -> CFArrayRef {
-        (self.snapshot_fn)(list)
+        (self.snapshot_fn)(_list)
     }
 
     unsafe fn ls_shared_file_list_item_copy_display_name(
@@ -249,7 +266,7 @@ impl MacOsApi for MockMacOsApi {
 fn should_fail_when_list_handle_is_null() -> Result<()> {
     // Arrange
     let expected_error = Err(FinderError::AccessError(FavoritesError::NullListHandle));
-    let mock_api = MockMacOsApi::failing_list();
+    let mock_api = MockMacOsApiBuilder::new().with_null_list().build();
     let finder = Finder::new(mock_api);
 
     // Act
@@ -264,7 +281,7 @@ fn should_fail_when_list_handle_is_null() -> Result<()> {
 fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
     // Arrange
     let expected_error = Err(FinderError::AccessError(FavoritesError::NullSnapshotHandle));
-    let mock_api = MockMacOsApi::failing_snapshot();
+    let mock_api = MockMacOsApiBuilder::new().with_null_snapshot().build();
     let finder = Finder::new(mock_api);
 
     // Act
@@ -279,7 +296,7 @@ fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
 fn should_return_empty_list_when_no_favorites() -> Result<()> {
     // Arrange
     let expected_result: Vec<SidebarItem> = vec![];
-    let mock_api = MockBuilder::new().with_items(vec![]).build();
+    let mock_api = MockMacOsApiBuilder::new().build();
     let finder = Finder::new(mock_api);
 
     // Act
@@ -297,12 +314,10 @@ fn should_return_favorite_with_display_name_and_url() -> Result<()> {
         Some(test_data::DOCUMENTS_NAME.to_string()),
         Target(format!("file://{}", test_data::DOCUMENTS_PATH)),
     )];
-    let mock_api = MockBuilder::new()
-        .with_items(vec![(
-            Some(test_data::DOCUMENTS_NAME),
-            test_data::DOCUMENTS_PATH,
-        )])
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some(test_data::DOCUMENTS_NAME), test_data::DOCUMENTS_PATH)
         .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
 
     // Act
@@ -320,9 +335,10 @@ fn should_handle_airdrop_item() -> Result<()> {
         None,
         Target(test_data::AIRDROP_URL.to_string()),
     )];
-    let mock_api = MockBuilder::new()
-        .with_items(vec![(None, test_data::AIRDROP_URL)])
+    let favorites = FavoritesBuilder::new()
+        .add_item(None, test_data::AIRDROP_URL)
         .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
 
     // Act
@@ -347,13 +363,12 @@ fn should_handle_multiple_favorites() -> Result<()> {
             Target("file:///Users/user/Downloads/".to_string()),
         ),
     ];
-    let mock_api = MockBuilder::new()
-        .with_items(vec![
-            (None, test_data::AIRDROP_URL),
-            (Some("Applications"), "/Applications/"),
-            (Some("Downloads"), "/Users/user/Downloads/"),
-        ])
+    let favorites = FavoritesBuilder::new()
+        .add_item(None, test_data::AIRDROP_URL)
+        .add_item(Some("Applications"), "/Applications/")
+        .add_item(Some("Downloads"), "/Users/user/Downloads/")
         .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
 
     // Act
