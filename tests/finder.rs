@@ -16,6 +16,7 @@ use favkit::{
         favorites::{DisplayName, FavoritesError, Url},
     },
 };
+use std::rc::Rc;
 
 mod test_data {
     pub const DOCUMENTS_NAME: &str = "Documents";
@@ -87,8 +88,8 @@ struct MockMacOsApi {
     display_name_fn: DisplayNameFn,
     resolved_url_fn: ResolvedUrlFn,
     snapshot_array: Option<CFArray<LSSharedFileListItemRef>>,
-    display_names: Vec<CFString>,
-    urls: Vec<CFURL>,
+    display_names: Vec<Option<DisplayName>>,
+    urls: Vec<Url>,
 }
 
 impl Default for MockMacOsApi {
@@ -111,73 +112,52 @@ impl MockMacOsApi {
     }
 
     fn with_favorites(mut self, favorites: Vec<FavoriteItem>) -> Self {
-        // Set up items and snapshot
-        let item_refs: Vec<_> = favorites
-            .iter()
-            .map(|item| Self::create_list_item_ref(item.id))
-            .collect();
+        let mut item_refs = Vec::new();
+        let mut display_names = Vec::new();
+        let mut urls = Vec::new();
+        let mut lookup_data = Vec::new();
+
+        // First, store all domain objects
+        for item in favorites {
+            item_refs.push(Self::to_list_item_ref(item.id));
+            display_names.push(item.display_name);
+            urls.push(item.url);
+        }
+
+        // Then build lookup data using references to stored objects
+        for (i, id) in item_refs.iter().enumerate() {
+            lookup_data.push((
+                *id as i32,
+                display_names[i]
+                    .as_ref()
+                    .map(|name| name.into())
+                    .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef()),
+                (&urls[i]).into(),
+            ));
+        }
+
         let array = CFArray::from_copyable(&item_refs);
         let items_ref = array.as_concrete_TypeRef();
+
         self.snapshot_array = Some(array);
         self.snapshot_fn = Box::new(move |_| items_ref);
-
-        // Set up list creation
         self.list_create_fn = Box::new(|| 1 as LSSharedFileListRef);
-
-        // Set up display name function
-        let mut display_names = Vec::new();
-        let display_name_refs = favorites
-            .iter()
-            .map(|item| {
-                let name_str = item
-                    .display_name
-                    .as_ref()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
-                let cf_string = CFString::new(&name_str);
-                display_names.push(cf_string.clone());
-                (item.id, cf_string.as_concrete_TypeRef())
-            })
-            .collect::<Vec<_>>();
-
         self.display_names = display_names;
-        self.display_name_fn = Box::new(move |item_ref| {
-            let id = item_ref as i32;
-            display_name_refs
-                .iter()
-                .find(|(item_id, _)| *item_id == id)
-                .map(|(_, name_ref)| *name_ref)
-                .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef())
-        });
-
-        // Set up URL function
-        let mut urls = Vec::new();
-        let url_refs = favorites
-            .iter()
-            .map(|item| {
-                let url_str = item.url.to_string();
-                let is_dir = url_str.ends_with('/');
-                let file_path = CFString::new(&url_str);
-                let url = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
-                urls.push(url.clone());
-                (item.id, url.as_concrete_TypeRef())
-            })
-            .collect::<Vec<_>>();
-
         self.urls = urls;
-        self.resolved_url_fn = Box::new(move |item_ref| {
-            let id = item_ref as i32;
-            url_refs
-                .iter()
-                .find(|(item_id, _)| *item_id == id)
-                .map(|(_, url_ref)| *url_ref)
-                .unwrap_or_else(std::ptr::null)
-        });
+
+        let lookup_data = Rc::new(lookup_data);
+        let lookup_data_clone = Rc::clone(&lookup_data);
+
+        self.display_name_fn =
+            Box::new(move |item_ref| Self::lookup_display_name_ref(&lookup_data, item_ref as i32));
+
+        self.resolved_url_fn =
+            Box::new(move |item_ref| Self::lookup_url_ref(&lookup_data_clone, item_ref as i32));
 
         self
     }
 
-    fn create_list_item_ref(id: i32) -> LSSharedFileListItemRef {
+    fn to_list_item_ref(id: i32) -> LSSharedFileListItemRef {
         id as LSSharedFileListItemRef
     }
 
@@ -194,6 +174,25 @@ impl MockMacOsApi {
             snapshot_fn: Box::new(|_| std::ptr::null_mut()),
             ..Default::default()
         }
+    }
+
+    fn lookup_display_name_ref(
+        lookup_data: &[(i32, CFStringRef, CFURLRef)],
+        id: i32,
+    ) -> CFStringRef {
+        lookup_data
+            .iter()
+            .find(|(item_id, _, _)| *item_id == id)
+            .map(|(_, name_ref, _)| *name_ref)
+            .unwrap_or_else(|| CFString::new("").as_concrete_TypeRef())
+    }
+
+    fn lookup_url_ref(lookup_data: &[(i32, CFStringRef, CFURLRef)], id: i32) -> CFURLRef {
+        lookup_data
+            .iter()
+            .find(|(item_id, _, _)| *item_id == id)
+            .map(|(_, _, url_ref)| *url_ref)
+            .unwrap_or_else(std::ptr::null)
     }
 }
 
