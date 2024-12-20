@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean clean-coverage watch build build-release
+.PHONY: help run test fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean clean-coverage watch build build-release nix-build
 
 # Cargo settings
 CARGO := cargo
@@ -51,6 +51,9 @@ build: ## Build debug version
 
 build-release: ## Build optimized release version
 	@$(CARGO) $(CARGO_FLAGS) build --all-features --release
+
+nix-build: ## Build using Nix (with caching)
+	@nix build
 
 ##@ Code Quality
 fmt: ## Format code
