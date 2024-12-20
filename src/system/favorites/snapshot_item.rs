@@ -1,10 +1,11 @@
 use std::ptr::NonNull;
 
+use core_services::OpaqueLSSharedFileListItemRef;
+
 use crate::system::{
     core_foundation::RawRef,
     favorites::errors::{FavoritesError, Result},
 };
-use core_services::OpaqueLSSharedFileListItemRef;
 
 #[derive(Clone)]
 pub struct SnapshotItem(RawRef<OpaqueLSSharedFileListItemRef>);

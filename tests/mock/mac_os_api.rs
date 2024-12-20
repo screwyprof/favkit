@@ -1,7 +1,8 @@
+use std::rc::Rc;
+
 use core_foundation::{
     array::{CFArray, CFArrayRef},
-    base::TCFType,
-    base::{CFAllocatorRef, CFTypeRef},
+    base::{CFAllocatorRef, CFTypeRef, TCFType},
     error::CFErrorRef,
     string::CFStringRef,
     url::CFURLRef,
@@ -11,7 +12,6 @@ use core_services::{
     OpaqueLSSharedFileListItemRef,
 };
 use favkit::system::favorites::{DisplayName, Snapshot, Url};
-use std::rc::Rc;
 
 use super::favorites::Favorites;
 

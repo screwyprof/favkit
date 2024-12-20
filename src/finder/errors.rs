@@ -1,5 +1,6 @@
-use crate::system::favorites::FavoritesError;
 use thiserror::Error;
+
+use crate::system::favorites::FavoritesError;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum FinderError {

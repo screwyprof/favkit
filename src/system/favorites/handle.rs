@@ -1,8 +1,9 @@
+use core_services::OpaqueLSSharedFileListRef;
+
 use crate::system::{
     core_foundation::RawRef,
     favorites::errors::{FavoritesError, Result},
 };
-use core_services::OpaqueLSSharedFileListRef;
 
 pub struct FavoritesHandle(RawRef<OpaqueLSSharedFileListRef>);
 
@@ -24,8 +25,9 @@ impl From<FavoritesHandle> for *mut OpaqueLSSharedFileListRef {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::ptr::NonNull;
+
+    use super::*;
     const FAVORITES_REF: *mut OpaqueLSSharedFileListRef = 42 as *mut _;
 
     #[test]

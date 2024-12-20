@@ -1,7 +1,9 @@
-use core_foundation::url::{CFURL, CFURLRef};
 use std::fmt;
 
-use core_foundation::base::TCFType;
+use core_foundation::{
+    base::TCFType,
+    url::{CFURL, CFURLRef},
+};
 
 use crate::system::{
     core_foundation::CFRef,
@@ -35,8 +37,9 @@ impl fmt::Display for Url {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core_foundation::{base::TCFType, string::CFString, url::kCFURLPOSIXPathStyle};
+
+    use super::*;
 
     const EXAMPLE_URL: &str = "file:///Users/user/Documents";
 

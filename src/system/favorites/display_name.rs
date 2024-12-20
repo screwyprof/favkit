@@ -1,6 +1,7 @@
+use std::fmt;
+
 use core_foundation::string::{CFString, CFStringRef};
 use core_services::TCFType;
-use std::fmt;
 
 use crate::system::{
     core_foundation::CFRef,
@@ -34,8 +35,9 @@ impl fmt::Display for DisplayName {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core_foundation::base::TCFType;
+
+    use super::*;
 
     const EXAMPLE_DISPLAY_NAME: &str = "Documents";
 

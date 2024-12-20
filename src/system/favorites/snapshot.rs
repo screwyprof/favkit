@@ -4,15 +4,13 @@ use core_foundation::{
     array::{CFArray, CFArrayRef},
     base::CFRange,
 };
-use core_services::LSSharedFileListItemRef;
-use core_services::TCFType;
+use core_services::{LSSharedFileListItemRef, TCFType};
 
+use super::snapshot_item::SnapshotItem;
 use crate::system::{
     core_foundation::CFRef,
     favorites::errors::{FavoritesError, Result},
 };
-
-use super::snapshot_item::SnapshotItem;
 
 #[derive(Debug)]
 pub struct Snapshot(CFRef<CFArray<LSSharedFileListItemRef>>);
@@ -85,8 +83,9 @@ impl Iterator for SnapshotIterator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core_foundation::base::TCFType;
+
+    use super::*;
 
     const ITEM_REF: LSSharedFileListItemRef = 1 as LSSharedFileListItemRef;
 

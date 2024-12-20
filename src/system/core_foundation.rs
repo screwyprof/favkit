@@ -9,7 +9,7 @@
 //! ```no_run
 //! use core_foundation::{
 //!     base::TCFType,
-//!     string::{CFString, CFStringRef}
+//!     string::{CFString, CFStringRef},
 //! };
 //! # use favkit::system::core_foundation::{CFRef, Error};
 //!
@@ -42,8 +42,9 @@
 //! # Ok::<(), Error>(())
 //! ```
 
-use core_foundation::base::{TCFType, TCFTypeRef};
 use std::{ops::Deref, ptr::NonNull};
+
+use core_foundation::base::{TCFType, TCFTypeRef};
 use thiserror::Error;
 
 /// Errors that can occur when working with Core Foundation types.
@@ -151,8 +152,8 @@ impl<T> From<RawRef<T>> for *mut T {
 ///
 /// ```no_run
 /// use core_foundation::{
+///     array::{CFArray, CFArrayRef},
 ///     base::TCFType,
-///     array::{CFArray, CFArrayRef}
 /// };
 /// # use favkit::system::core_foundation::{CFRef, Error};
 ///
@@ -176,15 +177,11 @@ impl<T: TCFType> CFRef<T> {
     /// use core_foundation::{
     ///     base::TCFType,
     ///     string::CFString,
-    ///     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle}
+    ///     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
     /// };
     /// # use favkit::system::core_foundation::{CFRef, Error};
     ///
-    /// let url = CFURL::from_file_system_path(
-    ///     CFString::new("/test"),
-    ///     kCFURLPOSIXPathStyle,
-    ///     true
-    /// );
+    /// let url = CFURL::from_file_system_path(CFString::new("/test"), kCFURLPOSIXPathStyle, true);
     /// let ptr = url.as_concrete_TypeRef();
     /// let wrapped = CFRef::<CFURL>::try_from_ref(ptr)?;
     /// # Ok::<(), Error>(())

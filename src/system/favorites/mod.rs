@@ -5,15 +5,14 @@ mod snapshot;
 mod snapshot_item;
 mod url;
 
+use core_foundation::base::kCFAllocatorDefault;
+use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
 pub use display_name::DisplayName;
 pub use errors::FavoritesError;
 pub use handle::FavoritesHandle;
 pub use snapshot::Snapshot;
 pub use snapshot_item::SnapshotItem;
 pub use url::Url;
-
-use core_foundation::base::kCFAllocatorDefault;
-use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
 
 use crate::{
     finder::{Result, SidebarItem, Target, favorites::FavoritesApi},

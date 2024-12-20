@@ -6,10 +6,10 @@ mod sidebar;
 
 pub use display_name::DisplayName;
 pub use errors::{FinderError, Result};
+use favorites::FavoritesApi;
 pub use sidebar::{SidebarItem, Target};
 
 use crate::system::{RealMacOsApi, api::MacOsApi, favorites::Favorites};
-use favorites::FavoritesApi;
 
 pub struct Finder {
     favorites: Favorites,

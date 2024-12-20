@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use core_foundation::{
     array::CFArray,
     base::TCFType,
@@ -6,7 +8,6 @@ use core_foundation::{
 };
 use core_services::OpaqueLSSharedFileListItemRef;
 use favkit::system::favorites::{DisplayName, Snapshot, Url};
-use std::rc::Rc;
 
 /// Builder for creating test data
 #[derive(Default)]
