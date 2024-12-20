@@ -2,15 +2,14 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean clean-coverage watch build build-release nix-build
+.PHONY: help run test test-debug fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean watch build build-release nix-build checks all
 
 # Cargo settings
 CARGO := cargo
 CARGO_FLAGS := --quiet
-CARGO_TEST_FLAGS :=
-CARGO_LLVM_COV_FLAGS := --all-features --workspace --show-missing-lines \
-                        --ignore-filename-regex=".cargo|test.rs" \
-						--branch
+LLVM_COV_FLAGS := --all-features --workspace --show-missing-lines \
+                  --ignore-filename-regex=".cargo|test.rs" \
+				  --branch
 
 # Coverage settings
 COVERAGE_DIR := target/coverage
@@ -36,13 +35,16 @@ run: ## Run the project
 	@$(CARGO) $(CARGO_FLAGS) run
 
 test: ## Run all tests
-	@$(CARGO) $(CARGO_FLAGS) test $(CARGO_TEST_FLAGS)
+	@cargo nextest run
+
+test-debug: ## Show paths to test binaries for debugging
+	@$(CARGO) test --no-run --message-format=json | jq -r 'select(.profile.test == true) | .executable'
 
 watch: ## Watch for changes and run tests and clippy
 	@$(CARGO) watch \
 		-w src \
 		-w tests \
-		-x "test --features test-utils" \
+		-x "nextest run --features test-utils" \
 		-x "clippy --all-targets --all-features -- -D warnings" \
 		-c
 
@@ -67,18 +69,19 @@ check: fmt lint ## Run all checks
 
 ##@ Coverage
 coverage: ## Generate code coverage report and open it in browser
-	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --html --open
+	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS) --html
+	@open target/llvm-cov/html/index.html
 
 coverage-text: ## Generate code coverage report in text format
-	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --text
+	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS)
 
 coverage-summary: ## Generate code coverage summary
-	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --summary-only
+	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS) --summary-only
 
 coverage-lcov: ## Generate code coverage report in lcov format
 	@mkdir -p $(COVERAGE_DIR)
-	@$(CARGO) $(CARGO_FLAGS) llvm-cov $(CARGO_LLVM_COV_FLAGS) --lcov \
-		| rustfilt | sed '/^Uncovered/,$$d' > $(COVERAGE_DIR)/lcov.info
+	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS) --lcov \
+			| rustfilt | sed '/^Uncovered/,$$d' > $(COVERAGE_DIR)/lcov.info
 
 coverage-html: coverage-lcov ## Generate detailed HTML coverage report with all metrics
 	@genhtml $(COVERAGE_DIR)/lcov.info \

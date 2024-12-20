@@ -1,0 +1,11 @@
+[profile.default]
+# Default settings
+test-threads = "num-cpus"
+
+[profile.ci]
+# CI-specific settings
+fail-fast = false
+retries = 2
+test-threads = "num-cpus"
+status-level = "all"
+final-status-level = "all" 

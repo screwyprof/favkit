@@ -31,7 +31,7 @@
         cargo-edit
         cargo-audit
         cargo-binutils
-        #cargo-llvm-cov
+        cargo-nextest
 
         # Coverage tools
         lcov
