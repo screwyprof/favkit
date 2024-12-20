@@ -67,8 +67,9 @@ nix-build: ## Build using Nix (with caching)
 fmt: ## Format code
 	@$(CARGO) fmt --all
 
-lint: ## Run clippy
+lint: ## Run clippy and security audit
 	@$(CARGO) $(CARGO_FLAGS) clippy --all-targets --all-features -- -D warnings
+	@$(CARGO) $(CARGO_FLAGS) audit
 
 ##@ Coverage
 coverage: ## Generate code coverage report and open it in browser
