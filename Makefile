@@ -2,7 +2,10 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test test-debug fmt lint check coverage coverage-text coverage-summary coverage-lcov coverage-html clean watch build build-release nix-build checks all
+.PHONY: help run test test-debug test-failures test-live \
+        fmt lint \
+        coverage coverage-text coverage-summary coverage-lcov coverage-html \
+        clean watch build build-release nix-build all
 
 # Cargo settings
 CARGO := cargo
@@ -19,8 +22,7 @@ export CARGO_INCREMENTAL=0
 export RUSTFLAGS=-C instrument-coverage -C codegen-units=1 -C opt-level=0 -C link-dead-code --cfg coverage_nightly
 export LLVM_PROFILE_FILE=$(COVERAGE_DIR)/coverage-%p-%m.profraw
 
-all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
-
+##@ Main Commands
 help: ## Show available commands
 	@printf "\033[1;34mUsage:\033[0m\n"
 	@printf "  make \033[36m<target>\033[0m\n\n"
@@ -30,23 +32,27 @@ help: ## Show available commands
 		/^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' \
 		$(MAKEFILE_LIST)
 
+all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
+
 ##@ Development Commands
+
 run: ## Run the project
 	@$(CARGO) $(CARGO_FLAGS) run
 
 test: ## Run all tests
-	@cargo nextest run
+	@cargo $(CARGO_FLAGS) nextest run
 
 test-debug: ## Show paths to test binaries for debugging
-	@$(CARGO) test --no-run --message-format=json | jq -r 'select(.profile.test == true) | .executable'
+	@$(CARGO) $(CARGO_FLAGS) test --no-run --message-format=json | jq -r 'select(.profile.test == true) | .executable'
+
+test-failures: ## Run tests and show only failures
+	@cargo $(CARGO_FLAGS) nextest run --status-level=fail --failure-output immediate --success-output never
+
+test-live: ## Run tests with live output (no capture)
+	@cargo $(CARGO_FLAGS) nextest run --no-capture
 
 watch: ## Watch for changes and run tests and clippy
-	@$(CARGO) watch \
-		-w src \
-		-w tests \
-		-x "nextest run --features test-utils" \
-		-x "clippy --all-targets --all-features -- -D warnings" \
-		-c
+	@bacon
 
 build: ## Build debug version
 	@$(CARGO) $(CARGO_FLAGS) build --all-features
@@ -64,13 +70,9 @@ fmt: ## Format code
 lint: ## Run clippy
 	@$(CARGO) $(CARGO_FLAGS) clippy --all-targets --all-features -- -D warnings
 
-check: fmt lint ## Run all checks
-	@$(CARGO) $(CARGO_FLAGS) check --all-features
-
 ##@ Coverage
 coverage: ## Generate code coverage report and open it in browser
-	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS) --html
-	@open target/llvm-cov/html/index.html
+	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS) --html --open
 
 coverage-text: ## Generate code coverage report in text format
 	@cargo $(CARGO_FLAGS) llvm-cov nextest $(LLVM_COV_FLAGS)
@@ -101,5 +103,3 @@ coverage-html: coverage-lcov ## Generate detailed HTML coverage report with all 
 clean: ## Clean build artifacts
 	@$(CARGO) $(CARGO_FLAGS) clean
 	@rm -rf $(COVERAGE_DIR)
-
-checks: check test coverage ## Run all checks, tests and coverage

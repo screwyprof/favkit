@@ -27,7 +27,7 @@
       # Development tools
       devTools = with pkgs; [
         # Cargo extensions
-        cargo-watch
+        bacon
         cargo-edit
         cargo-audit
         cargo-binutils

@@ -1,0 +1,87 @@
+# Default configuration
+default_job = "all"
+
+# Start in summary mode (only show errors/warnings/test results)
+summary = true
+
+# Export locations for IDE integration
+[exports.locations]
+auto = false  # only export when triggered by key
+path = ".bacon-locations"
+line_format = "{kind} {path}:{line}:{column} {message}"
+
+# Export job output to a file
+[exports.output]
+auto = false 
+path = ".bacon-output"
+
+[jobs.doc-open]
+command = ["cargo", "doc", "--no-deps", "--open"]
+on_success = "back" # so that we don't open the browser at each change
+
+[jobs.run]
+command = ["make", "-s", "run"]
+allow_warnings = true
+need_stdout = true
+on_success = "back"
+
+[jobs.test]
+command = ["make", "-s", "test"]
+analyzer = "nextest"
+need_stdout = true
+
+[jobs.test-failures]
+command = ["make", "-s", "test-failures"]
+analyzer = "nextest"
+need_stdout = true
+
+[jobs.test-live]
+command = ["make", "-s", "test-live"]
+analyzer = "nextest"
+need_stdout = true
+
+[jobs.coverage]
+command = ["make", "-s", "coverage-html"]
+need_stdout = true
+on_success = "back"
+
+[jobs.fmt]
+command = ["make", "-s", "fmt"]
+need_stdout = true
+
+[jobs.lint]
+command = ["make", "-s", "lint"]
+need_stdout = true
+
+[jobs.build]
+command = ["make", "-s", "build"]
+need_stdout = true
+
+[jobs.all]
+command = ["make", "-s", "-j", "all"]
+need_stdout = true
+
+# Key bindings
+[keybindings]
+# Job shortcuts
+a = "job:all"
+b = "job:build"
+c = "job:coverage"
+d = "job:doc-open"
+f = "job:test-failures"
+l = "job:lint"
+r = "job:run"
+t = "job:test"
+shift-t = "job:test-live"  # Live test output
+
+# Navigation (vim-like)
+esc = "back"
+g = "scroll-to-top"
+shift-g = "scroll-to-bottom"
+k = "scroll-lines(-1)"
+j = "scroll-lines(1)"
+ctrl-u = "scroll-page(-1)"
+ctrl-d = "scroll-page(1)"
+
+# Export shortcuts
+e = "export:output"      # Export current output to file
