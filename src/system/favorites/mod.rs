@@ -68,12 +68,18 @@ impl Favorites {
     }
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
-        let display_name = unsafe { self.copy_display_name(&item) }
-            .ok()
-            .map(|name| name.to_string())
-            .and_then(|name| (!name.is_empty()).then_some(name));
         let url = unsafe { self.copy_resolved_url(&item) }?;
         let target = Target(url.to_string());
+
+        let display_name = if target.0 == "nwnode://domain-AirDrop" {
+            Some("AirDrop".to_string())
+        } else {
+            unsafe { self.copy_display_name(&item) }
+                .ok()
+                .map(|name| name.to_string())
+                .and_then(|name| (!name.is_empty()).then_some(name))
+        };
+
         Ok(SidebarItem::new(display_name, target))
     }
 }

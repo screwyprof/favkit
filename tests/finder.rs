@@ -2,6 +2,7 @@ use favkit::{
     finder::{Finder, FinderError, Result, SidebarItem, Target},
     system::favorites::FavoritesError,
 };
+use pretty_assertions::assert_eq;
 
 mod mock;
 use mock::{favorites::FavoritesBuilder, mac_os_api::MockMacOsApiBuilder};
@@ -82,7 +83,7 @@ fn should_return_favorite_with_display_name_and_url() -> Result<()> {
 fn should_handle_airdrop_item() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(
-        None,
+        Some("AirDrop".to_string()),
         Target(constants::AIRDROP_URL.to_string()),
     )];
     let favorites = FavoritesBuilder::new()
@@ -103,7 +104,10 @@ fn should_handle_airdrop_item() -> Result<()> {
 fn should_handle_multiple_favorites() -> Result<()> {
     // Arrange
     let expected_result = vec![
-        SidebarItem::new(None, Target(constants::AIRDROP_URL.to_string())),
+        SidebarItem::new(
+            Some("AirDrop".to_string()),
+            Target(constants::AIRDROP_URL.to_string()),
+        ),
         SidebarItem::new(
             Some("Applications".to_string()),
             Target("file:///Applications/".to_string()),
