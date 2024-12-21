@@ -2,10 +2,12 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help run test test-debug test-failures test-live \
+# Declare all phony targets (all and clean first as required)
+.PHONY: all clean test \
+        help run test-debug test-failures test-live \
         fmt lint \
         coverage coverage-text coverage-summary coverage-lcov coverage-html \
-        clean watch build build-release build-nix all
+        watch build build-release build-nix
 
 # Cargo settings
 CARGO := cargo
@@ -24,21 +26,21 @@ export LLVM_PROFILE_FILE=$(COVERAGE_DIR)/coverage-%p-%m.profraw
 
 ##@ Main Commands
 help: ## Show available commands
-	@printf "\033[1;34mUsage:\033[0m\n"
-	@printf "  make \033[36m<target>\033[0m\n\n"
-	@printf "\033[1;34mAvailable targets:\033[0m\n\n"
-	@awk 'BEGIN {FS = ":.*##"; printf ""} \
+	@awk 'BEGIN {FS = ":.*##"; printf "\033[1;34mUsage:\033[0m\n  make \033[36m<target>\033[0m\n\n\033[1;34mAvailable targets:\033[0m\n"} \
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0,5) } \
 		/^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' \
 		$(MAKEFILE_LIST)
 
-all: Cargo.toml Cargo.lock $(shell find src -name '*.rs') fmt lint test build-release ## Format, lint, test, and build everything
+all: fmt lint test build-release ## Format, lint, test, and build everything
 
-##@ Development Commands
-
+##@ Development
 run: ## Run the project
 	@$(CARGO) $(CARGO_FLAGS) run
 
+watch: ## Watch for changes and run tests and clippy
+	@bacon
+
+##@ Testing
 test: ## Run all tests
 	@cargo $(CARGO_FLAGS) nextest run
 
@@ -51,9 +53,7 @@ test-failures: ## Run tests and show only failures
 test-live: ## Run tests with live output (no capture)
 	@cargo $(CARGO_FLAGS) nextest run --no-capture
 
-watch: ## Watch for changes and run tests and clippy
-	@bacon
-
+##@ Building
 build: ## Build debug version
 	@$(CARGO) $(CARGO_FLAGS) build --all-features
 

@@ -39,6 +39,9 @@
         # Coverage tools
         lcov
         rustfilt
+
+        # Linters
+        checkmake
       ];
 
       # macOS specific dependencies

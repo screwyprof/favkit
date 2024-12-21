@@ -22,6 +22,13 @@
 
       nixfmt-classic.enable = true;
       statix.enable = true;
+
+      checkmake = {
+        enable = true;
+        name = "Makefile Lint";
+        entry = "checkmake";
+        files = "Makefile$";
+      };
     };
   };
 }
