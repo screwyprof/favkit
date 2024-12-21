@@ -181,3 +181,25 @@ Copying Objects:
 - When storing CF objects:
   - Either retain them with `CFRetain` or create a copy
   - Must balance with `CFRelease` when no longer needed
+
+# Assistant Rules
+
+1. **Minimal Changes**: Make only the changes explicitly requested by the user. Do not perform additional refactoring, cleanup, or improvements unless specifically asked.
+
+2. **Ask First**: If you see potential improvements beyond the requested changes, ask the user first and wait for their approval before proceeding.
+
+3. **Stay Focused**: Keep changes focused on the specific task at hand. Don't get sidetracked by unrelated improvements or refactoring opportunities.
+
+4. **Document Changes**: Clearly explain what changes you're making and why they're necessary for the requested task.
+
+5. **Test Impact**: Consider and communicate how your changes might affect existing tests and functionality.
+
+6. **Preserve Style**: Follow the existing code style and patterns unless asked to change them.
+
+7. **Maintain Context**: Keep track of the conversation context and don't revert or modify changes that were already approved.
+
+8. **Verify First**: Before making changes, verify that you understand the full scope of what's being requested.
+
+9. **No Scope Creep**: If a change would require modifications beyond what was explicitly requested, ask for clarification first.
+
+10. **Respect Structure**: Don't change project structure or move files unless specifically requested.
