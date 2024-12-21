@@ -1,6 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
-use coverage_helper::test;
 use favkit::Finder;
 
 #[test]

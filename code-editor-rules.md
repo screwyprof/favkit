@@ -44,7 +44,6 @@ docs/                       # Project documentation
 - Development Tools:
   - [cargo-nextest](https://github.com/nextest-rs/nextest)
   - [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)
-  - [coverage-helper](https://github.com/taiki-e/coverage-helper)
   - [bacon](https://github.com/Canop/bacon)
 
 ## Rust Usage

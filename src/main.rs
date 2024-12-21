@@ -1,8 +1,6 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 use favkit::Finder;
 
-#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(coverage, coverage(off))]
 fn main() {
     let finder = Finder::default();
 
