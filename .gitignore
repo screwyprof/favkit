@@ -15,4 +15,6 @@
 
 # Dependencies
 /core-foundation/
- 
+
+# Pre-commit config
+.pre-commit-config.yaml

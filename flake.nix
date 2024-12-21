@@ -11,15 +11,17 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, rust-overlay, ... }:
+  outputs = { self, nixpkgs, rust-overlay, git-hooks, ... }:
     let
       system = "aarch64-darwin";
       overlays = [ (import rust-overlay) ];
-      pkgs = import nixpkgs {
-        inherit system overlays;
-      };
+      pkgs = import nixpkgs { inherit system overlays; };
 
       # Rust toolchain
       toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -48,10 +50,13 @@
       rustEnv = {
         RUST_BACKTRACE = "1";
         CARGO_NET_GIT_FETCH_WITH_CLI = "true";
-        
+
         # Add cargo bin to PATH
         PATH = "$HOME/.cargo/bin:${pkgs.lib.makeBinPath devTools}:$PATH";
       };
+
+      # Git hooks configuration
+      hooks = import ./.pre-commit-hooks.nix { inherit git-hooks system; };
 
       # Build the package
       favkit = pkgs.rustPlatform.buildRustPackage {
@@ -59,7 +64,7 @@
         version = "0.1.0";
         src = ./.;
         cargoLock.lockFile = ./Cargo.lock;
-        
+
         buildInputs = with pkgs.darwin.apple_sdk.frameworks; [
           CoreServices
           CoreFoundation
@@ -69,8 +74,7 @@
         RUSTC_BOOTSTRAP = 1;
         nativeBuildInputs = [ toolchain ];
       };
-    in
-    {
+    in {
       # Development environment
       devShells.${system}.default = pkgs.mkShell {
         # Build inputs
@@ -78,7 +82,7 @@
         buildInputs = darwinDeps;
 
         # Environment
-        inherit (rustEnv) RUST_BACKTRACE CARGO_NET_GIT_FETCH_WITH_CLI PATH; 
+        inherit (rustEnv) RUST_BACKTRACE CARGO_NET_GIT_FETCH_WITH_CLI PATH;
 
         # Shell initialization 
         shellHook = ''
@@ -86,24 +90,24 @@
           echo "Rust version: $(rustc --version)"
           echo "Cargo version: $(cargo --version)"
 
-          # Check if cargo-llvm-cov is available in PATH after adding cargo bin
-          if ! type cargo-llvm-cov >/dev/null 2>&1; then
-            echo "Installing cargo-llvm-cov..."
-            cargo install cargo-llvm-cov
-          fi
+          # Setup git hooks
+          ${hooks.pre-commit-check.shellHook}
         '';
       };
 
       # Package output
       packages.${system} = {
         default = favkit;
-        favkit = favkit;
+        inherit favkit;
       };
 
       # Meta information
       meta = {
-        maintainers = ["Maksim Shcherbo <max@happygopher.nl>"];
-        platforms = ["x86_64-darwin" "aarch64-darwin"];
+        maintainers = [ "Maksim Shcherbo <max@happygopher.nl>" ];
+        platforms = [ "x86_64-darwin" "aarch64-darwin" ];
       };
+
+      # Git hooks
+      checks.${system} = { inherit (hooks) pre-commit-check; };
     };
 }
