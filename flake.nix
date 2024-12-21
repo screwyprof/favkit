@@ -15,9 +15,10 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-filter.url = "github:numtide/nix-filter";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, git-hooks, ... }:
+  outputs = { self, nixpkgs, rust-overlay, git-hooks, nix-filter, ... }:
     let
       system = "aarch64-darwin";
       overlays = [ (import rust-overlay) ];
@@ -62,7 +63,11 @@
       favkit = pkgs.rustPlatform.buildRustPackage {
         pname = "favkit";
         version = "0.1.0";
-        src = ./.;
+        src = nix-filter.lib {
+          root = ./.;
+          include =
+            [ "src" "tests" "Cargo.toml" "Cargo.lock" "rust-toolchain.toml" ];
+        };
         cargoLock.lockFile = ./Cargo.lock;
 
         buildInputs = with pkgs.darwin.apple_sdk.frameworks; [

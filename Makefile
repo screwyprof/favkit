@@ -5,7 +5,7 @@ SHELL := /bin/bash
 .PHONY: help run test test-debug test-failures test-live \
         fmt lint \
         coverage coverage-text coverage-summary coverage-lcov coverage-html \
-        clean watch build build-release nix-build all
+        clean watch build build-release build-nix all
 
 # Cargo settings
 CARGO := cargo
@@ -60,7 +60,7 @@ build: ## Build debug version
 build-release: ## Build optimized release version
 	@$(CARGO) $(CARGO_FLAGS) build --all-features --release
 
-nix-build: ## Build using Nix (with caching)
+build-nix: ## Build using Nix (with caching)
 	@nix build
 
 ##@ Code Quality
