@@ -1,0 +1,36 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: macos-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          release-type: rust
+          config-file: .release-please-config.json
+      # Build and upload happen in same job as release-please
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.release_created }}
+      - uses: DeterminateSystems/nix-installer-action@main
+        if: ${{ steps.release.outputs.release_created }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+        if: ${{ steps.release.outputs.release_created }}
+      - name: Build Release Binary
+        if: ${{ steps.release.outputs.release_created }}
+        run: make build-nix
+      - name: Upload Release Artifact
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ steps.release.outputs.tag_name }} result/bin/favkit
