@@ -98,6 +98,9 @@
           echo "Rust version: $(rustc --version)"
           echo "Cargo version: $(cargo --version)"
 
+          echo "Installing cargo-llvm-cov..."
+          cargo install cargo-llvm-cov
+
           # Setup git hooks
           ${hooks.pre-commit-check.shellHook}
         '';

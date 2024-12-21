@@ -23,17 +23,17 @@ jobs:
       - name: Setup Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Run Tests and Lints
+      - name: Run Lints
         run: |
-          # Enter nix shell and run our make targets
           nix develop --command make lint
-          nix develop --command make test
 
-      - name: Run Coverage
+      - name: Run Tests With Coverage
+        id: coverage
         run: |
           nix develop --command make coverage-lcov
 
       - name: Upload coverage to Codecov
+        if: steps.coverage.outcome == 'success'
         uses: codecov/codecov-action@v5
         with:
           files: target/coverage/lcov.info
