@@ -1,6 +1,4 @@
-# 6. Release Please Automation
-
-Date: 2024-01-14
+# Release Please Automation
 
 ## Status
 
