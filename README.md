@@ -1,6 +1,6 @@
 # FavKit v3
 
-A modern Rust library and CLI tool for managing macOS Finder favorites. This project is a modern replacement for the abandoned `mysides` tool.
+A modern Rust library and CLI tool for managing macOS Finder favorites. This project is a modern replacement for the abandoned [mysides](https://github.com/mosen/mysides) tool.
 
 ## Project Goals
 
@@ -40,3 +40,7 @@ make # run linters, tests and build project
 ## License
 
 MIT
+
+## Contributing
+
+See our [Contributing Guide](CONTRIBUTING.md) for details on how to get involved with the project.
