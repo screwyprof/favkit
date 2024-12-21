@@ -4,6 +4,7 @@ mod handle;
 mod snapshot;
 mod snapshot_item;
 mod url;
+mod url_mapper;
 
 use core_foundation::base::kCFAllocatorDefault;
 use core_services::{LSSharedFileListResolutionFlags, kLSSharedFileListFavoriteItems};
@@ -13,6 +14,7 @@ pub use handle::FavoritesHandle;
 pub use snapshot::Snapshot;
 pub use snapshot_item::SnapshotItem;
 pub use url::Url;
+pub use url_mapper::TargetUrl;
 
 use crate::{
     finder::{Result, SidebarItem, Target, favorites::FavoritesApi},
@@ -69,16 +71,8 @@ impl Favorites {
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
         let url = unsafe { self.copy_resolved_url(&item) }?;
-        let target = if url.to_string() == "nwnode://domain-AirDrop" {
-            Target::AirDrop
-        } else {
-            let name = unsafe { self.copy_display_name(&item) }?.to_string();
-            Target::Custom {
-                label: name,
-                path: url.to_string(),
-            }
-        };
-
+        let name = unsafe { self.copy_display_name(&item) }?;
+        let target = Target::from(TargetUrl(url, name));
         Ok(SidebarItem::new(target))
     }
 }
