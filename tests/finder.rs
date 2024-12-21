@@ -1,5 +1,5 @@
 use favkit::{
-    finder::{Finder, FinderError, Result, SidebarItem, Target},
+    finder::{DisplayName, Finder, FinderError, Result, SidebarItem, Target},
     system::favorites::FavoritesError,
 };
 use pretty_assertions::assert_eq;
@@ -62,7 +62,7 @@ fn should_return_empty_list_when_no_favorites() -> Result<()> {
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(
-        Some(constants::DOCUMENTS_NAME.to_string()),
+        DisplayName::Custom(constants::DOCUMENTS_NAME.to_string()),
         Target(format!("file://{}", constants::DOCUMENTS_PATH)),
     )];
     let favorites = FavoritesBuilder::new()
@@ -83,7 +83,7 @@ fn should_return_favorite_with_display_name_and_url() -> Result<()> {
 fn should_handle_airdrop_item() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(
-        Some("AirDrop".to_string()),
+        DisplayName::AirDrop,
         Target(constants::AIRDROP_URL.to_string()),
     )];
     let favorites = FavoritesBuilder::new()
@@ -105,15 +105,15 @@ fn should_handle_multiple_favorites() -> Result<()> {
     // Arrange
     let expected_result = vec![
         SidebarItem::new(
-            Some("AirDrop".to_string()),
+            DisplayName::AirDrop,
             Target(constants::AIRDROP_URL.to_string()),
         ),
         SidebarItem::new(
-            Some("Applications".to_string()),
+            DisplayName::Custom("Applications".to_string()),
             Target("file:///Applications/".to_string()),
         ),
         SidebarItem::new(
-            Some("Downloads".to_string()),
+            DisplayName::Custom("Downloads".to_string()),
             Target("file:///Users/user/Downloads/".to_string()),
         ),
     ];
