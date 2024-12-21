@@ -1,5 +1,7 @@
 # FavKit
 
+[![codecov](https://codecov.io/gh/screwyprof/favkit/graph/badge.svg?token=B5ARXL56RN)](https://codecov.io/gh/screwyprof/favkit)
+
 A modern Rust library and CLI tool for managing macOS Finder favorites. This project is a modern replacement for the abandoned [mysides](https://github.com/mosen/mysides) tool.
 
 ## Project Goals
