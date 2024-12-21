@@ -15,7 +15,7 @@ pub use snapshot_item::SnapshotItem;
 pub use url::Url;
 
 use crate::{
-    finder::{self, Result, SidebarItem, Target, favorites::FavoritesApi},
+    finder::{Result, SidebarItem, Target, favorites::FavoritesApi},
     system::api::MacOsApi,
 };
 
@@ -69,19 +69,17 @@ impl Favorites {
 
     unsafe fn convert_item(&self, item: SnapshotItem) -> Result<SidebarItem> {
         let url = unsafe { self.copy_resolved_url(&item) }?;
-        let target = Target(url.to_string());
-
-        let display_name = if target.0 == "nwnode://domain-AirDrop" {
-            finder::DisplayName::AirDrop
+        let target = if url.to_string() == "nwnode://domain-AirDrop" {
+            Target::AirDrop
         } else {
-            let name = unsafe { self.copy_display_name(&item) }
-                .ok()
-                .map(|name| name.to_string())
-                .and_then(|name| (!name.is_empty()).then_some(name));
-            finder::DisplayName::from(name)
+            let name = unsafe { self.copy_display_name(&item) }?.to_string();
+            Target::Custom {
+                label: name,
+                path: url.to_string(),
+            }
         };
 
-        Ok(SidebarItem::new(display_name, target))
+        Ok(SidebarItem::new(target))
     }
 }
 

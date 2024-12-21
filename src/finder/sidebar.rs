@@ -1,32 +1,28 @@
 use std::fmt;
 
-use super::DisplayName;
-
 #[derive(Debug, PartialEq)]
-pub struct Target(pub String);
+pub enum Target {
+    AirDrop,
+    Custom { label: String, path: String },
+}
 
 #[derive(Debug, PartialEq)]
 pub struct SidebarItem {
-    display_name: DisplayName,
     target: Target,
 }
 
 impl SidebarItem {
-    pub fn new(display_name: DisplayName, target: Target) -> Self {
-        Self {
-            display_name,
-            target,
-        }
+    pub fn new(target: Target) -> Self {
+        Self { target }
     }
 }
 
 impl fmt::Display for SidebarItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match &self.display_name {
-            DisplayName::AirDrop => "AirDrop",
-            DisplayName::Custom(name) => name,
-        };
-        write!(f, "{} -> {}", name, self.target.0)
+        match &self.target {
+            Target::AirDrop => write!(f, "AirDrop"),
+            Target::Custom { label, path } => write!(f, "{} -> {}", label, path),
+        }
     }
 }
 
@@ -36,10 +32,10 @@ mod tests {
 
     #[test]
     fn should_create_sidebar_item_with_display_name() {
-        let item = SidebarItem::new(
-            DisplayName::Custom("Documents".to_string()),
-            Target("file:///Users/user/Documents".to_string()),
-        );
+        let item = SidebarItem::new(Target::Custom {
+            label: "Documents".to_string(),
+            path: "file:///Users/user/Documents".to_string(),
+        });
         assert_eq!(
             format!("{}", item),
             "Documents -> file:///Users/user/Documents"
@@ -48,10 +44,7 @@ mod tests {
 
     #[test]
     fn should_create_sidebar_item_with_airdrop() {
-        let item = SidebarItem::new(
-            DisplayName::AirDrop,
-            Target("nwnode://domain-AirDrop".to_string()),
-        );
-        assert_eq!(format!("{}", item), "AirDrop -> nwnode://domain-AirDrop");
+        let item = SidebarItem::new(Target::AirDrop);
+        assert_eq!(format!("{}", item), "AirDrop");
     }
 }

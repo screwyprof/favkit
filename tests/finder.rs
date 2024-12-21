@@ -1,5 +1,5 @@
 use favkit::{
-    finder::{DisplayName, Finder, FinderError, Result, SidebarItem, Target},
+    finder::{Finder, FinderError, Result, SidebarItem, Target},
     system::favorites::FavoritesError,
 };
 use pretty_assertions::assert_eq;
@@ -61,10 +61,10 @@ fn should_return_empty_list_when_no_favorites() -> Result<()> {
 #[test]
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
     // Arrange
-    let expected_result = vec![SidebarItem::new(
-        DisplayName::Custom(constants::DOCUMENTS_NAME.to_string()),
-        Target(format!("file://{}", constants::DOCUMENTS_PATH)),
-    )];
+    let expected_result = vec![SidebarItem::new(Target::Custom {
+        label: constants::DOCUMENTS_NAME.to_string(),
+        path: format!("file://{}", constants::DOCUMENTS_PATH),
+    })];
     let favorites = FavoritesBuilder::new()
         .add_item(Some(constants::DOCUMENTS_NAME), constants::DOCUMENTS_PATH)
         .build();
@@ -82,10 +82,7 @@ fn should_return_favorite_with_display_name_and_url() -> Result<()> {
 #[test]
 fn should_handle_airdrop_item() -> Result<()> {
     // Arrange
-    let expected_result = vec![SidebarItem::new(
-        DisplayName::AirDrop,
-        Target(constants::AIRDROP_URL.to_string()),
-    )];
+    let expected_result = vec![SidebarItem::new(Target::AirDrop)];
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
         .build();
@@ -104,18 +101,15 @@ fn should_handle_airdrop_item() -> Result<()> {
 fn should_handle_multiple_favorites() -> Result<()> {
     // Arrange
     let expected_result = vec![
-        SidebarItem::new(
-            DisplayName::AirDrop,
-            Target(constants::AIRDROP_URL.to_string()),
-        ),
-        SidebarItem::new(
-            DisplayName::Custom("Applications".to_string()),
-            Target("file:///Applications/".to_string()),
-        ),
-        SidebarItem::new(
-            DisplayName::Custom("Downloads".to_string()),
-            Target("file:///Users/user/Downloads/".to_string()),
-        ),
+        SidebarItem::new(Target::AirDrop),
+        SidebarItem::new(Target::Custom {
+            label: "Applications".to_string(),
+            path: "file:///Applications/".to_string(),
+        }),
+        SidebarItem::new(Target::Custom {
+            label: "Downloads".to_string(),
+            path: "file:///Users/user/Downloads/".to_string(),
+        }),
     ];
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
