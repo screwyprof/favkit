@@ -16,7 +16,7 @@ path = "src/main.rs"
 [dependencies]
 core-foundation = "0.10.0"
 core-services = "1.0.0"
-thiserror = "2.0.4"
+thiserror = "2.0.8"
 dirs = "5.0"
 
 [dev-dependencies]
