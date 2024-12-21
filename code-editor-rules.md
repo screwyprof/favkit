@@ -153,6 +153,8 @@ FavKit is a modern Rust library and CLI tool for managing macOS Finder favorites
 4. **Git Commits**
    Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
    
+   When the user says "let's commit" or similar, only propose a commit message following this format - do not execute any git commands.
+
    Format: `<type>[optional scope]: <description>`
    ```
    <type>[optional scope]: <description>
