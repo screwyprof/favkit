@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2](https://github.com/screwyprof/favkit/compare/v0.1.1...v0.1.2) (2024-12-22)
+
+
+### Bug Fixes
+
+* correct release artifact packaging permissions ([bb9f4e4](https://github.com/screwyprof/favkit/commit/bb9f4e4a1d5e2834d6c5af66c15d233b5a67f7ed))
+
 ## [0.1.1](https://github.com/screwyprof/favkit/compare/v0.1.0...v0.1.1) (2024-12-22)
 
 
