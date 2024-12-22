@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1](https://github.com/screwyprof/favkit/compare/v0.1.0...v0.1.1) (2024-12-22)
+
+
+### Bug Fixes
+
+* trigger release with improved artifact packaging ([4634922](https://github.com/screwyprof/favkit/commit/4634922fa3f46176f57096424d2c9deacea20730))
+
 ## 0.1.0 (2024-12-21)
 
 
