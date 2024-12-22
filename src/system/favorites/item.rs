@@ -16,33 +16,23 @@ pub enum MacOsUrl {
 }
 
 impl MacOsUrl {
-    pub const AIRDROP: &'static str = "nwnode://domain-AirDrop";
-    pub const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
-    pub const APPLICATIONS: &'static str = "file:///Applications/";
-    const USER_HOME_FOLDER_DEPTH: usize = 4; // /Users/username/folder/
-
-    fn is_user_downloads(url: impl AsRef<str>) -> bool {
-        Self::is_user_folder(url, "Downloads")
-    }
-
-    fn is_user_desktop(url: impl AsRef<str>) -> bool {
-        Self::is_user_folder(url, "Desktop")
-    }
+    const AIRDROP: &'static str = "nwnode://domain-AirDrop";
+    const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+    const APPLICATIONS: &'static str = "file:///Applications/";
+    const USER_PREFIX: &'static str = "file:///Users/";
+    const DOWNLOADS: &'static str = "Downloads";
+    const DESKTOP: &'static str = "Desktop";
 
     fn is_user_folder(url: impl AsRef<str>, folder: impl AsRef<str>) -> bool {
         url.as_ref()
-            .strip_prefix("file://")
-            .filter(|url_path| Self::is_inside_home_dir(url_path, folder.as_ref()))
+            .strip_prefix(Self::USER_PREFIX)
+            .and_then(|rest| {
+                let mut parts = rest.split('/').take(2);
+                let _username = parts.next()?;
+                let folder_name = parts.next()?;
+                (folder_name == folder.as_ref()).then_some(())
+            })
             .is_some()
-    }
-
-    fn is_inside_home_dir(url_path: &str, folder: &str) -> bool {
-        url_path
-            .matches('/')
-            .count()
-            .eq(&Self::USER_HOME_FOLDER_DEPTH)
-            && url_path.ends_with(&format!("/{}/", folder))
-            && url_path.starts_with("/Users/")
     }
 }
 
@@ -52,8 +42,8 @@ impl From<&str> for MacOsUrl {
             Self::AIRDROP => Self::AirDrop,
             Self::RECENTS => Self::Recents,
             Self::APPLICATIONS => Self::Applications,
-            path if Self::is_user_desktop(path) => Self::Desktop,
-            path if Self::is_user_downloads(path) => Self::Downloads,
+            _ if Self::is_user_folder(url, Self::DESKTOP) => Self::Desktop,
+            _ if Self::is_user_folder(url, Self::DOWNLOADS) => Self::Downloads,
             path => Self::Custom(path.to_string()),
         }
     }
