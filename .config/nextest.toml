@@ -9,3 +9,9 @@ retries = 2
 test-threads = "num-cpus"
 status-level = "all"
 final-status-level = "all" 
+
+# JUnit configuration for test results
+[profile.ci.junit]
+path = "junit.xml"
+report-name = "favkit-tests"
+store-success-output = true

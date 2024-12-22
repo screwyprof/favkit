@@ -35,10 +35,11 @@ This project is currently in alpha stage. Progress and next steps:
 
 ✅ **Completed**:
 - Basic viewing of Finder favorites
+- Proper display names for special locations (AirDrop)
 
 🚧 **In Progress**:
-- Improve display names (show "AirDrop" instead of "<no name>")
 - User-friendly path formatting (show regular paths instead of raw URLs)
+- Improve display names for system locations (Recents)
 
 🔜 **Planned**:
 - Add/remove favorites

@@ -52,6 +52,7 @@ FavKit is a modern Rust library and CLI tool for managing macOS Finder favorites
    - Can abbreviate rule descriptions to single words/phrases
 
 2. **Change Management**
+   - ALWAYS read the file content before making changes
    - Make only explicitly requested changes
    - Stay focused on the specific task
    - Follow existing patterns
