@@ -32,8 +32,10 @@ jobs:
       - name: Prepare Binary for Release
         if: ${{ steps.release.outputs.release_created }}
         run: |
-          chmod +x result/bin/favkit
-          cd result/bin && zip ../../favkit-macos.zip favkit
+          cp result/bin/favkit .
+          chmod +x favkit
+          zip -j favkit-macos.zip favkit
+          rm favkit
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
