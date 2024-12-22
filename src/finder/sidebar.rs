@@ -6,6 +6,7 @@ pub enum Target {
     Recents,
     Applications,
     Downloads,
+    Desktop,
     Custom { label: String, path: String },
 }
 
@@ -27,6 +28,7 @@ impl fmt::Display for SidebarItem {
             Target::Recents => write!(f, "Recents"),
             Target::Applications => write!(f, "Applications"),
             Target::Downloads => write!(f, "~/Downloads"),
+            Target::Desktop => write!(f, "~/Desktop"),
             Target::Custom { label, path } => write!(f, "{} -> {}", label, path),
         }
     }
@@ -69,5 +71,11 @@ mod tests {
     fn should_create_sidebar_item_with_downloads() {
         let item = SidebarItem::new(Target::Downloads);
         assert_eq!(format!("{}", item), "~/Downloads");
+    }
+
+    #[test]
+    fn should_create_sidebar_item_with_desktop() {
+        let item = SidebarItem::new(Target::Desktop);
+        assert_eq!(format!("{}", item), "~/Desktop");
     }
 }

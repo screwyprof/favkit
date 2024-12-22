@@ -12,6 +12,7 @@ mod constants {
     pub const RECENTS_LABEL: &str = "Recents";
     pub const APPLICATIONS_LABEL: &str = "Applications";
     pub const DOWNLOADS_LABEL: &str = "Downloads";
+    pub const DESKTOP_LABEL: &str = "Desktop";
     pub const DOCUMENTS_LABEL: &str = "Documents";
 
     // URLs
@@ -19,6 +20,7 @@ mod constants {
     pub const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
     pub const APPLICATIONS_URL: &str = "file:///Applications/";
     pub const DOWNLOADS_URL: &str = "file:///Users/user/Downloads/";
+    pub const DESKTOP_URL: &str = "file:///Users/user/Desktop/";
     pub const DOCUMENTS_URL: &str = "file:///Users/user/Documents/";
 }
 
@@ -178,6 +180,24 @@ fn should_handle_multiple_favorites() -> Result<()> {
             constants::APPLICATIONS_URL,
         )
         .add_item(Some(constants::DOWNLOADS_LABEL), constants::DOWNLOADS_URL)
+        .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
+}
+
+#[test]
+fn should_handle_desktop_item() -> Result<()> {
+    // Arrange
+    let expected_result = vec![SidebarItem::new(Target::Desktop)];
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some(constants::DESKTOP_LABEL), constants::DESKTOP_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);

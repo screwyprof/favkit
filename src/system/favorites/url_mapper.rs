@@ -16,6 +16,13 @@ fn is_downloads_url(url: &str) -> bool {
         && url_path.starts_with("/Users/")
 }
 
+fn is_desktop_url(url: &str) -> bool {
+    let url_path = url.strip_prefix("file://").unwrap_or(url);
+    url_path.matches('/').count() == 4
+        && url_path.ends_with("/Desktop/")
+        && url_path.starts_with("/Users/")
+}
+
 impl From<TargetUrl> for Target {
     fn from(target: TargetUrl) -> Self {
         let url = target.0.to_string();
@@ -25,6 +32,7 @@ impl From<TargetUrl> for Target {
             RECENTS_URL => Target::Recents,
             APPLICATIONS_URL => Target::Applications,
             path if is_downloads_url(path) => Target::Downloads,
+            path if is_desktop_url(path) => Target::Desktop,
             path => Target::Custom {
                 label: target.1.to_string(),
                 path: path.to_string(),
@@ -102,5 +110,14 @@ mod tests {
             label: "Documents".to_string(),
             path: "file:///Users/user/Documents/".to_string(),
         });
+    }
+
+    #[test]
+    fn should_convert_desktop_url() {
+        let target = Target::from(TargetUrl(
+            create_url("file:///Users/user/Desktop/"),
+            create_display_name("Desktop"),
+        ));
+        assert_eq!(target, Target::Desktop);
     }
 }
