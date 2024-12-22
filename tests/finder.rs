@@ -8,11 +8,18 @@ mod mock;
 use mock::{favorites::FavoritesBuilder, mac_os_api::MockMacOsApiBuilder};
 
 mod constants {
-    pub const DOCUMENTS_NAME: &str = "Documents";
-    pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
+    // Display Labels
+    pub const RECENTS_LABEL: &str = "Recents";
+    pub const APPLICATIONS_LABEL: &str = "Applications";
+    pub const DOWNLOADS_LABEL: &str = "Downloads";
+    pub const DOCUMENTS_LABEL: &str = "Documents";
+
+    // URLs
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
     pub const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
     pub const APPLICATIONS_URL: &str = "file:///Applications/";
+    pub const DOWNLOADS_URL: &str = "file:///Users/user/Downloads/";
+    pub const DOCUMENTS_URL: &str = "file:///Users/user/Documents/";
 }
 
 #[test]
@@ -64,11 +71,11 @@ fn should_return_empty_list_when_no_favorites() -> Result<()> {
 fn should_return_favorite_with_display_name_and_url() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(Target::Custom {
-        label: constants::DOCUMENTS_NAME.to_string(),
-        path: format!("file://{}", constants::DOCUMENTS_PATH),
+        label: constants::DOCUMENTS_LABEL.to_string(),
+        path: constants::DOCUMENTS_URL.to_string(),
     })];
     let favorites = FavoritesBuilder::new()
-        .add_item(Some(constants::DOCUMENTS_NAME), constants::DOCUMENTS_PATH)
+        .add_item(Some(constants::DOCUMENTS_LABEL), constants::DOCUMENTS_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
@@ -104,7 +111,7 @@ fn should_handle_recents_item() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(Target::Recents)];
     let favorites = FavoritesBuilder::new()
-        .add_item(Some("Recents"), constants::RECENTS_URL)
+        .add_item(Some(constants::RECENTS_LABEL), constants::RECENTS_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
@@ -122,7 +129,28 @@ fn should_handle_applications_item() -> Result<()> {
     // Arrange
     let expected_result = vec![SidebarItem::new(Target::Applications)];
     let favorites = FavoritesBuilder::new()
-        .add_item(Some("Applications"), constants::APPLICATIONS_URL)
+        .add_item(
+            Some(constants::APPLICATIONS_LABEL),
+            constants::APPLICATIONS_URL,
+        )
+        .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
+}
+
+#[test]
+fn should_handle_downloads_item() -> Result<()> {
+    // Arrange
+    let expected_result = vec![SidebarItem::new(Target::Downloads)];
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some(constants::DOWNLOADS_LABEL), constants::DOWNLOADS_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
@@ -141,15 +169,15 @@ fn should_handle_multiple_favorites() -> Result<()> {
     let expected_result = vec![
         SidebarItem::new(Target::AirDrop),
         SidebarItem::new(Target::Applications),
-        SidebarItem::new(Target::Custom {
-            label: "Downloads".to_string(),
-            path: "file:///Users/user/Downloads/".to_string(),
-        }),
+        SidebarItem::new(Target::Downloads),
     ];
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
-        .add_item(Some("Applications"), constants::APPLICATIONS_URL)
-        .add_item(Some("Downloads"), "/Users/user/Downloads/")
+        .add_item(
+            Some(constants::APPLICATIONS_LABEL),
+            constants::APPLICATIONS_URL,
+        )
+        .add_item(Some(constants::DOWNLOADS_LABEL), constants::DOWNLOADS_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);

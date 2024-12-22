@@ -9,34 +9,25 @@ const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
 const APPLICATIONS_URL: &str = "file:///Applications/";
 
-enum MacOsUrl {
-    AirDrop,
-    Recents,
-    Applications,
-    Custom(String),
-}
-
-impl From<&str> for MacOsUrl {
-    fn from(url: &str) -> Self {
-        match url {
-            AIRDROP_URL => MacOsUrl::AirDrop,
-            RECENTS_URL => MacOsUrl::Recents,
-            APPLICATIONS_URL => MacOsUrl::Applications,
-            path => MacOsUrl::Custom(path.to_string()),
-        }
-    }
+fn is_downloads_url(url: &str) -> bool {
+    let url_path = url.strip_prefix("file://").unwrap_or(url);
+    url_path.matches('/').count() == 4
+        && url_path.ends_with("/Downloads/")
+        && url_path.starts_with("/Users/")
 }
 
 impl From<TargetUrl> for Target {
     fn from(target: TargetUrl) -> Self {
         let url = target.0.to_string();
-        match MacOsUrl::from(url.as_str()) {
-            MacOsUrl::AirDrop => Target::AirDrop,
-            MacOsUrl::Recents => Target::Recents,
-            MacOsUrl::Applications => Target::Applications,
-            MacOsUrl::Custom(path) => Target::Custom {
+
+        match url.as_str() {
+            AIRDROP_URL => Target::AirDrop,
+            RECENTS_URL => Target::Recents,
+            APPLICATIONS_URL => Target::Applications,
+            path if is_downloads_url(path) => Target::Downloads,
+            path => Target::Custom {
                 label: target.1.to_string(),
-                path,
+                path: path.to_string(),
             },
         }
     }
@@ -93,14 +84,23 @@ mod tests {
     }
 
     #[test]
+    fn should_convert_downloads_url() {
+        let target = Target::from(TargetUrl(
+            create_url("file:///Users/user/Downloads/"),
+            create_display_name("Downloads"),
+        ));
+        assert_eq!(target, Target::Downloads);
+    }
+
+    #[test]
     fn should_convert_custom_url() {
         let target = Target::from(TargetUrl(
-            create_url("file:///Users/user/Documents"),
+            create_url("file:///Users/user/Documents/"),
             create_display_name("Documents"),
         ));
         assert_eq!(target, Target::Custom {
             label: "Documents".to_string(),
-            path: "file:///Users/user/Documents".to_string(),
+            path: "file:///Users/user/Documents/".to_string(),
         });
     }
 }
