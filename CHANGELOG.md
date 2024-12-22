@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/screwyprof/favkit/compare/v0.3.0...v0.4.0) (2024-12-22)
+
+
+### Features
+
+* add special handling for Downloads folder ([8e5817b](https://github.com/screwyprof/favkit/commit/8e5817bda365d04a79130e5887646459ae1190dd))
+
 ## [0.3.0](https://github.com/screwyprof/favkit/compare/v0.2.0...v0.3.0) (2024-12-22)
 
 
