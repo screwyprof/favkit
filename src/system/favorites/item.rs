@@ -23,6 +23,14 @@ impl MacOsUrl {
     const DOWNLOADS: &'static str = "Downloads";
     const DESKTOP: &'static str = "Desktop";
 
+    fn clean_path(url: impl AsRef<str>) -> String {
+        url.as_ref()
+            .strip_prefix("file://")
+            .and_then(|p| p.strip_suffix('/'))
+            .unwrap_or(url.as_ref())
+            .to_string()
+    }
+
     fn is_user_folder(url: impl AsRef<str>, folder: impl AsRef<str>) -> bool {
         url.as_ref()
             .strip_prefix(Self::USER_PREFIX)
@@ -36,15 +44,17 @@ impl MacOsUrl {
     }
 }
 
-impl From<&str> for MacOsUrl {
-    fn from(url: &str) -> Self {
-        match url {
+impl From<Url> for MacOsUrl {
+    fn from(url: Url) -> Self {
+        let url_str = url.to_string();
+
+        match url_str.as_str() {
             Self::AIRDROP => Self::AirDrop,
             Self::RECENTS => Self::Recents,
             Self::APPLICATIONS => Self::Applications,
-            _ if Self::is_user_folder(url, Self::DESKTOP) => Self::Desktop,
-            _ if Self::is_user_folder(url, Self::DOWNLOADS) => Self::Downloads,
-            path => Self::Custom(path.to_string()),
+            url if Self::is_user_folder(url, Self::DESKTOP) => Self::Desktop,
+            url if Self::is_user_folder(url, Self::DOWNLOADS) => Self::Downloads,
+            url => Self::Custom(Self::clean_path(url)),
         }
     }
 }
@@ -69,23 +79,16 @@ impl fmt::Display for FavoriteItem {
 
 impl From<FavoriteItem> for Target {
     fn from(item: FavoriteItem) -> Self {
-        let url = item.url.to_string();
-        match MacOsUrl::from(url.as_str()) {
+        match MacOsUrl::from(item.url) {
             MacOsUrl::AirDrop => Target::AirDrop,
             MacOsUrl::Recents => Target::Recents,
             MacOsUrl::Applications => Target::Applications,
             MacOsUrl::Downloads => Target::Downloads,
             MacOsUrl::Desktop => Target::Desktop,
-            MacOsUrl::Custom(path) => {
-                let clean_path = path
-                    .strip_prefix("file://")
-                    .map(|p| p.strip_suffix('/').unwrap_or(p))
-                    .unwrap_or(&path);
-                Target::Custom {
-                    label: item.name.to_string(),
-                    path: clean_path.to_string(),
-                }
-            }
+            MacOsUrl::Custom(path) => Target::Custom {
+                label: item.name.to_string(),
+                path,
+            },
         }
     }
 }
@@ -211,15 +214,17 @@ mod tests {
 
     #[test]
     fn should_not_recognize_path_without_file_prefix() {
-        let raw_path = "/Users/user/Downloads/";
-        let url = MacOsUrl::from(raw_path);
-        assert!(matches!(url, MacOsUrl::Custom(_)));
+        let target = Target::from(FavoriteItem::new(
+            create_url("smb:///Users/user/Downloads/"),
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
     }
 
     #[test]
     fn should_not_recognize_path_with_different_prefix() {
         let path = "http:///Users/user/Downloads/";
-        let url = MacOsUrl::from(path);
+        let url = MacOsUrl::from(create_url(path));
         assert!(matches!(url, MacOsUrl::Custom(_)));
     }
 
@@ -269,5 +274,14 @@ mod tests {
             label: "Projects".to_string(),
             path: "/Users/happygopher/Documents/Projects".to_string(),
         });
+    }
+
+    #[test]
+    fn should_treat_non_file_url_as_custom() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("http:///Users/user/Downloads/"),
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
     }
 }
