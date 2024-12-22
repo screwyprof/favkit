@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/screwyprof/favkit/compare/v0.1.2...v0.2.0) (2024-12-22)
+
+
+### Features
+
+* improve AirDrop display in Finder sidebar ([#6](https://github.com/screwyprof/favkit/issues/6)) ([767c9aa](https://github.com/screwyprof/favkit/commit/767c9aa6fc9abefcd49d376b56773645f25cf24f))
+
 ## [0.1.2](https://github.com/screwyprof/favkit/compare/v0.1.1...v0.1.2) (2024-12-22)
 
 
