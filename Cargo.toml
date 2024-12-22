@@ -1,6 +1,6 @@
 [package]
 name = "favkit"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "A tool to manage macOS Finder sidebar items"
 authors = ["Maksim Shcherbo <max@happygopher.nl>"]
