@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{
     finder::Target,
     system::favorites::{DisplayName, Url},
@@ -5,39 +7,61 @@ use crate::{
 
 pub struct TargetUrl(pub Url, pub DisplayName);
 
-const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
-const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
-const APPLICATIONS_URL: &str = "file:///Applications/";
+struct MacOsPath(Url);
 
-fn is_downloads_url(url: &str) -> bool {
-    let url_path = url.strip_prefix("file://").unwrap_or(url);
-    url_path.matches('/').count() == 4
-        && url_path.ends_with("/Downloads/")
-        && url_path.starts_with("/Users/")
+impl MacOsPath {
+    const AIRDROP: &'static str = "nwnode://domain-AirDrop";
+    const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+    const APPLICATIONS: &'static str = "file:///Applications/";
+
+    fn is_special_folder(&self, folder: &str) -> bool {
+        let path = self.0.to_string();
+        let url_path = path.strip_prefix("file://").unwrap_or(&path);
+        url_path.matches('/').count() == 4
+            && url_path.ends_with(&format!("/{}/", folder))
+            && url_path.starts_with("/Users/")
+    }
 }
 
-fn is_desktop_url(url: &str) -> bool {
-    let url_path = url.strip_prefix("file://").unwrap_or(url);
-    url_path.matches('/').count() == 4
-        && url_path.ends_with("/Desktop/")
-        && url_path.starts_with("/Users/")
+impl fmt::Display for MacOsPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Url> for MacOsPath {
+    fn from(url: Url) -> Self {
+        Self(url)
+    }
+}
+
+impl From<MacOsPath> for Target {
+    fn from(path: MacOsPath) -> Self {
+        let url = path.to_string();
+        match url.as_str() {
+            MacOsPath::AIRDROP => Target::AirDrop,
+            MacOsPath::RECENTS => Target::Recents,
+            MacOsPath::APPLICATIONS => Target::Applications,
+            _ if path.is_special_folder("Downloads") => Target::Downloads,
+            _ if path.is_special_folder("Desktop") => Target::Desktop,
+            path_str => Target::Custom {
+                label: String::new(), // Will be overridden
+                path: path_str.to_string(),
+            },
+        }
+    }
 }
 
 impl From<TargetUrl> for Target {
-    fn from(target: TargetUrl) -> Self {
-        let url = target.0.to_string();
-
-        match url.as_str() {
-            AIRDROP_URL => Target::AirDrop,
-            RECENTS_URL => Target::Recents,
-            APPLICATIONS_URL => Target::Applications,
-            path if is_downloads_url(path) => Target::Downloads,
-            path if is_desktop_url(path) => Target::Desktop,
-            path => Target::Custom {
-                label: target.1.to_string(),
-                path: path.to_string(),
-            },
+    fn from(TargetUrl(url, name): TargetUrl) -> Self {
+        let mut target = Target::from(MacOsPath::from(url));
+        if let Target::Custom { label: _, path } = &target {
+            target = Target::Custom {
+                label: name.to_string(),
+                path: path.clone(),
+            };
         }
+        target
     }
 }
 
@@ -67,7 +91,7 @@ mod tests {
     #[test]
     fn should_convert_airdrop_url() {
         let target = Target::from(TargetUrl(
-            create_url(AIRDROP_URL),
+            create_url(MacOsPath::AIRDROP),
             create_display_name("AirDrop"),
         ));
         assert_eq!(target, Target::AirDrop);
@@ -76,7 +100,7 @@ mod tests {
     #[test]
     fn should_convert_recents_url() {
         let target = Target::from(TargetUrl(
-            create_url(RECENTS_URL),
+            create_url(MacOsPath::RECENTS),
             create_display_name("Recents"),
         ));
         assert_eq!(target, Target::Recents);
@@ -85,7 +109,7 @@ mod tests {
     #[test]
     fn should_convert_applications_url() {
         let target = Target::from(TargetUrl(
-            create_url(APPLICATIONS_URL),
+            create_url(MacOsPath::APPLICATIONS),
             create_display_name("Applications"),
         ));
         assert_eq!(target, Target::Applications);
@@ -101,6 +125,15 @@ mod tests {
     }
 
     #[test]
+    fn should_convert_desktop_url() {
+        let target = Target::from(TargetUrl(
+            create_url("file:///Users/user/Desktop/"),
+            create_display_name("Desktop"),
+        ));
+        assert_eq!(target, Target::Desktop);
+    }
+
+    #[test]
     fn should_convert_custom_url() {
         let target = Target::from(TargetUrl(
             create_url("file:///Users/user/Documents/"),
@@ -110,14 +143,5 @@ mod tests {
             label: "Documents".to_string(),
             path: "file:///Users/user/Documents/".to_string(),
         });
-    }
-
-    #[test]
-    fn should_convert_desktop_url() {
-        let target = Target::from(TargetUrl(
-            create_url("file:///Users/user/Desktop/"),
-            create_display_name("Desktop"),
-        ));
-        assert_eq!(target, Target::Desktop);
     }
 }
