@@ -11,10 +11,9 @@ A modern Rust library and CLI tool for managing macOS Finder favorites. This pro
    ```bash
    unzip favkit-macos.zip
    ```
-3. Make the binary executable and remove quarantine:
+3. Remove quarantine:
    ```bash
-   chmod +x favkit
-   xattr -d com.apple.quarantine favkit
+   sudo xattr -d com.apple.quarantine favkit
    ```
 4. Move to a directory in your PATH (optional):
    ```bash
