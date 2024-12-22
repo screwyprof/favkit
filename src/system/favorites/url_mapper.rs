@@ -5,6 +5,9 @@ use crate::{
 
 pub struct TargetUrl(pub Url, pub DisplayName);
 
+const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
+const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+
 enum MacOsUrl {
     AirDrop,
     Recents,
@@ -14,10 +17,8 @@ enum MacOsUrl {
 impl From<&str> for MacOsUrl {
     fn from(url: &str) -> Self {
         match url {
-            "nwnode://domain-AirDrop" => MacOsUrl::AirDrop,
-            "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/" => {
-                MacOsUrl::Recents
-            }
+            AIRDROP_URL => MacOsUrl::AirDrop,
+            RECENTS_URL => MacOsUrl::Recents,
             path => MacOsUrl::Custom(path.to_string()),
         }
     }
@@ -44,6 +45,7 @@ mod tests {
         string::CFString,
         url::{CFURL, kCFURLPOSIXPathStyle},
     };
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -62,7 +64,7 @@ mod tests {
     #[test]
     fn should_convert_airdrop_url() {
         let target = Target::from(TargetUrl(
-            create_url("nwnode://domain-AirDrop"),
+            create_url(AIRDROP_URL),
             create_display_name("AirDrop"),
         ));
         assert_eq!(target, Target::AirDrop);
@@ -71,9 +73,7 @@ mod tests {
     #[test]
     fn should_convert_recents_url() {
         let target = Target::from(TargetUrl(
-            create_url(
-                "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/",
-            ),
+            create_url(RECENTS_URL),
             create_display_name("Recents"),
         ));
         assert_eq!(target, Target::Recents);
