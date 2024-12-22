@@ -11,6 +11,7 @@ mod constants {
     pub const DOCUMENTS_NAME: &str = "Documents";
     pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
+    pub const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
 }
 
 #[test]
@@ -85,6 +86,24 @@ fn should_handle_airdrop_item() -> Result<()> {
     let expected_result = vec![SidebarItem::new(Target::AirDrop)];
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
+        .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
+}
+
+#[test]
+fn should_handle_recents_item() -> Result<()> {
+    // Arrange
+    let expected_result = vec![SidebarItem::new(Target::Recents)];
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some("Recents"), constants::RECENTS_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);

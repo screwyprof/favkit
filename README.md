@@ -35,13 +35,15 @@ This project is currently in alpha stage. Progress and next steps:
 
 ✅ **Completed**:
 - Basic viewing of Finder favorites
-- Proper display names for special locations (AirDrop)
+- Proper display names for special locations:
+  - AirDrop: Shows as "AirDrop" without exposing internal URL
+  - Recents: Shows as "Recents" without exposing internal URL
 
 🚧 **In Progress**:
 - User-friendly path formatting (show regular paths instead of raw URLs)
-- Improve display names for system locations (Recents)
 
 🔜 **Planned**:
+- Handle Applications folder (`file:///Applications/`) in Finder sidebar
 - Add/remove favorites
 - Command-line interface improvements
 

@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum Target {
     AirDrop,
+    Recents,
     Custom { label: String, path: String },
 }
 
@@ -21,6 +22,7 @@ impl fmt::Display for SidebarItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.target {
             Target::AirDrop => write!(f, "AirDrop"),
+            Target::Recents => write!(f, "Recents"),
             Target::Custom { label, path } => write!(f, "{} -> {}", label, path),
         }
     }
@@ -46,5 +48,11 @@ mod tests {
     fn should_create_sidebar_item_with_airdrop() {
         let item = SidebarItem::new(Target::AirDrop);
         assert_eq!(format!("{}", item), "AirDrop");
+    }
+
+    #[test]
+    fn should_create_sidebar_item_with_recents() {
+        let item = SidebarItem::new(Target::Recents);
+        assert_eq!(format!("{}", item), "Recents");
     }
 }
