@@ -12,6 +12,7 @@ mod constants {
     pub const DOCUMENTS_PATH: &str = "/Users/user/Documents/";
     pub const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
     pub const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+    pub const APPLICATIONS_URL: &str = "file:///Applications/";
 }
 
 #[test]
@@ -117,14 +118,29 @@ fn should_handle_recents_item() -> Result<()> {
 }
 
 #[test]
+fn should_handle_applications_item() -> Result<()> {
+    // Arrange
+    let expected_result = vec![SidebarItem::new(Target::Applications)];
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some("Applications"), constants::APPLICATIONS_URL)
+        .build();
+    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
+    let finder = Finder::new(mock_api);
+
+    // Act
+    let result = finder.get_favorites_list()?;
+
+    // Assert
+    assert_eq!(result, expected_result);
+    Ok(())
+}
+
+#[test]
 fn should_handle_multiple_favorites() -> Result<()> {
     // Arrange
     let expected_result = vec![
         SidebarItem::new(Target::AirDrop),
-        SidebarItem::new(Target::Custom {
-            label: "Applications".to_string(),
-            path: "file:///Applications/".to_string(),
-        }),
+        SidebarItem::new(Target::Applications),
         SidebarItem::new(Target::Custom {
             label: "Downloads".to_string(),
             path: "file:///Users/user/Downloads/".to_string(),
@@ -132,7 +148,7 @@ fn should_handle_multiple_favorites() -> Result<()> {
     ];
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
-        .add_item(Some("Applications"), "/Applications/")
+        .add_item(Some("Applications"), constants::APPLICATIONS_URL)
         .add_item(Some("Downloads"), "/Users/user/Downloads/")
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();

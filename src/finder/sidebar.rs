@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Target {
     AirDrop,
     Recents,
+    Applications,
     Custom { label: String, path: String },
 }
 
@@ -23,6 +24,7 @@ impl fmt::Display for SidebarItem {
         match &self.target {
             Target::AirDrop => write!(f, "AirDrop"),
             Target::Recents => write!(f, "Recents"),
+            Target::Applications => write!(f, "Applications"),
             Target::Custom { label, path } => write!(f, "{} -> {}", label, path),
         }
     }
@@ -30,18 +32,17 @@ impl fmt::Display for SidebarItem {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]
-    fn should_create_sidebar_item_with_display_name() {
+    fn should_create_sidebar_item_with_custom_target() {
         let item = SidebarItem::new(Target::Custom {
             label: "Documents".to_string(),
-            path: "file:///Users/user/Documents".to_string(),
+            path: "/Users/user/Documents".to_string(),
         });
-        assert_eq!(
-            format!("{}", item),
-            "Documents -> file:///Users/user/Documents"
-        );
+        assert_eq!(format!("{}", item), "Documents -> /Users/user/Documents");
     }
 
     #[test]
@@ -54,5 +55,11 @@ mod tests {
     fn should_create_sidebar_item_with_recents() {
         let item = SidebarItem::new(Target::Recents);
         assert_eq!(format!("{}", item), "Recents");
+    }
+
+    #[test]
+    fn should_create_sidebar_item_with_applications() {
+        let item = SidebarItem::new(Target::Applications);
+        assert_eq!(format!("{}", item), "Applications");
     }
 }

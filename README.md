@@ -38,12 +38,15 @@ This project is currently in alpha stage. Progress and next steps:
 - Proper display names for special locations:
   - AirDrop: Shows as "AirDrop" without exposing internal URL
   - Recents: Shows as "Recents" without exposing internal URL
+  - Applications: Shows as "Applications" without exposing internal URL
 
 🚧 **In Progress**:
 - User-friendly path formatting (show regular paths instead of raw URLs)
 
 🔜 **Planned**:
-- Handle Applications folder (`file:///Applications/`) in Finder sidebar
+- Handle special locations:
+  - User Desktop (`file:///Users/<user>/Desktop/`)
+  - User Downloads (`file:///Users/<user>/Downloads/`)
 - Add/remove favorites
 - Command-line interface improvements
 

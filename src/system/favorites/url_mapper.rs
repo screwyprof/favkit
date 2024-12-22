@@ -7,10 +7,12 @@ pub struct TargetUrl(pub Url, pub DisplayName);
 
 const AIRDROP_URL: &str = "nwnode://domain-AirDrop";
 const RECENTS_URL: &str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+const APPLICATIONS_URL: &str = "file:///Applications/";
 
 enum MacOsUrl {
     AirDrop,
     Recents,
+    Applications,
     Custom(String),
 }
 
@@ -19,6 +21,7 @@ impl From<&str> for MacOsUrl {
         match url {
             AIRDROP_URL => MacOsUrl::AirDrop,
             RECENTS_URL => MacOsUrl::Recents,
+            APPLICATIONS_URL => MacOsUrl::Applications,
             path => MacOsUrl::Custom(path.to_string()),
         }
     }
@@ -30,6 +33,7 @@ impl From<TargetUrl> for Target {
         match MacOsUrl::from(url.as_str()) {
             MacOsUrl::AirDrop => Target::AirDrop,
             MacOsUrl::Recents => Target::Recents,
+            MacOsUrl::Applications => Target::Applications,
             MacOsUrl::Custom(path) => Target::Custom {
                 label: target.1.to_string(),
                 path,
@@ -77,6 +81,15 @@ mod tests {
             create_display_name("Recents"),
         ));
         assert_eq!(target, Target::Recents);
+    }
+
+    #[test]
+    fn should_convert_applications_url() {
+        let target = Target::from(TargetUrl(
+            create_url(APPLICATIONS_URL),
+            create_display_name("Applications"),
+        ));
+        assert_eq!(target, Target::Applications);
     }
 
     #[test]
