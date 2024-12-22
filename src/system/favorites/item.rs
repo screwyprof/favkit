@@ -1,9 +1,52 @@
-use std::fmt;
-
 use crate::{
     finder::Target,
     system::favorites::{DisplayName, Url},
 };
+
+#[derive(Debug)]
+enum MacOsUrl {
+    AirDrop,
+    Recents,
+    Applications,
+    Downloads,
+    Desktop,
+    Custom(String),
+}
+
+impl MacOsUrl {
+    const AIRDROP: &'static str = "nwnode://domain-AirDrop";
+    const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+    const APPLICATIONS: &'static str = "file:///Applications/";
+    const USER_HOME_FOLDER_DEPTH: usize = 4; // /Users/username/folder/
+
+    fn is_user_downloads(url: &str) -> bool {
+        Self::is_user_folder(url, "Downloads")
+    }
+
+    fn is_user_desktop(url: &str) -> bool {
+        Self::is_user_folder(url, "Desktop")
+    }
+
+    fn is_user_folder(url: &str, folder: &str) -> bool {
+        let url_path = url.strip_prefix("file://").unwrap_or(url);
+        url_path.matches('/').count() == Self::USER_HOME_FOLDER_DEPTH
+            && url_path.ends_with(&format!("/{}/", folder))
+            && url_path.starts_with("/Users/")
+    }
+}
+
+impl From<&str> for MacOsUrl {
+    fn from(url: &str) -> Self {
+        match url {
+            Self::AIRDROP => Self::AirDrop,
+            Self::RECENTS => Self::Recents,
+            Self::APPLICATIONS => Self::Applications,
+            path if Self::is_user_desktop(path) => Self::Desktop,
+            path if Self::is_user_downloads(path) => Self::Downloads,
+            path => Self::Custom(path.to_string()),
+        }
+    }
+}
 
 pub struct FavoriteItem {
     url: Url,
@@ -11,41 +54,23 @@ pub struct FavoriteItem {
 }
 
 impl FavoriteItem {
-    const AIRDROP: &'static str = "nwnode://domain-AirDrop";
-    const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
-    const APPLICATIONS: &'static str = "file:///Applications/";
-
     pub fn new(url: Url, name: DisplayName) -> Self {
         Self { url, name }
-    }
-
-    fn is_special_folder(&self, folder: &str) -> bool {
-        let path = self.url.to_string();
-        let url_path = path.strip_prefix("file://").unwrap_or(&path);
-        url_path.matches('/').count() == 4
-            && url_path.ends_with(&format!("/{}/", folder))
-            && url_path.starts_with("/Users/")
-    }
-}
-
-impl fmt::Display for FavoriteItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.url)
     }
 }
 
 impl From<FavoriteItem> for Target {
-    fn from(path: FavoriteItem) -> Self {
-        let url = path.to_string();
-        match url.as_str() {
-            FavoriteItem::AIRDROP => Target::AirDrop,
-            FavoriteItem::RECENTS => Target::Recents,
-            FavoriteItem::APPLICATIONS => Target::Applications,
-            _ if path.is_special_folder("Downloads") => Target::Downloads,
-            _ if path.is_special_folder("Desktop") => Target::Desktop,
-            path_str => Target::Custom {
-                label: path.name.to_string(),
-                path: path_str.to_string(),
+    fn from(item: FavoriteItem) -> Self {
+        let url = item.url.to_string();
+        match MacOsUrl::from(url.as_str()) {
+            MacOsUrl::AirDrop => Target::AirDrop,
+            MacOsUrl::Recents => Target::Recents,
+            MacOsUrl::Applications => Target::Applications,
+            MacOsUrl::Downloads => Target::Downloads,
+            MacOsUrl::Desktop => Target::Desktop,
+            MacOsUrl::Custom(path) => Target::Custom {
+                label: item.name.to_string(),
+                path,
             },
         }
     }
@@ -77,7 +102,7 @@ mod tests {
     #[test]
     fn should_convert_airdrop_url() {
         let target = Target::from(FavoriteItem::new(
-            create_url(FavoriteItem::AIRDROP),
+            create_url(MacOsUrl::AIRDROP),
             create_display_name("AirDrop"),
         ));
         assert_eq!(target, Target::AirDrop);
@@ -86,7 +111,7 @@ mod tests {
     #[test]
     fn should_convert_recents_url() {
         let target = Target::from(FavoriteItem::new(
-            create_url(FavoriteItem::RECENTS),
+            create_url(MacOsUrl::RECENTS),
             create_display_name("Recents"),
         ));
         assert_eq!(target, Target::Recents);
@@ -95,7 +120,7 @@ mod tests {
     #[test]
     fn should_convert_applications_url() {
         let target = Target::from(FavoriteItem::new(
-            create_url(FavoriteItem::APPLICATIONS),
+            create_url(MacOsUrl::APPLICATIONS),
             create_display_name("Applications"),
         ));
         assert_eq!(target, Target::Applications);
@@ -129,5 +154,14 @@ mod tests {
             label: "Documents".to_string(),
             path: "file:///Users/user/Documents/".to_string(),
         });
+    }
+
+    #[test]
+    fn should_not_recognize_deep_downloads_path() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///Users/user/Documents/Downloads/"),
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
     }
 }
