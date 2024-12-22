@@ -29,8 +29,13 @@ jobs:
       - name: Build Release Binary
         if: ${{ steps.release.outputs.release_created }}
         run: make build-nix
+      - name: Prepare Binary for Release
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          chmod +x result/bin/favkit
+          cd result/bin && zip ../../favkit-macos.zip favkit
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ steps.release.outputs.tag_name }} result/bin/favkit
+        run: gh release upload ${{ steps.release.outputs.tag_name }} favkit-macos.zip
