@@ -4,6 +4,23 @@
 
 A modern Rust library and CLI tool for managing macOS Finder favorites. This project is a modern replacement for the abandoned [mysides](https://github.com/mosen/mysides) tool.
 
+## Installation
+
+1. Download the latest release from the [releases page](https://github.com/screwyprof/favkit/releases)
+2. Unzip the downloaded file:
+   ```bash
+   unzip favkit-macos.zip
+   ```
+3. Make the binary executable and remove quarantine:
+   ```bash
+   chmod +x favkit
+   xattr -d com.apple.quarantine favkit
+   ```
+4. Move to a directory in your PATH (optional):
+   ```bash
+   sudo mv favkit /usr/local/bin/
+   ```
+
 ## Project Goals
 
 1. **Primary Goal**: Create a maintained alternative to `mysides` for managing macOS Finder favorites
