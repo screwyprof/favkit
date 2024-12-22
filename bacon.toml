@@ -73,6 +73,7 @@ l = "job:lint"
 r = "job:run"
 t = "job:test"
 shift-t = "job:test-live"  # Live test output
+ctrl-r = "toggle-raw-output"  # Toggle raw output display
 
 # Navigation (vim-like)
 esc = "back"

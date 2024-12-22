@@ -2,7 +2,13 @@
   pre-commit-check = git-hooks.lib.${system}.run {
     src = ./.;
     hooks = {
-      rustfmt.enable = true;
+      fmt = {
+        enable = true;
+        name = "Formatting";
+        entry = "make fmt";
+        pass_filenames = false;
+        files = "\\.rs$";
+      };
 
       tests = {
         enable = true;

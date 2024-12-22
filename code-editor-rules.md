@@ -1,183 +1,214 @@
-# FavKit
-
-Every time you choose to apply a rule(s), explicitly state the rule(s) in the output. You can abbreviate the rule description to a single word or phrase.
+# FavKit Project Rules
 
 ## Project Context
 
-A modern Rust library and CLI tool for managing macOS Finder favorites, serving as a replacement for the abandoned `mysides` tool.
+FavKit is a modern Rust library and CLI tool for managing macOS Finder favorites, replacing the abandoned `mysides` tool.
 
-- Clean Architecture implementation in Rust
-- Outside-In TDD (London School) showcase
-- Domain-Driven Design principles application
-- Modern development practices with nix + direnv
+## Architecture
 
-## Code Style and Structure
+1. **Clean Architecture**
+   - Domain layer (`finder/`):
+     - Pure business logic and types
+     - Rich domain model (not anemic)
+     - Type-driven development
+     - Business rules encoded in types
+     - Domain invariants enforced at compile time
+   - Implementation layer (`system/`):
+     - Technical details and infrastructure
+     - Adapters for external systems
+     - Implementation details
 
-- Write idiomatic, clean Rust code following community guidelines
-- Use functional programming patterns where appropriate
-- Prefer composition over inheritance
-- Use descriptive variable names that indicate purpose
-- Structure repository files as follows:
+2. **Testing Strategy**
+   - Outside-In TDD approach:
+     1. Start with acceptance tests when possible
+     2. Use integration tests with mocks for external APIs
+     3. Work inward with unit tests
+     4. Implement minimal code to pass
+     5. Refactor without changing behavior
+   - Test Coverage:
+     - Unit tests for all modules
+     - Mocks only for outermost layer (macOS API)
+     - Thorough error case testing
+     - Prefer Result over unwrap
 
-```
-src/
-├── finder/                 # Domain layer - pure types and high-level business logic
-├── system/                 # Implementation layer
-    ├── core_foundation.rs  # Safe wrappers around Core Foundation types
-    ├── favorites/          # Safe wrapper around macOS API for favorites manipulation
-    └── macos/              # Low-level macOS API calls implementation
-tests/                      # Acceptance and integration tests
-├── mock/                   # Test doubles
-docs/                       # Project documentation
-└── adr/                    # Architecture Decision Records
-```
+3. **Project Structure**
+   ```
+   src/
+   ├── finder/                 # Domain layer
+   ├── system/                 # Implementation layer
+       ├── core_foundation.rs  # CF wrappers
+       ├── favorites/          # macOS API wrapper
+       └── macos/              # Low-level API calls
+   tests/                      # Tests
+   ├── mock/                   # Test doubles
+   docs/                       # Documentation
+   └── adr/                    # ADRs
+   ```
 
-## Tech Stack
+## AI Agent Rules
 
-- Rust (nightly toolchain)
-  - Edition 2024
-  - Components: rustc, rust-std, rust-src, rust-analyzer, rust-docs, rustfmt, cargo, clippy, llvm-tools-preview
-- [Core Foundation](https://docs.rs/core-foundation/latest/core_foundation/)
-- [Core Services](https://docs.rs/core-services/latest/core_services/)
-- [thiserror](https://docs.rs/thiserror/latest/thiserror/)
-- [dirs](https://docs.rs/dirs/latest/dirs/)
-- Development Tools:
-  - [cargo-nextest](https://github.com/nextest-rs/nextest)
-  - [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)
-  - [bacon](https://github.com/Canop/bacon)
+1. **Rule Acknowledgment**
+   - State which rule(s) you're following in each response
+   - Can abbreviate rule descriptions to single words/phrases
 
-## Rust Usage
+2. **Change Management**
+   - Make only explicitly requested changes
+   - Stay focused on the specific task
+   - Follow existing patterns
+   - Document changes clearly
+   - Keep conversation context
+   - Don't revert approved changes
 
-- Use traits for abstraction and dependency inversion
-- Use proper error handling with Result and Option
-- Prefer functional programming style over imperative
-- Prefer method chaining over explicit loops (e.g., `iter().map().filter().collect()`)
-- Prefer standard library traits (e.g., `From`, `Into`, `AsRef`) over custom traits when possible
-- Use iterators and combinators over explicit loops
+3. **Communication**
+   - Propose improvements after requested changes
+   - Wait for user approval
+   - Provide clear examples
+   - Explain rationale
+   - Ask for clarification when in doubt
 
-## Error Handling
+4. **Architecture Review**
+   - Ensure Clean Architecture compliance
+   - Follow KISS, DRY, YAGNI, SOLID principles
+   - Verify domain isolation
+   - Check separation of concerns
+   - Review and update ADRs
 
-- Use thiserror for error definitions
-- Implement custom error types for each module
-- Provide clear error messages
-- Use Result type for fallible operations
-- Implement proper error conversion traits
+## Technical Requirements
 
-## Testing
+1. **Tech Stack**
+   ```toml
+   [toolchain]
+   rust = "nightly"
+   edition = "2024"
+   components = [
+     "rustc", "rust-std", "rust-src",
+     "rust-analyzer", "rust-docs",
+     "rustfmt", "cargo", "clippy",
+     "llvm-tools-preview"
+   ]
 
-- Write acceptance tests first (ATDD)
-- Implement unit tests for all modules
-- Use test doubles (mocks) only for the outermost layer (macos api)
-- Test error cases thoroughly
-- Prefer result type for fallible operations over unwrap
+   [dependencies]
+   core-foundation = "*"  # https://docs.rs/core-foundation/latest/core_foundation/
+   core-services = "*"    # https://docs.rs/core-services/latest/core_services/
+   thiserror = "*"       # https://docs.rs/thiserror/latest/thiserror/
+   dirs = "*"            # https://docs.rs/dirs/latest/dirs/
 
-## State Management
+   [dev-dependencies]
+   cargo-nextest = "*"   # https://github.com/nextest-rs/nextest
+   cargo-llvm-cov = "*"  # https://github.com/taiki-e/cargo-llvm-cov
+   bacon = "*"           # https://github.com/Canop/bacon
+   ```
 
-- Use immutable data structures when possible
+2. **Rust Development**
+   - Type System Usage:
+     - Express domain concepts through types
+     - Encode business rules in type system
+     - Use type-driven development
+     - Prevent invalid states at compile time
+     ```rust
+     // WRONG: Stringly-typed API
+     fn add_favorite(path: String) -> Result<(), Error>
+     
+     // RIGHT: Domain concepts in types
+     struct Target {
+         path: ValidPath,
+         kind: TargetKind,
+     }
+     ```
 
-## Syntax and Formatting
+   - Standard Library Traits:
+     ```rust
+     // WRONG: Custom conversion methods
+     fn url_to_target() -> Target
+     fn as_string() -> String
+     fn into_bytes() -> Vec<u8>
+     
+     // RIGHT: Standard library traits
+     impl From<Url> for Target
+     impl AsRef<str> for Type
+     impl Into<Vec<u8>> for Type
+     ```
 
-- Use rustfmt for consistent formatting (make fmt)
-- Follow Rust naming conventions
-- Implement proper documentation comments
-- Use clippy for code quality (make lint)
+   - Code Organization:
+     - Separate data from behavior
+     - Use traits for abstraction
+     - Prefer functional style over OOP
+     - Use Rust idioms effectively
+     - Method chaining when appropriate
+     - Iterators and combinators
 
-## Documentation
+   - Error Handling:
+     - thiserror for definitions
+     - Custom error types per module
+     - Result for fallible operations
+     - Proper error conversion traits
 
-- Maintain clear README with setup instructions
-- Document public APIs with examples
-- Keep ADRs up to date
-- Include usage examples
-- Document error conditions
+3. **Documentation**
+   - Clear README
+   - API examples
+   - Up-to-date ADRs
+   - Usage examples
+   - Error conditions
 
-## Development Workflow
+4. **Git Commits**
+   Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+   
+   When the user says "let's commit" or similar, only propose a commit message following this format - do not execute any git commands.
 
-- Follow (A)TDD cycle
-- Follow semantic versioning
+   Format: `<type>[optional scope]: <description>`
+   ```
+   <type>[optional scope]: <description>
 
-## Git Usage
+   [optional body]
 
-Follow the Conventional Commits specification at https://www.conventionalcommits.org/en/v1.0.0/
+   [optional footer(s)]
+   ```
+   Types:
+   - feat: features (correlates with MINOR in semver)
+   - fix: bug fixes (correlates with PATCH in semver)
+   - refactor: code changes that neither fix bugs nor add features
+   - docs: documentation changes
+   - chore: maintenance tasks, dependency updates, etc.
+   
+   Breaking changes can be indicated by:
+   - Adding a `!` after the type/scope: `feat!:` or `feat(api)!:`
+   - Adding `BREAKING CHANGE:` in the footer
 
-Format: `<type>[optional scope]: <description>`
+   Example with breaking change:
+   ```
+   feat!: drop support for Node 6
 
-```
-<type>[optional scope]: <description>
+   BREAKING CHANGE: use JavaScript features not available in Node 6.
+   ```
 
-[optional body]
+## Core Foundation Rules
 
-[optional footer(s)]
-```
+1. **Overview**
+   Most memory management is handled by core-foundation and core-services crates.
+   Our wrapper in `system/core_foundation.rs` provides additional safety:
+   - Type-safe wrappers around CF types
+   - Safe handling of raw pointers
+   - Proper memory management in test doubles
 
-Types:
-- `feat:` new features
-- `fix:` bug fixes
-- `refactor:` code changes that neither fix bugs nor add features
-- `docs:` documentation changes
-- `chore:` maintenance tasks, dependency updates, etc.
+   Core Foundation Documentation:
+   - [Memory Management Guide](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/CFMemoryMgmt.html)
+   - [Object Lifecycle](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Articles/lifecycle.html)
+   - [Ownership Policy](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html)
+   - [Copy Functions](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/CopyFunctions.html)
 
-Breaking changes can be indicated by adding a `!` after the type/scope or by adding a `BREAKING CHANGE:` footer.
-
-## Security
-
-- Handle sensitive data properly
-- Implement proper error handling
-- Follow Rust security best practices
-- Use safe Rust by default
-- Document security considerations
-
-## Core Foundation Memory Management
-
-We work with Core Foundation types through two layers of abstraction:
-
-1. The [core-foundation](https://docs.rs/core-foundation/latest/core_foundation/) Rust crate, which provides safe wrappers around:
+2. **Core Foundation Types**
    - [CFType](https://docs.rs/core-foundation/latest/core_foundation/base/index.html) - base type
    - [CFString](https://docs.rs/core-foundation/latest/core_foundation/string/index.html) - string type
    - [CFArray](https://docs.rs/core-foundation/latest/core_foundation/array/index.html) - array type
    - [CFUrl](https://docs.rs/core-foundation/latest/core_foundation/url/index.html) - URL type
 
-2. Our own wrapper in `system/core_foundation.rs` which provides:
-   - `CFRef<T>` - Type-safe wrapper around Core Foundation types
-   - `RawRef<T>` - Safe wrapper around non-null raw pointers
-   - Null pointer safety checks
-   - Type-safe conversions
-
-Memory Management References:
-- [Memory Management Programming Guide](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/CFMemoryMgmt.html)
-- [Object Lifecycle Management](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Articles/lifecycle.html)
-- [Ownership Policy](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html)
-- [Copy Functions](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/CopyFunctions.html)
-
-Rules:
-
-Reference Counting:
-- Every CF object has a reference count
-- `CFRetain` increments the reference count
-- `CFRelease` decrements the reference count
-- When reference count reaches 0, the object is deallocated
-
-Ownership Rules:
-- Functions with these words in their names give you ownership:
-  - `Create` (reference count = 1)
-  - `Copy` (reference count = 1)
-  - `Retain` (increments reference count)
-- Functions without these words do not give you ownership:
-  - `Get`
-  - `Find`
-  - `Register`
-
-Memory Management:
-- If you own an object, you MUST call `CFRelease` exactly once
-- If you don't own an object but need to keep it:
-  - Call `CFRetain` to claim ownership
-  - Later call `CFRelease` when done
-- Never call `CFRelease` on an object you don't own
-- Never access a CF object after releasing it
-
-Copying Objects:
-- For compound objects (collections):
-  - `CreateCopy` performs shallow copy (only container is copied)
-  - Deep copy must be done manually if needed
-- When storing CF objects:
-  - Either retain them with `CFRetain` or create a copy
-  - Must balance with `CFRelease` when no longer needed
+3. **Memory Management in Mocks**
+   When working directly with CF types:
+   - Track owned objects in mock structures
+   - Balance CFRetain/CFRelease calls
+   - Never access released objects
+   - Be extra careful with raw pointers
+   - Retain objects you need to keep
+   - Release when mock is dropped
+   - Never release objects you don't own
+   - Prevent dangling pointers
