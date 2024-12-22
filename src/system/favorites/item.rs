@@ -1,10 +1,12 @@
+use std::fmt;
+
 use crate::{
     finder::Target,
     system::favorites::{DisplayName, Url},
 };
 
-#[derive(Debug)]
-enum MacOsUrl {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MacOsUrl {
     AirDrop,
     Recents,
     Applications,
@@ -14,22 +16,31 @@ enum MacOsUrl {
 }
 
 impl MacOsUrl {
-    const AIRDROP: &'static str = "nwnode://domain-AirDrop";
-    const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
-    const APPLICATIONS: &'static str = "file:///Applications/";
+    pub const AIRDROP: &'static str = "nwnode://domain-AirDrop";
+    pub const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
+    pub const APPLICATIONS: &'static str = "file:///Applications/";
     const USER_HOME_FOLDER_DEPTH: usize = 4; // /Users/username/folder/
 
-    fn is_user_downloads(url: &str) -> bool {
+    fn is_user_downloads(url: impl AsRef<str>) -> bool {
         Self::is_user_folder(url, "Downloads")
     }
 
-    fn is_user_desktop(url: &str) -> bool {
+    fn is_user_desktop(url: impl AsRef<str>) -> bool {
         Self::is_user_folder(url, "Desktop")
     }
 
-    fn is_user_folder(url: &str, folder: &str) -> bool {
-        let url_path = url.strip_prefix("file://").unwrap_or(url);
-        url_path.matches('/').count() == Self::USER_HOME_FOLDER_DEPTH
+    fn is_user_folder(url: impl AsRef<str>, folder: impl AsRef<str>) -> bool {
+        url.as_ref()
+            .strip_prefix("file://")
+            .filter(|url_path| Self::is_inside_home_dir(url_path, folder.as_ref()))
+            .is_some()
+    }
+
+    fn is_inside_home_dir(url_path: &str, folder: &str) -> bool {
+        url_path
+            .matches('/')
+            .count()
+            .eq(&Self::USER_HOME_FOLDER_DEPTH)
             && url_path.ends_with(&format!("/{}/", folder))
             && url_path.starts_with("/Users/")
     }
@@ -48,6 +59,7 @@ impl From<&str> for MacOsUrl {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FavoriteItem {
     url: Url,
     name: DisplayName,
@@ -56,6 +68,12 @@ pub struct FavoriteItem {
 impl FavoriteItem {
     pub fn new(url: Url, name: DisplayName) -> Self {
         Self { url, name }
+    }
+}
+
+impl fmt::Display for FavoriteItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} -> {}", self.name, self.url)
     }
 }
 
@@ -161,6 +179,85 @@ mod tests {
         let target = Target::from(FavoriteItem::new(
             create_url("file:///Users/user/Documents/Downloads/"),
             create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+
+    #[test]
+    fn should_not_recognize_shallow_path() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///Users/Downloads/"), // Only 3 slashes
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+
+    #[test]
+    fn should_format_favorite_item() {
+        let item = FavoriteItem::new(
+            create_url("file:///Users/user/Documents/"),
+            create_display_name("Documents"),
+        );
+        assert_eq!(
+            format!("{}", item),
+            "Documents -> file:///Users/user/Documents/"
+        );
+    }
+
+    #[test]
+    fn should_not_recognize_non_user_path_with_correct_depth() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///System/Library/Desktop/"),
+            create_display_name("Desktop"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+
+    #[test]
+    fn should_not_recognize_path_without_file_prefix() {
+        let raw_path = "/Users/user/Downloads/";
+        let url = MacOsUrl::from(raw_path);
+        assert!(matches!(url, MacOsUrl::Custom(_)));
+    }
+
+    #[test]
+    fn should_not_recognize_path_with_different_prefix() {
+        let path = "http:///Users/user/Downloads/";
+        let url = MacOsUrl::from(path);
+        assert!(matches!(url, MacOsUrl::Custom(_)));
+    }
+
+    #[test]
+    fn should_not_recognize_path_with_correct_depth_but_wrong_structure() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///one/two/three/four/"), // Right depth but wrong structure
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+    #[test]
+    fn should_not_recognize_path_with_correct_depth_and_prefix_but_wrong_ending() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///Users/user/WrongFolder/"), // Right depth and prefix, wrong ending
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+
+    #[test]
+    fn should_not_recognize_path_with_correct_ending_but_wrong_structure() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///var/tmp/Downloads/"), // Right ending but wrong depth and prefix
+            create_display_name("Downloads"),
+        ));
+        assert!(matches!(target, Target::Custom { .. }));
+    }
+
+    #[test]
+    fn should_not_recognize_path_with_correct_prefix_but_wrong_structure() {
+        let target = Target::from(FavoriteItem::new(
+            create_url("file:///Users/Documents/"), // Right prefix but wrong depth and ending
+            create_display_name("Documents"),
         ));
         assert!(matches!(target, Target::Custom { .. }));
     }
