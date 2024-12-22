@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 # Declare all phony targets (all and clean first as required)
 .PHONY: all clean test \
-        help run test-debug test-failures test-live \
+        help run test-debug test-failures test-live test-junit \
         fmt lint \
         coverage coverage-text coverage-summary coverage-lcov coverage-html \
         watch build build-release build-nix
@@ -52,6 +52,10 @@ test-failures: ## Run tests and show only failures
 
 test-live: ## Run tests with live output (no capture)
 	@cargo $(CARGO_FLAGS) nextest run --no-capture
+
+test-junit: ## Run tests and generate JUnit report
+	@mkdir -p $(COVERAGE_DIR)
+	@cargo $(CARGO_FLAGS) nextest run --profile ci
 
 ##@ Building
 build: ## Build debug version
