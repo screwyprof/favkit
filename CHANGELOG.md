@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/screwyprof/favkit/compare/v0.2.0...v0.3.0) (2024-12-22)
+
+
+### Features
+
+* handle special locations (Recents & Applications) in Finder sidebar ([#9](https://github.com/screwyprof/favkit/issues/9)) ([101102b](https://github.com/screwyprof/favkit/commit/101102b2462796415a38efd4e92bc4336170a32b))
+
 ## [0.2.0](https://github.com/screwyprof/favkit/compare/v0.1.2...v0.2.0) (2024-12-22)
 
 
