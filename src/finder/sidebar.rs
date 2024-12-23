@@ -5,8 +5,16 @@ pub enum Target {
     AirDrop,
     Recents,
     Applications,
-    Downloads,
     Custom { label: String, path: String },
+}
+
+impl Target {
+    pub fn custom(label: impl Into<String>, path: impl Into<String>) -> Self {
+        Self::Custom {
+            label: label.into(),
+            path: path.into(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,7 +34,6 @@ impl fmt::Display for SidebarItem {
             Target::AirDrop => write!(f, "AirDrop"),
             Target::Recents => write!(f, "Recents"),
             Target::Applications => write!(f, "Applications"),
-            Target::Downloads => write!(f, "~/Downloads"),
             Target::Custom { label, path } => write!(f, "{} -> {}", label, path),
         }
     }
@@ -40,11 +47,8 @@ mod tests {
 
     #[test]
     fn should_create_sidebar_item_with_custom_target() {
-        let item = SidebarItem::new(Target::Custom {
-            label: "Documents".to_string(),
-            path: "/Users/user/Documents".to_string(),
-        });
-        assert_eq!(format!("{}", item), "Documents -> /Users/user/Documents");
+        let item = SidebarItem::new(Target::custom("Projects", "/Users/user/Projects"));
+        assert_eq!(format!("{}", item), "Projects -> /Users/user/Projects");
     }
 
     #[test]
@@ -63,11 +67,5 @@ mod tests {
     fn should_create_sidebar_item_with_applications() {
         let item = SidebarItem::new(Target::Applications);
         assert_eq!(format!("{}", item), "Applications");
-    }
-
-    #[test]
-    fn should_create_sidebar_item_with_downloads() {
-        let item = SidebarItem::new(Target::Downloads);
-        assert_eq!(format!("{}", item), "~/Downloads");
     }
 }
