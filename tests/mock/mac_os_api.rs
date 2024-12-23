@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{cell::RefCell, ffi::c_void, rc::Rc};
 
 use core_foundation::{
     array::{CFArray, CFArrayRef},
-    base::{CFAllocatorRef, CFTypeRef, TCFType},
+    base::{CFAllocatorRef, TCFType},
     error::CFErrorRef,
     string::CFStringRef,
     url::CFURLRef,
@@ -11,7 +11,10 @@ use core_services::{
     LSSharedFileListItemRef, LSSharedFileListRef, LSSharedFileListResolutionFlags,
     OpaqueLSSharedFileListItemRef,
 };
-use favkit::system::favorites::{DisplayName, Snapshot, Url};
+use favkit::system::{
+    MacOsApi,
+    favorites::{DisplayName, Snapshot, Url},
+};
 
 use super::favorites::Favorites;
 
@@ -26,36 +29,44 @@ impl From<LSSharedFileListItemRef> for ItemIndex {
 }
 
 type ListHandle = LSSharedFileListRef;
-type SnapshotArray = CFArrayRef;
+type SnapshotHandle = CFArrayRef;
+type DisplayNameHandle = CFStringRef;
+type UrlHandle = CFURLRef;
 
 /// Function types for mocking API behavior
 pub mod handlers {
     use super::*;
 
     pub type CreateListFn = Box<dyn Fn() -> ListHandle>;
-    pub type GetSnapshotFn = Box<dyn Fn(ListHandle) -> SnapshotArray>;
-    pub type GetDisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFStringRef>;
-    pub type GetUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> CFURLRef>;
+    pub type GetSnapshotFn = Box<dyn Fn(ListHandle) -> SnapshotHandle>;
+    pub type GetDisplayNameFn = Box<dyn Fn(LSSharedFileListItemRef) -> DisplayNameHandle>;
+    pub type GetUrlFn = Box<dyn Fn(LSSharedFileListItemRef) -> UrlHandle>;
 }
 use handlers::*;
 
-/// State markers
-pub struct Uninitialized;
-pub struct WithList;
-pub struct WithNullList;
-pub struct WithNullSnapshot;
-
-/// Builder for creating mock API implementations
-pub struct MockMacOsApiBuilder<State = Uninitialized> {
-    list_create_fn: Option<CreateListFn>,
-    snapshot_fn: Option<GetSnapshotFn>,
-    display_name_fn: Option<GetDisplayNameFn>,
-    resolved_url_fn: Option<GetUrlFn>,
-    _state: std::marker::PhantomData<State>,
+#[derive(Default)]
+pub struct Expectations {
+    pub list_create_calls: usize,
+    pub snapshot_calls: usize,
+    pub display_name_calls: usize,
+    pub resolved_url_calls: usize,
 }
 
-impl Default for MockMacOsApiBuilder<Uninitialized> {
-    fn default() -> Self {
+/// Mock implementation of MacOsApi for testing
+pub struct MockMacOsApi {
+    list_create_fn: CreateListFn,
+    snapshot_fn: GetSnapshotFn,
+    display_name_fn: GetDisplayNameFn,
+    resolved_url_fn: GetUrlFn,
+    call_tracker: Rc<CallTracker>,
+}
+
+impl MockMacOsApi {
+    pub fn call_tracker(&self) -> Rc<CallTracker> {
+        Rc::clone(&self.call_tracker)
+    }
+
+    pub fn new() -> Self {
         let raw_list = 1 as ListHandle;
         let empty_snapshot =
             CFArray::from_copyable(&Vec::<*mut OpaqueLSSharedFileListItemRef>::new());
@@ -63,22 +74,23 @@ impl Default for MockMacOsApiBuilder<Uninitialized> {
             Snapshot::try_from(empty_snapshot.as_concrete_TypeRef()).unwrap(),
         ));
 
+        let expectations = Expectations {
+            list_create_calls: 1,
+            snapshot_calls: 1,
+            display_name_calls: 0,
+            resolved_url_calls: 0,
+        };
+
         Self {
-            list_create_fn: Some(Box::new(move || raw_list)),
-            snapshot_fn: Some(Box::new(move |_| {
+            list_create_fn: Box::new(move || raw_list),
+            snapshot_fn: Box::new(move |_| {
                 let snapshot = snapshot.as_ref().as_ref().unwrap();
                 snapshot.into()
-            })),
-            display_name_fn: None,
-            resolved_url_fn: None,
-            _state: std::marker::PhantomData,
+            }),
+            display_name_fn: Box::new(|_| std::ptr::null_mut()),
+            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
+            call_tracker: Rc::new(CallTracker::new(expectations)),
         }
-    }
-}
-
-impl MockMacOsApiBuilder<Uninitialized> {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     fn get_display_name(
@@ -94,98 +106,105 @@ impl MockMacOsApiBuilder<Uninitialized> {
         (&urls[idx.0]).into()
     }
 
-    pub fn with_favorites(self, favorites: Favorites) -> MockMacOsApiBuilder<WithList> {
+    pub fn with_favorites(favorites: Favorites) -> Self {
         let raw_list = 1 as ListHandle;
         let snapshot = Rc::clone(&favorites.snapshot);
         let display_names = Rc::clone(&favorites.display_names);
         let urls = Rc::clone(&favorites.urls);
+        let expectations = Self::calculate_expectations(Some(&favorites));
 
-        MockMacOsApiBuilder {
-            list_create_fn: Some(Box::new(move || raw_list)),
-            snapshot_fn: Some(Box::new(move |_| {
+        Self {
+            list_create_fn: Box::new(move || raw_list),
+            snapshot_fn: Box::new(move |_| {
                 let snapshot = snapshot.as_ref().as_ref().unwrap();
                 snapshot.into()
-            })),
-            display_name_fn: Some(Box::new(move |item_ref| {
+            }),
+            display_name_fn: Box::new(move |item_ref| {
                 Self::get_display_name(&display_names, item_ref)
-            })),
-            resolved_url_fn: Some(Box::new(move |item_ref| Self::get_url(&urls, item_ref))),
-            _state: std::marker::PhantomData,
+            }),
+            resolved_url_fn: Box::new(move |item_ref| Self::get_url(&urls, item_ref)),
+            call_tracker: Rc::new(CallTracker::new(expectations)),
         }
     }
 
-    pub fn with_null_list(self) -> MockMacOsApiBuilder<WithNullList> {
-        MockMacOsApiBuilder {
-            list_create_fn: Some(Box::new(std::ptr::null_mut)),
-            snapshot_fn: None,
-            display_name_fn: None,
-            resolved_url_fn: None,
-            _state: std::marker::PhantomData,
+    pub fn with_null_list() -> Self {
+        let expectations = Expectations {
+            list_create_calls: 1,
+            ..Default::default()
+        };
+
+        Self {
+            list_create_fn: Box::new(std::ptr::null_mut),
+            snapshot_fn: Box::new(|_| std::ptr::null()),
+            display_name_fn: Box::new(|_| std::ptr::null_mut()),
+            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
+            call_tracker: Rc::new(CallTracker::new(expectations)),
         }
     }
 
-    pub fn with_null_snapshot(self) -> MockMacOsApiBuilder<WithNullSnapshot> {
+    pub fn with_null_snapshot() -> Self {
         let raw_list = 1 as ListHandle;
-        MockMacOsApiBuilder {
-            list_create_fn: Some(Box::new(move || raw_list)),
-            snapshot_fn: Some(Box::new(|_| std::ptr::null())),
-            display_name_fn: None,
-            resolved_url_fn: None,
-            _state: std::marker::PhantomData,
+        let expectations = Expectations {
+            list_create_calls: 1,
+            snapshot_calls: 1,
+            ..Default::default()
+        };
+
+        Self {
+            list_create_fn: Box::new(move || raw_list),
+            snapshot_fn: Box::new(|_| std::ptr::null()),
+            display_name_fn: Box::new(|_| std::ptr::null_mut()),
+            resolved_url_fn: Box::new(|_| std::ptr::null_mut()),
+            call_tracker: Rc::new(CallTracker::new(expectations)),
+        }
+    }
+
+    fn calculate_expectations(favorites: Option<&Favorites>) -> Expectations {
+        match favorites {
+            Some(f) => {
+                let item_count = f.display_names.len();
+                Expectations {
+                    list_create_calls: 1,
+                    snapshot_calls: 1,
+                    display_name_calls: item_count,
+                    resolved_url_calls: item_count,
+                }
+            }
+            None => Expectations {
+                list_create_calls: 1,
+                snapshot_calls: 1,
+                display_name_calls: 0,
+                resolved_url_calls: 0,
+            },
         }
     }
 }
 
-// Implement build() for each final state
-impl<State> MockMacOsApiBuilder<State> {
-    pub fn build(self) -> MockMacOsApi {
-        MockMacOsApi {
-            list_create_fn: self
-                .list_create_fn
-                .unwrap_or_else(|| Box::new(std::ptr::null_mut)),
-            snapshot_fn: self
-                .snapshot_fn
-                .unwrap_or_else(|| Box::new(|_| std::ptr::null())),
-            display_name_fn: self
-                .display_name_fn
-                .unwrap_or_else(|| Box::new(|_| std::ptr::null_mut())),
-            resolved_url_fn: self
-                .resolved_url_fn
-                .unwrap_or_else(|| Box::new(|_| std::ptr::null_mut())),
-        }
-    }
-}
-
-/// Mock implementation of MacOsApi for testing
-pub struct MockMacOsApi {
-    list_create_fn: CreateListFn,
-    snapshot_fn: GetSnapshotFn,
-    display_name_fn: GetDisplayNameFn,
-    resolved_url_fn: GetUrlFn,
-}
-
-impl favkit::system::MacOsApi for MockMacOsApi {
+impl MacOsApi for MockMacOsApi {
     unsafe fn ls_shared_file_list_create(
         &self,
         _allocator: CFAllocatorRef,
         _list_type: CFStringRef,
-        _list_options: CFTypeRef,
-    ) -> LSSharedFileListRef {
+        _options: *const c_void,
+    ) -> ListHandle {
+        self.call_tracker.track_list_create();
         (self.list_create_fn)()
     }
 
     unsafe fn ls_shared_file_list_copy_snapshot(
         &self,
-        _list: LSSharedFileListRef,
+        list: ListHandle,
         _seed: *mut u32,
-    ) -> CFArrayRef {
-        (self.snapshot_fn)(_list)
+    ) -> SnapshotHandle {
+        self.call_tracker.track_snapshot(list);
+        (self.snapshot_fn)(list)
     }
 
     unsafe fn ls_shared_file_list_item_copy_display_name(
         &self,
         item: LSSharedFileListItemRef,
-    ) -> CFStringRef {
+    ) -> DisplayNameHandle {
+        self.call_tracker.track_display_name(item);
         (self.display_name_fn)(item)
     }
 
@@ -194,7 +213,85 @@ impl favkit::system::MacOsApi for MockMacOsApi {
         item: LSSharedFileListItemRef,
         _flags: LSSharedFileListResolutionFlags,
         _error: *mut CFErrorRef,
-    ) -> CFURLRef {
+    ) -> UrlHandle {
+        self.call_tracker.track_resolved_url(item);
         (self.resolved_url_fn)(item)
+    }
+}
+
+#[derive(Default)]
+pub struct CallTracker {
+    list_create_calls: RefCell<Vec<()>>,
+    snapshot_calls: RefCell<Vec<LSSharedFileListRef>>,
+    display_name_calls: RefCell<Vec<LSSharedFileListItemRef>>,
+    resolved_url_calls: RefCell<Vec<LSSharedFileListItemRef>>,
+    expectations: Expectations,
+}
+
+impl CallTracker {
+    pub fn new(expectations: Expectations) -> Self {
+        Self {
+            expectations,
+            ..Default::default()
+        }
+    }
+
+    pub fn list_create_called(&self) -> usize {
+        self.list_create_calls.borrow().len()
+    }
+
+    pub fn snapshot_calls(&self) -> Vec<LSSharedFileListRef> {
+        self.snapshot_calls.borrow().clone()
+    }
+
+    pub fn display_name_calls(&self) -> Vec<LSSharedFileListItemRef> {
+        self.display_name_calls.borrow().clone()
+    }
+
+    pub fn resolved_url_calls(&self) -> Vec<LSSharedFileListItemRef> {
+        self.resolved_url_calls.borrow().clone()
+    }
+
+    pub(crate) fn track_list_create(&self) {
+        self.list_create_calls.borrow_mut().push(());
+    }
+
+    pub(crate) fn track_snapshot(&self, list: LSSharedFileListRef) {
+        self.snapshot_calls.borrow_mut().push(list);
+    }
+
+    pub(crate) fn track_display_name(&self, item: LSSharedFileListItemRef) {
+        self.display_name_calls.borrow_mut().push(item);
+    }
+
+    pub(crate) fn track_resolved_url(&self, item: LSSharedFileListItemRef) {
+        self.resolved_url_calls.borrow_mut().push(item);
+    }
+
+    pub fn verify(&self) {
+        assert_eq!(
+            self.list_create_called(),
+            self.expectations.list_create_calls,
+            "Expected list_create to be called {} times",
+            self.expectations.list_create_calls
+        );
+        assert_eq!(
+            self.snapshot_calls().len(),
+            self.expectations.snapshot_calls,
+            "Expected copy_snapshot to be called {} times",
+            self.expectations.snapshot_calls
+        );
+        assert_eq!(
+            self.display_name_calls().len(),
+            self.expectations.display_name_calls,
+            "Expected copy_display_name to be called {} times",
+            self.expectations.display_name_calls
+        );
+        assert_eq!(
+            self.resolved_url_calls().len(),
+            self.expectations.resolved_url_calls,
+            "Expected copy_resolved_url to be called {} times",
+            self.expectations.resolved_url_calls
+        );
     }
 }

@@ -79,14 +79,11 @@ impl Favorites {
 
 impl FavoritesApi for Favorites {
     fn list_items(&self) -> Result<Vec<SidebarItem>> {
-        unsafe {
-            let list = self.list_create()?;
-            let snapshot = self.copy_snapshot(list)?;
-
-            snapshot
-                .into_iter()
-                .map(|item| self.convert_item(item))
-                .collect()
-        }
+        let list = unsafe { self.list_create() }?;
+        let snapshot = unsafe { self.copy_snapshot(list) }?;
+        snapshot
+            .into_iter()
+            .map(|item| unsafe { self.convert_item(item) })
+            .collect()
     }
 }

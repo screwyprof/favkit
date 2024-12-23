@@ -4,8 +4,9 @@ use favkit::{
 };
 use pretty_assertions::assert_eq;
 
+use crate::mock::{favorites::FavoritesBuilder, mac_os_api::MockMacOsApi};
+
 mod mock;
-use mock::{favorites::FavoritesBuilder, mac_os_api::MockMacOsApiBuilder};
 
 mod constants {
     // AirDrop
@@ -29,14 +30,16 @@ mod constants {
 fn should_fail_when_list_handle_is_null() -> Result<()> {
     // Arrange
     let expected_error = Err(FinderError::AccessError(FavoritesError::NullListHandle));
-    let mock_api = MockMacOsApiBuilder::new().with_null_list().build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_null_list();
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list();
 
     // Assert
     assert_eq!(result, expected_error);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -44,14 +47,16 @@ fn should_fail_when_list_handle_is_null() -> Result<()> {
 fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
     // Arrange
     let expected_error = Err(FinderError::AccessError(FavoritesError::NullSnapshotHandle));
-    let mock_api = MockMacOsApiBuilder::new().with_null_snapshot().build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_null_snapshot();
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list();
 
     // Assert
     assert_eq!(result, expected_error);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -59,14 +64,16 @@ fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
 fn should_return_empty_list_when_no_favorites() -> Result<()> {
     // Arrange
     let expected_result: Vec<SidebarItem> = vec![];
-    let mock_api = MockMacOsApiBuilder::new().build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::new();
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -77,14 +84,16 @@ fn should_handle_airdrop_item() -> Result<()> {
     let favorites = FavoritesBuilder::new()
         .add_item(None, constants::AIRDROP_URL)
         .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_favorites(favorites);
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -95,14 +104,16 @@ fn should_handle_recents_item() -> Result<()> {
     let favorites = FavoritesBuilder::new()
         .add_item(Some(constants::RECENTS_LABEL), constants::RECENTS_URL)
         .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_favorites(favorites);
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -116,14 +127,16 @@ fn should_handle_applications_item() -> Result<()> {
             constants::APPLICATIONS_URL,
         )
         .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_favorites(favorites);
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -146,14 +159,16 @@ fn should_handle_multiple_favorites() -> Result<()> {
         )
         .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_URL)
         .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_favorites(favorites);
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
 
@@ -168,13 +183,15 @@ fn should_handle_custom_location() -> Result<()> {
     let favorites = FavoritesBuilder::new()
         .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_URL)
         .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
+    let api = MockMacOsApi::with_favorites(favorites);
+    let call_tracker = api.call_tracker();
+    let finder = Finder::new(api);
 
     // Act
     let result = finder.get_favorites_list()?;
 
     // Assert
     assert_eq!(result, expected_result);
+    call_tracker.verify();
     Ok(())
 }
