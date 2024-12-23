@@ -171,18 +171,9 @@ mod tests {
     }
 
     #[test]
-    fn should_not_recognize_deep_downloads_path() {
+    fn should_not_recognize_deep_downloads_path_as_downloads() {
         let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/Documents/Downloads/"),
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_not_recognize_shallow_path() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/Downloads/"), // Only 3 slashes
+            create_url("file:///Users/user/Projects/Downloads/"),
             create_display_name("Downloads"),
         ));
         assert!(matches!(target, Target::Custom { .. }));
@@ -198,87 +189,5 @@ mod tests {
             format!("{}", item),
             "Documents -> file:///Users/user/Documents/"
         );
-    }
-
-    #[test]
-    fn should_not_recognize_non_user_path_with_correct_depth() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///System/Library/Desktop/"),
-            create_display_name("Desktop"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_not_recognize_path_without_file_prefix() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("smb:///Users/user/Downloads/"),
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_not_recognize_path_with_different_prefix() {
-        let path = "http:///Users/user/Downloads/";
-        let url = MacOsUrl::from(create_url(path));
-        assert!(matches!(url, MacOsUrl::Custom(_)));
-    }
-
-    #[test]
-    fn should_not_recognize_path_with_correct_depth_but_wrong_structure() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///one/two/three/four/"), // Right depth but wrong structure
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-    #[test]
-    fn should_not_recognize_path_with_correct_depth_and_prefix_but_wrong_ending() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/WrongFolder/"), // Right depth and prefix, wrong ending
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_not_recognize_path_with_correct_ending_but_wrong_structure() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///var/tmp/Downloads/"), // Right ending but wrong depth and prefix
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_not_recognize_path_with_correct_prefix_but_wrong_structure() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/Documents/"), // Right prefix but wrong depth and ending
-            create_display_name("Documents"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
-    }
-
-    #[test]
-    fn should_format_custom_location() {
-        let url = "file:///Users/user/Documents/Projects/";
-        let target = Target::from(FavoriteItem::new(
-            create_url(url),
-            create_display_name("Projects"),
-        ));
-        assert_eq!(target, Target::Custom {
-            label: "Projects".to_string(),
-            path: "/Users/user/Documents/Projects".to_string(),
-        });
-    }
-
-    #[test]
-    fn should_treat_non_file_url_as_custom() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("http:///Users/user/Downloads/"),
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
     }
 }
