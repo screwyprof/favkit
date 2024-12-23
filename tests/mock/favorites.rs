@@ -7,7 +7,13 @@ use core_foundation::{
     url::{CFURL, kCFURLPOSIXPathStyle},
 };
 use core_services::OpaqueLSSharedFileListItemRef;
-use favkit::system::favorites::{DisplayName, Snapshot, Url};
+use favkit::{
+    finder::{Result, SidebarItem},
+    system::favorites::{DisplayName, Snapshot, Url},
+};
+use pretty_assertions::assert_eq;
+
+use super::mac_os_api::CallTracker;
 
 /// Builder for creating test data
 #[derive(Default)]
@@ -100,4 +106,13 @@ impl Favorites {
             urls,
         }
     }
+}
+
+pub fn assert_favorites(
+    result: Result<Vec<SidebarItem>>,
+    expected: Vec<SidebarItem>,
+    tracker: &CallTracker,
+) {
+    assert_eq!(result, Ok(expected));
+    tracker.verify();
 }
