@@ -10,8 +10,6 @@ pub enum MacOsUrl {
     AirDrop,
     Recents,
     Applications,
-    Downloads,
-    Desktop,
     Custom(String),
 }
 
@@ -19,9 +17,6 @@ impl MacOsUrl {
     const AIRDROP: &'static str = "nwnode://domain-AirDrop";
     const RECENTS: &'static str = "file:///System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/";
     const APPLICATIONS: &'static str = "file:///Applications/";
-    const USER_PREFIX: &'static str = "file:///Users/";
-    const DOWNLOADS: &'static str = "Downloads";
-    const DESKTOP: &'static str = "Desktop";
 
     fn clean_path(url: impl AsRef<str>) -> String {
         url.as_ref()
@@ -29,18 +24,6 @@ impl MacOsUrl {
             .and_then(|p| p.strip_suffix('/'))
             .unwrap_or(url.as_ref())
             .to_string()
-    }
-
-    fn is_user_folder(url: impl AsRef<str>, folder: impl AsRef<str>) -> bool {
-        url.as_ref()
-            .strip_prefix(Self::USER_PREFIX)
-            .and_then(|rest| {
-                let mut parts = rest.split('/').take(2);
-                let _username = parts.next()?;
-                let folder_name = parts.next()?;
-                (folder_name == folder.as_ref()).then_some(())
-            })
-            .is_some()
     }
 }
 
@@ -52,8 +35,6 @@ impl From<Url> for MacOsUrl {
             Self::AIRDROP => Self::AirDrop,
             Self::RECENTS => Self::Recents,
             Self::APPLICATIONS => Self::Applications,
-            url if Self::is_user_folder(url, Self::DESKTOP) => Self::Desktop,
-            url if Self::is_user_folder(url, Self::DOWNLOADS) => Self::Downloads,
             url => Self::Custom(Self::clean_path(url)),
         }
     }
@@ -83,8 +64,6 @@ impl From<FavoriteItem> for Target {
             MacOsUrl::AirDrop => Target::AirDrop,
             MacOsUrl::Recents => Target::Recents,
             MacOsUrl::Applications => Target::Applications,
-            MacOsUrl::Downloads => Target::Downloads,
-            MacOsUrl::Desktop => Target::Desktop,
             MacOsUrl::Custom(path) => Target::custom(item.name.to_string(), path),
         }
     }
@@ -141,53 +120,26 @@ mod tests {
     }
 
     #[test]
-    fn should_convert_downloads_url() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/Downloads/"),
-            create_display_name("Downloads"),
-        ));
-        assert_eq!(target, Target::Downloads);
-    }
-
-    #[test]
-    fn should_convert_desktop_url() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/Desktop/"),
-            create_display_name("Desktop"),
-        ));
-        assert_eq!(target, Target::Desktop);
-    }
-
-    #[test]
     fn should_convert_custom_url() {
         let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/Documents/"),
-            create_display_name("Documents"),
+            create_url("file:///Users/user/Projects/"),
+            create_display_name("Projects"),
         ));
         assert_eq!(target, Target::Custom {
-            label: "Documents".to_string(),
-            path: "/Users/user/Documents".to_string(),
+            label: "Projects".to_string(),
+            path: "/Users/user/Projects".to_string(),
         });
-    }
-
-    #[test]
-    fn should_not_recognize_deep_downloads_path_as_downloads() {
-        let target = Target::from(FavoriteItem::new(
-            create_url("file:///Users/user/Projects/Downloads/"),
-            create_display_name("Downloads"),
-        ));
-        assert!(matches!(target, Target::Custom { .. }));
     }
 
     #[test]
     fn should_format_favorite_item() {
         let item = FavoriteItem::new(
-            create_url("file:///Users/user/Documents/"),
-            create_display_name("Documents"),
+            create_url("file:///Users/user/Projects/"),
+            create_display_name("Projects"),
         );
         assert_eq!(
             format!("{}", item),
-            "Documents -> file:///Users/user/Documents/"
+            "Projects -> file:///Users/user/Projects/"
         );
     }
 }

@@ -19,14 +19,6 @@ mod constants {
     pub const APPLICATIONS_LABEL: &str = "Applications";
     pub const APPLICATIONS_URL: &str = "file:///Applications/";
 
-    // Desktop
-    pub const DESKTOP_LABEL: &str = "Desktop";
-    pub const DESKTOP_URL: &str = "file:///Users/user/Desktop/";
-
-    // Downloads
-    pub const DOWNLOADS_LABEL: &str = "Downloads";
-    pub const DOWNLOADS_URL: &str = "file:///Users/user/Downloads/";
-
     // Projects
     pub const PROJECTS_LABEL: &str = "Projects";
     pub const PROJECTS_PATH: &str = "/Users/user/Projects";
@@ -136,31 +128,11 @@ fn should_handle_applications_item() -> Result<()> {
 }
 
 #[test]
-fn should_handle_downloads_item() -> Result<()> {
-    // Arrange
-    let expected_result = vec![SidebarItem::new(Target::Downloads)];
-    let favorites = FavoritesBuilder::new()
-        .add_item(Some(constants::DOWNLOADS_LABEL), constants::DOWNLOADS_URL)
-        .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
-
-    // Act
-    let result = finder.get_favorites_list()?;
-
-    // Assert
-    assert_eq!(result, expected_result);
-    Ok(())
-}
-
-#[test]
 fn should_handle_multiple_favorites() -> Result<()> {
     // Arrange
     let expected_result = vec![
         SidebarItem::new(Target::AirDrop),
         SidebarItem::new(Target::Applications),
-        SidebarItem::new(Target::Downloads),
-        SidebarItem::new(Target::Desktop),
         SidebarItem::new(Target::Custom {
             label: constants::PROJECTS_LABEL.to_string(),
             path: constants::PROJECTS_PATH.to_string(),
@@ -172,27 +144,7 @@ fn should_handle_multiple_favorites() -> Result<()> {
             Some(constants::APPLICATIONS_LABEL),
             constants::APPLICATIONS_URL,
         )
-        .add_item(Some(constants::DOWNLOADS_LABEL), constants::DOWNLOADS_URL)
-        .add_item(Some(constants::DESKTOP_LABEL), constants::DESKTOP_URL)
         .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_URL)
-        .build();
-    let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
-    let finder = Finder::new(mock_api);
-
-    // Act
-    let result = finder.get_favorites_list()?;
-
-    // Assert
-    assert_eq!(result, expected_result);
-    Ok(())
-}
-
-#[test]
-fn should_handle_desktop_item() -> Result<()> {
-    // Arrange
-    let expected_result = vec![SidebarItem::new(Target::Desktop)];
-    let favorites = FavoritesBuilder::new()
-        .add_item(Some(constants::DESKTOP_LABEL), constants::DESKTOP_URL)
         .build();
     let mock_api = MockMacOsApiBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock_api);
