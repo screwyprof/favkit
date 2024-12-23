@@ -10,6 +10,15 @@ pub enum Target {
     Custom { label: String, path: String },
 }
 
+impl Target {
+    pub fn custom(label: impl Into<String>, path: impl Into<String>) -> Self {
+        Self::Custom {
+            label: label.into(),
+            path: path.into(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct SidebarItem {
     target: Target,
@@ -42,11 +51,8 @@ mod tests {
 
     #[test]
     fn should_create_sidebar_item_with_custom_target() {
-        let item = SidebarItem::new(Target::Custom {
-            label: "Documents".to_string(),
-            path: "/Users/user/Documents".to_string(),
-        });
-        assert_eq!(format!("{}", item), "Documents -> /Users/user/Documents");
+        let item = SidebarItem::new(Target::custom("Projects", "/Users/user/Projects"));
+        assert_eq!(format!("{}", item), "Projects -> /Users/user/Projects");
     }
 
     #[test]

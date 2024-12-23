@@ -85,10 +85,7 @@ impl From<FavoriteItem> for Target {
             MacOsUrl::Applications => Target::Applications,
             MacOsUrl::Downloads => Target::Downloads,
             MacOsUrl::Desktop => Target::Desktop,
-            MacOsUrl::Custom(path) => Target::Custom {
-                label: item.name.to_string(),
-                path,
-            },
+            MacOsUrl::Custom(path) => Target::custom(item.name.to_string(), path),
         }
     }
 }
@@ -265,14 +262,14 @@ mod tests {
 
     #[test]
     fn should_format_custom_location() {
-        let url = "file:///Users/happygopher/Documents/Projects/";
+        let url = "file:///Users/user/Documents/Projects/";
         let target = Target::from(FavoriteItem::new(
             create_url(url),
             create_display_name("Projects"),
         ));
         assert_eq!(target, Target::Custom {
             label: "Projects".to_string(),
-            path: "/Users/happygopher/Documents/Projects".to_string(),
+            path: "/Users/user/Documents/Projects".to_string(),
         });
     }
 
