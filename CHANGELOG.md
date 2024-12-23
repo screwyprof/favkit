@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0](https://github.com/screwyprof/favkit/compare/v0.4.0...v1.0.0) (2024-12-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Desktop and Downloads are now handled as custom locations with full paths instead of special targets with ~ notation.
+
+### Features
+
+* simplify target handling to use full paths ([#12](https://github.com/screwyprof/favkit/issues/12)) ([ac0e996](https://github.com/screwyprof/favkit/commit/ac0e99656b22724001addacc687945ee2471ec7a))
+
 ## [0.4.0](https://github.com/screwyprof/favkit/compare/v0.3.0...v0.4.0) (2024-12-22)
 
 
