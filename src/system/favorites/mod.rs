@@ -1,5 +1,5 @@
 mod display_name;
-mod errors;
+pub mod errors;
 mod handle;
 mod item;
 mod snapshot;

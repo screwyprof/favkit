@@ -1,13 +1,32 @@
-use std::{convert::TryFrom, rc::Rc};
+use std::{marker::PhantomData, rc::Rc};
 
 use core_foundation::{
-    array::CFArray,
+    array::{CFArray, CFArrayRef},
     base::TCFType,
-    string::CFString,
-    url::{CFURL, kCFURLPOSIXPathStyle},
+    string::{CFString, CFStringRef},
+    url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
 };
-use core_services::OpaqueLSSharedFileListItemRef;
-use favkit::system::favorites::{DisplayName, FavoritesError, Snapshot, Url};
+use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
+use favkit::system::favorites::{
+    DisplayName, Snapshot, Url,
+    errors::{FavoritesError, Result},
+};
+
+// Type-safe index for Core Foundation items
+#[derive(Debug)]
+pub(crate) struct ItemIndex {
+    index: usize,
+    _marker: PhantomData<LSSharedFileListItemRef>,
+}
+
+impl From<LSSharedFileListItemRef> for ItemIndex {
+    fn from(raw: LSSharedFileListItemRef) -> Self {
+        Self {
+            index: (raw as i32 - 1) as usize,
+            _marker: PhantomData,
+        }
+    }
+}
 
 // Domain types
 #[derive(Debug)]
@@ -32,28 +51,47 @@ impl Favorites {
 }
 
 // Infrastructure types
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CFFavorites {
-    pub(crate) snapshot: Rc<Option<Snapshot>>,
-    pub(crate) display_names: Rc<Vec<DisplayName>>,
-    pub(crate) urls: Rc<Vec<Url>>,
+    snapshot: Rc<Option<Snapshot>>,
+    display_names: Rc<Vec<DisplayName>>,
+    urls: Rc<Vec<Url>>,
 }
 
 impl CFFavorites {
-    fn create_display_name(name: Option<&str>) -> Result<DisplayName, FavoritesError> {
+    // Helper methods for mock builder
+    pub(crate) fn get_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
+        let idx = ItemIndex::from(item_ref);
+        (&self.display_names[idx.index]).into()
+    }
+
+    pub(crate) fn get_url(&self, item_ref: LSSharedFileListItemRef) -> CFURLRef {
+        let idx = ItemIndex::from(item_ref);
+        (&self.urls[idx.index]).into()
+    }
+
+    pub(crate) fn get_snapshot(&self) -> CFArrayRef {
+        self.snapshot
+            .as_ref()
+            .as_ref()
+            .expect("Snapshot must exist")
+            .into()
+    }
+
+    fn create_display_name(name: Option<&str>) -> Result<DisplayName> {
         let name = name.unwrap_or_default();
         let cf_string = CFString::new(name);
         DisplayName::try_from(cf_string.as_concrete_TypeRef())
     }
 
-    fn create_url(path: &str) -> Result<Url, FavoritesError> {
+    fn create_url(path: &str) -> Result<Url> {
         let is_dir = path.ends_with('/');
         let file_path = CFString::new(path);
         let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
         Url::try_from(url_cf.as_concrete_TypeRef())
     }
 
-    fn create_snapshot(items_count: usize) -> Result<Snapshot, FavoritesError> {
+    fn create_snapshot(items_count: usize) -> Result<Snapshot> {
         let snapshot_items: Vec<_> = (1..=items_count)
             .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
             .collect();
@@ -65,7 +103,7 @@ impl CFFavorites {
 impl TryFrom<&Favorites> for CFFavorites {
     type Error = FavoritesError;
 
-    fn try_from(favorites: &Favorites) -> Result<Self, Self::Error> {
+    fn try_from(favorites: &Favorites) -> Result<Self> {
         let items = favorites.items();
 
         let snapshot = Rc::new(Some(Self::create_snapshot(items.len())?));
@@ -73,13 +111,13 @@ impl TryFrom<&Favorites> for CFFavorites {
             items
                 .iter()
                 .map(|item| Self::create_display_name(item.name.as_deref()))
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>>>()?,
         );
         let urls = Rc::new(
             items
                 .iter()
                 .map(|item| Self::create_url(&item.path))
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>>>()?,
         );
 
         Ok(Self {

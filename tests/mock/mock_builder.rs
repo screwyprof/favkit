@@ -1,6 +1,11 @@
-use core_foundation::{string::CFStringRef, url::CFURLRef};
+use core_foundation::{
+    array::CFArrayRef,
+    base::{CFAllocatorRef, CFTypeRef},
+    error::CFErrorRef,
+    string::CFStringRef,
+    url::CFURLRef,
+};
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-use favkit::system::favorites::{DisplayName, Url};
 
 use super::{
     favorites::{CFFavorites, Favorites},
@@ -24,14 +29,6 @@ impl Handle {
 impl From<Handle> for LSSharedFileListRef {
     fn from(handle: Handle) -> Self {
         handle.0
-    }
-}
-
-struct ItemIndex(usize);
-
-impl ItemIndex {
-    fn from_raw(raw: LSSharedFileListItemRef) -> Self {
-        Self((raw as i32 - 1) as usize)
     }
 }
 
@@ -116,17 +113,26 @@ impl MockBuilder<WithNullSnapshot> {
 }
 
 impl MockBuilder<WithItems> {
-    fn get_display_name(
-        display_names: &[DisplayName],
-        item_ref: LSSharedFileListItemRef,
-    ) -> CFStringRef {
-        let idx = ItemIndex::from_raw(item_ref);
-        (&display_names[idx.0]).into()
+    fn create_handle(_: CFAllocatorRef, _: CFStringRef, _: CFTypeRef) -> LSSharedFileListRef {
+        Handle::new().into()
     }
 
-    fn get_url(urls: &[Url], item_ref: LSSharedFileListItemRef) -> CFURLRef {
-        let idx = ItemIndex::from_raw(item_ref);
-        (&urls[idx.0]).into()
+    fn get_snapshot(
+        cf_favorites: CFFavorites,
+    ) -> impl Fn(LSSharedFileListRef, *mut u32) -> CFArrayRef {
+        move |_, _| cf_favorites.get_snapshot()
+    }
+
+    fn get_display_name(
+        cf_favorites: CFFavorites,
+    ) -> impl Fn(LSSharedFileListItemRef) -> CFStringRef {
+        move |item| cf_favorites.get_display_name(item)
+    }
+
+    fn get_url(
+        cf_favorites: CFFavorites,
+    ) -> impl Fn(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
+        move |item, _, _| cf_favorites.get_url(item)
     }
 
     pub fn build(self) -> MockMacOsApi {
@@ -134,22 +140,16 @@ impl MockBuilder<WithItems> {
         let cf_favorites = CFFavorites::try_from(&self.state.favorites).unwrap();
 
         mock.expect_ls_shared_file_list_create()
-            .returning_st(move |_, _, _| Handle::new().into());
+            .returning_st(Self::create_handle);
 
         mock.expect_ls_shared_file_list_copy_snapshot()
-            .returning_st(move |_, _| {
-                let snapshot = cf_favorites.snapshot.clone();
-                let snapshot = snapshot.as_ref().as_ref().unwrap();
-                snapshot.into()
-            });
+            .returning_st(Self::get_snapshot(cf_favorites.clone()));
 
-        let display_names = cf_favorites.display_names.clone();
         mock.expect_ls_shared_file_list_item_copy_display_name()
-            .returning_st(move |item| Self::get_display_name(&display_names, item));
+            .returning_st(Self::get_display_name(cf_favorites.clone()));
 
-        let urls = cf_favorites.urls.clone();
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
-            .returning_st(move |item, _, _| Self::get_url(&urls, item));
+            .returning_st(Self::get_url(cf_favorites.clone()));
 
         mock
     }
