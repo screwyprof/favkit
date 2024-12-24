@@ -7,10 +7,7 @@ use core_foundation::{
     url::{CFURL, kCFURLPOSIXPathStyle},
 };
 use core_services::OpaqueLSSharedFileListItemRef;
-use favkit::{
-    finder::{Result, SidebarItem},
-    system::favorites::{DisplayName, Snapshot, Url},
-};
+use favkit::system::favorites::{DisplayName, Snapshot, Url};
 
 /// Builder for creating test data
 #[derive(Default)]
@@ -102,5 +99,16 @@ impl Favorites {
             display_names,
             urls,
         }
+    }
+
+    pub fn into_items(self) -> Vec<FavoriteItem> {
+        let display_names = Rc::try_unwrap(self.display_names).unwrap_or_else(|rc| (*rc).clone());
+        let urls = Rc::try_unwrap(self.urls).unwrap_or_else(|rc| (*rc).clone());
+
+        display_names
+            .into_iter()
+            .zip(urls)
+            .map(|(display_name, url)| FavoriteItem { display_name, url })
+            .collect()
     }
 }

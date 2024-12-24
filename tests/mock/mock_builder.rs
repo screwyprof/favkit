@@ -1,10 +1,6 @@
-use core_foundation::{
-    array::CFArray,
-    string::{CFString, CFStringRef},
-    url::{CFURL, CFURLRef},
-};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef, OpaqueLSSharedFileListItemRef};
-use favkit::system::favorites::{DisplayName, Snapshot, Url};
+use core_foundation::{string::CFStringRef, url::CFURLRef};
+use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
+use favkit::system::favorites::{DisplayName, Url};
 
 use super::{
     favorites::{FavoriteItem, Favorites},
@@ -38,6 +34,11 @@ impl MockBuilder {
         }
     }
 
+    pub fn with_favorites(mut self, favorites: Favorites) -> Self {
+        self.favorites = favorites.into_items();
+        self
+    }
+
     fn get_display_name(
         display_names: &[DisplayName],
         item_ref: LSSharedFileListItemRef,
@@ -58,33 +59,6 @@ impl MockBuilder {
 
     pub fn with_null_snapshot(mut self) -> Self {
         self.should_return_null_snapshot = true;
-        self
-    }
-
-    pub fn with_airdrop(mut self) -> Self {
-        let air_drop = FavoriteItem::new(Some("AirDrop"), "nwnode://domain-AirDrop");
-        self.favorites.push(air_drop);
-        self
-    }
-
-    pub fn with_recents(mut self) -> Self {
-        let recents = FavoriteItem::new(
-            Some("Recents"),
-            "/System/Library/CoreServices/Finder.app/Contents/Resources/MyLibraries/myDocuments.cannedSearch/",
-        );
-        self.favorites.push(recents);
-        self
-    }
-
-    pub fn with_applications(mut self) -> Self {
-        let applications = FavoriteItem::new(Some("Applications"), "/Applications/");
-        self.favorites.push(applications);
-        self
-    }
-
-    pub fn with_custom(mut self, label: &str, path: &str) -> Self {
-        let custom = FavoriteItem::new(Some(label), path);
-        self.favorites.push(custom);
         self
     }
 

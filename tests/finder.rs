@@ -4,7 +4,7 @@ use favkit::{
 };
 use pretty_assertions::assert_eq;
 
-use crate::mock::{MockBuilder, sidebar_items::SidebarItemsBuilder};
+use crate::mock::{MockBuilder, favorites::FavoritesBuilder, sidebar_items::SidebarItemsBuilder};
 mod mock;
 mod constants {
     // AirDrop
@@ -73,7 +73,10 @@ fn should_return_empty_list_when_no_favorites() -> Result<()> {
 fn should_handle_airdrop_item() -> Result<()> {
     // Arrange
     let expected_result = SidebarItemsBuilder::new().airdrop().build();
-    let mock = MockBuilder::new().with_airdrop().build();
+    let favorites = FavoritesBuilder::new()
+        .add_item(None, constants::AIRDROP_URL)
+        .build();
+    let mock = MockBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock);
 
     // Act
@@ -88,7 +91,10 @@ fn should_handle_airdrop_item() -> Result<()> {
 fn should_handle_recents_item() -> Result<()> {
     // Arrange
     let expected_result = SidebarItemsBuilder::new().recents().build();
-    let mock = MockBuilder::new().with_recents().build();
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some(constants::RECENTS_LABEL), constants::RECENTS_URL)
+        .build();
+    let mock = MockBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock);
 
     // Act
@@ -103,7 +109,13 @@ fn should_handle_recents_item() -> Result<()> {
 fn should_handle_applications_item() -> Result<()> {
     // Arrange
     let expected_result = SidebarItemsBuilder::new().applications().build();
-    let mock = MockBuilder::new().with_applications().build();
+    let favorites = FavoritesBuilder::new()
+        .add_item(
+            Some(constants::APPLICATIONS_LABEL),
+            constants::APPLICATIONS_URL,
+        )
+        .build();
+    let mock = MockBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock);
 
     // Act
@@ -120,9 +132,10 @@ fn should_handle_custom_location() -> Result<()> {
     let expected_result = SidebarItemsBuilder::new()
         .custom(constants::PROJECTS_LABEL, constants::PROJECTS_PATH)
         .build();
-    let mock = MockBuilder::new()
-        .with_custom(constants::PROJECTS_LABEL, constants::PROJECTS_URL)
+    let favorites = FavoritesBuilder::new()
+        .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_URL)
         .build();
+    let mock = MockBuilder::new().with_favorites(favorites).build();
     let finder = Finder::new(mock);
 
     // Act
@@ -143,20 +156,16 @@ fn should_handle_multiple_favorites() -> Result<()> {
         .custom(constants::PROJECTS_LABEL, constants::PROJECTS_PATH)
         .build();
 
-    // let favorites = FavoritesBuilder::new()
-    //     .add_item(Some("Airdrop"), "/Users/user/Downloads")
-    //     .add_item(Some("Recents"), "/Users/user/Downloads")
-    //     .add_item(Some("Applications"), "/Applications")
-    //     .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_PATH)
-    //     .build();
-    // let mock = MockBuilder::new().with_favorites(favorites).build();
-
-    let mock = MockBuilder::new()
-        .with_airdrop()
-        .with_recents()
-        .with_applications()
-        .with_custom(constants::PROJECTS_LABEL, constants::PROJECTS_URL)
+    let favorites = FavoritesBuilder::new()
+        .add_item(None, constants::AIRDROP_URL)
+        .add_item(Some(constants::RECENTS_LABEL), constants::RECENTS_URL)
+        .add_item(
+            Some(constants::APPLICATIONS_LABEL),
+            constants::APPLICATIONS_URL,
+        )
+        .add_item(Some(constants::PROJECTS_LABEL), constants::PROJECTS_URL)
         .build();
+    let mock = MockBuilder::new().with_favorites(favorites).build();
 
     let finder = Finder::new(mock);
 
