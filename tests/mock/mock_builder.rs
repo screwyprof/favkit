@@ -14,9 +14,9 @@ use super::{favorites::FavoriteItem, mac_os_api::MockMacOsApi};
 // Core Foundation wrappers
 struct DisplayName(CFString);
 
-impl From<Option<&str>> for DisplayName {
-    fn from(name: Option<&str>) -> Self {
-        Self(CFString::new(name.unwrap_or_default()))
+impl From<&Option<String>> for DisplayName {
+    fn from(name: &Option<String>) -> Self {
+        Self(CFString::new(name.as_deref().unwrap_or_default()))
     }
 }
 
@@ -28,10 +28,10 @@ impl From<DisplayName> for CFString {
 
 struct Url(CFURL);
 
-impl From<&str> for Url {
-    fn from(path: &str) -> Self {
-        let is_dir = path.ends_with('/');
-        let file_path = CFString::new(path);
+impl<T: AsRef<str>> From<T> for Url {
+    fn from(path: T) -> Self {
+        let is_dir = path.as_ref().ends_with('/');
+        let file_path = CFString::new(path.as_ref());
         Self(CFURL::from_file_system_path(
             file_path,
             kCFURLPOSIXPathStyle,
@@ -203,7 +203,7 @@ impl MockBuilder<WithFavorites> {
             self.state
                 .items
                 .iter()
-                .map(|item| CFString::from(DisplayName::from(item.name.as_deref())))
+                .map(|item| CFString::from(DisplayName::from(&item.name)))
                 .collect(),
         );
         mock.expect_ls_shared_file_list_item_copy_display_name()
@@ -214,7 +214,7 @@ impl MockBuilder<WithFavorites> {
             self.state
                 .items
                 .iter()
-                .map(|item| CFURL::from(Url::from(item.path.as_str())))
+                .map(|item| CFURL::from(Url::from(&item.path)))
                 .collect(),
         );
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
