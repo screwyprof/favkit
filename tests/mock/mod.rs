@@ -1,4 +1,3 @@
-pub mod cf;
 pub mod favorites;
 pub mod mac_os_api;
 pub mod mock_builder;
