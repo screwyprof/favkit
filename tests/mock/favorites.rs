@@ -1,10 +1,10 @@
 use std::{marker::PhantomData, rc::Rc};
 
 use core_foundation::{
-    array::{CFArray, CFArrayRef},
+    array::CFArray,
     base::TCFType,
-    string::{CFString, CFStringRef},
-    url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
+    string::CFString,
+    url::{CFURL, kCFURLPOSIXPathStyle},
 };
 use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
 use favkit::system::favorites::{
@@ -15,7 +15,7 @@ use favkit::system::favorites::{
 // Type-safe index for Core Foundation items
 #[derive(Debug)]
 pub(crate) struct ItemIndex {
-    index: usize,
+    pub(crate) index: usize,
     _marker: PhantomData<LSSharedFileListItemRef>,
 }
 
@@ -53,31 +53,12 @@ impl Favorites {
 // Infrastructure types
 #[derive(Debug, Clone)]
 pub struct CFFavorites {
-    snapshot: Rc<Option<Snapshot>>,
-    display_names: Rc<Vec<DisplayName>>,
-    urls: Rc<Vec<Url>>,
+    pub(crate) snapshot: Rc<Option<Snapshot>>,
+    pub(crate) display_names: Rc<Vec<DisplayName>>,
+    pub(crate) urls: Rc<Vec<Url>>,
 }
 
 impl CFFavorites {
-    // Helper methods for mock builder
-    pub(crate) fn get_display_name(&self, item_ref: LSSharedFileListItemRef) -> CFStringRef {
-        let idx = ItemIndex::from(item_ref);
-        (&self.display_names[idx.index]).into()
-    }
-
-    pub(crate) fn get_url(&self, item_ref: LSSharedFileListItemRef) -> CFURLRef {
-        let idx = ItemIndex::from(item_ref);
-        (&self.urls[idx.index]).into()
-    }
-
-    pub(crate) fn get_snapshot(&self) -> CFArrayRef {
-        self.snapshot
-            .as_ref()
-            .as_ref()
-            .expect("Snapshot must exist")
-            .into()
-    }
-
     fn create_display_name(name: Option<&str>) -> Result<DisplayName> {
         let name = name.unwrap_or_default();
         let cf_string = CFString::new(name);

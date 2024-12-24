@@ -1,36 +1,8 @@
-use core_foundation::{
-    array::CFArrayRef,
-    base::{CFAllocatorRef, CFTypeRef},
-    error::CFErrorRef,
-    string::CFStringRef,
-    url::CFURLRef,
-};
-use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
-
 use super::{
-    favorites::{CFFavorites, Favorites},
+    favorites::{CFFavorites, Favorites, ItemIndex},
+    handle::Handle,
     mac_os_api::MockMacOsApi,
 };
-
-// Type-safe wrappers
-#[derive(Clone, Copy)]
-struct Handle(LSSharedFileListRef);
-
-impl Handle {
-    fn null() -> Self {
-        Self(std::ptr::null_mut())
-    }
-
-    fn new() -> Self {
-        Self(1 as LSSharedFileListRef)
-    }
-}
-
-impl From<Handle> for LSSharedFileListRef {
-    fn from(handle: Handle) -> Self {
-        handle.0
-    }
-}
 
 // States
 pub struct Initial;
@@ -113,43 +85,42 @@ impl MockBuilder<WithNullSnapshot> {
 }
 
 impl MockBuilder<WithItems> {
-    fn create_handle(_: CFAllocatorRef, _: CFStringRef, _: CFTypeRef) -> LSSharedFileListRef {
-        Handle::new().into()
-    }
-
-    fn get_snapshot(
-        cf_favorites: CFFavorites,
-    ) -> impl Fn(LSSharedFileListRef, *mut u32) -> CFArrayRef {
-        move |_, _| cf_favorites.get_snapshot()
-    }
-
-    fn get_display_name(
-        cf_favorites: CFFavorites,
-    ) -> impl Fn(LSSharedFileListItemRef) -> CFStringRef {
-        move |item| cf_favorites.get_display_name(item)
-    }
-
-    fn get_url(
-        cf_favorites: CFFavorites,
-    ) -> impl Fn(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
-        move |item, _, _| cf_favorites.get_url(item)
-    }
-
     pub fn build(self) -> MockMacOsApi {
         let mut mock = MockMacOsApi::new();
         let cf_favorites = CFFavorites::try_from(&self.state.favorites).unwrap();
 
         mock.expect_ls_shared_file_list_create()
-            .returning_st(Self::create_handle);
+            .returning_st(|_, _, _| Handle::new().into());
 
         mock.expect_ls_shared_file_list_copy_snapshot()
-            .returning_st(Self::get_snapshot(cf_favorites.clone()));
+            .returning_st({
+                let snapshot = cf_favorites.snapshot.clone();
+                move |_, _| {
+                    snapshot
+                        .as_ref()
+                        .as_ref()
+                        .expect("Snapshot must exist")
+                        .into()
+                }
+            });
 
         mock.expect_ls_shared_file_list_item_copy_display_name()
-            .returning_st(Self::get_display_name(cf_favorites.clone()));
+            .returning_st({
+                let display_names = cf_favorites.display_names.clone();
+                move |item| {
+                    let idx = ItemIndex::from(item);
+                    (&display_names[idx.index]).into()
+                }
+            });
 
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
-            .returning_st(Self::get_url(cf_favorites.clone()));
+            .returning_st({
+                let urls = cf_favorites.urls.clone();
+                move |item, _, _| {
+                    let idx = ItemIndex::from(item);
+                    (&urls[idx.index]).into()
+                }
+            });
 
         mock
     }
