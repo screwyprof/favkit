@@ -195,6 +195,10 @@ FavKit is a modern Rust library and CLI tool for managing macOS Finder favorites
 
      BREAKING CHANGE: The `-x` flag was removed.
      ```
+   - When user says "let's commit" or similar:
+     - Only propose the commit message
+     - Do not execute any git commands
+     - Let the user handle the actual commit
 
 ## Core Foundation Rules
 
