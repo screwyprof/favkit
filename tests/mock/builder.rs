@@ -153,37 +153,37 @@ pub struct WithFavorites {
     items: Vec<FavoriteItem>,
 }
 
-pub struct MockBuilder<State> {
+pub struct Builder<State> {
     state: State,
 }
 
 // Initial state transitions
-impl MockBuilder<Initial> {
+impl Builder<Initial> {
     pub fn new() -> Self {
         Self { state: Initial }
     }
 
-    pub fn with_null_favorites(self) -> MockBuilder<WithNullFavorites> {
-        MockBuilder {
+    pub fn with_null_favorites(self) -> Builder<WithNullFavorites> {
+        Builder {
             state: WithNullFavorites,
         }
     }
 
-    pub fn with_null_snapshot(self) -> MockBuilder<WithNullSnapshot> {
-        MockBuilder {
+    pub fn with_null_snapshot(self) -> Builder<WithNullSnapshot> {
+        Builder {
             state: WithNullSnapshot,
         }
     }
 
-    pub fn with_favorites(self, items: Vec<FavoriteItem>) -> MockBuilder<WithFavorites> {
-        MockBuilder {
+    pub fn with_favorites(self, items: Vec<FavoriteItem>) -> Builder<WithFavorites> {
+        Builder {
             state: WithFavorites { items },
         }
     }
 }
 
 // Terminal state builders
-impl MockBuilder<WithNullFavorites> {
+impl Builder<WithNullFavorites> {
     pub fn build(self) -> MockMacOsApi {
         let mut mock = MockMacOsApi::new();
         mock.expect_ls_shared_file_list_create()
@@ -192,7 +192,7 @@ impl MockBuilder<WithNullFavorites> {
     }
 }
 
-impl MockBuilder<WithNullSnapshot> {
+impl Builder<WithNullSnapshot> {
     pub fn build(self) -> MockMacOsApi {
         let mut mock = MockMacOsApi::new();
         mock.expect_ls_shared_file_list_create()
@@ -203,7 +203,7 @@ impl MockBuilder<WithNullSnapshot> {
     }
 }
 
-impl MockBuilder<WithFavorites> {
+impl Builder<WithFavorites> {
     fn convert_items<T, F>(&self, f: F) -> Vec<T>
     where
         F: Fn(&FavoriteItem) -> T,
