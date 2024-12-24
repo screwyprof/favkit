@@ -11,9 +11,6 @@ use favkit::{
     finder::{Result, SidebarItem},
     system::favorites::{DisplayName, Snapshot, Url},
 };
-use pretty_assertions::assert_eq;
-
-use super::mac_os_api::CallTracker;
 
 /// Builder for creating test data
 #[derive(Default)]
@@ -43,13 +40,13 @@ impl FavoritesBuilder {
 
 /// Represents a favorite item with its Core Foundation data
 #[derive(Debug)]
-struct FavoriteItem {
+pub struct FavoriteItem {
     display_name: DisplayName,
     url: Url,
 }
 
 impl FavoriteItem {
-    fn new(display_name: Option<&str>, url: &str) -> Self {
+    pub fn new(display_name: Option<&str>, url: &str) -> Self {
         let display_name = {
             let name = display_name.unwrap_or_default();
             let cf_string = CFString::new(name);
@@ -86,7 +83,7 @@ impl Default for Favorites {
 }
 
 impl Favorites {
-    fn new(items: Vec<FavoriteItem>) -> Self {
+    pub fn new(items: Vec<FavoriteItem>) -> Self {
         let snapshot = {
             let snapshot_items: Vec<_> = (1..=items.len())
                 .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
@@ -106,13 +103,4 @@ impl Favorites {
             urls,
         }
     }
-}
-
-pub fn assert_favorites(
-    result: Result<Vec<SidebarItem>>,
-    expected: Vec<SidebarItem>,
-    tracker: &CallTracker,
-) {
-    assert_eq!(result, Ok(expected));
-    tracker.verify();
 }
