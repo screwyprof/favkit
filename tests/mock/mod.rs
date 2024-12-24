@@ -1,3 +1,4 @@
+pub mod cf_favorites;
 pub mod favorites;
 pub mod handle;
 pub mod mac_os_api;

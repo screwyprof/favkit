@@ -1,5 +1,6 @@
 use super::{
-    favorites::{CFFavorites, Favorites, ItemIndex},
+    cf_favorites::{CFFavorites, ItemIndex},
+    favorites::Favorites,
     handle::Handle,
     mac_os_api::MockMacOsApi,
 };
