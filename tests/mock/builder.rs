@@ -253,16 +253,14 @@ impl Builder<WithFavorites> {
             .returning_st(create_snapshot_closure(snapshot));
 
         // Configure display names
-        let items = Rc::new(self.convert_items(|item| DisplayName::from(&item.name)));
-        let closure = create_display_name_closure(items);
+        let display_names = Rc::new(self.convert_items(|item| DisplayName::from(&item.name)));
         mock.expect_ls_shared_file_list_item_copy_display_name()
-            .returning_st(closure);
+            .returning_st(create_display_name_closure(display_names));
 
         // Configure URLs
-        let items = Rc::new(self.convert_items(|item| Url::from(&item.path)));
-        let closure = create_url_closure(items);
+        let urls = Rc::new(self.convert_items(|item| Url::from(&item.path)));
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
-            .returning_st(closure);
+            .returning_st(create_url_closure(urls));
 
         mock
     }
