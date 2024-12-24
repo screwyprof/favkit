@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{convert::TryFrom, rc::Rc};
 
 use core_foundation::{
     array::CFArray,
@@ -7,7 +7,7 @@ use core_foundation::{
     url::{CFURL, kCFURLPOSIXPathStyle},
 };
 use core_services::OpaqueLSSharedFileListItemRef;
-use favkit::system::favorites::{DisplayName, Snapshot, Url};
+use favkit::system::favorites::{DisplayName, FavoritesError, Snapshot, Url};
 
 // Domain types
 #[derive(Debug)]
@@ -39,52 +39,54 @@ pub struct CFFavorites {
     pub(crate) urls: Rc<Vec<Url>>,
 }
 
-impl From<&Favorites> for CFFavorites {
-    fn from(favorites: &Favorites) -> Self {
+impl CFFavorites {
+    fn create_display_name(name: Option<&str>) -> Result<DisplayName, FavoritesError> {
+        let name = name.unwrap_or_default();
+        let cf_string = CFString::new(name);
+        DisplayName::try_from(cf_string.as_concrete_TypeRef())
+    }
+
+    fn create_url(path: &str) -> Result<Url, FavoritesError> {
+        let is_dir = path.ends_with('/');
+        let file_path = CFString::new(path);
+        let url_cf = CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
+        Url::try_from(url_cf.as_concrete_TypeRef())
+    }
+
+    fn create_snapshot(items_count: usize) -> Result<Snapshot, FavoritesError> {
+        let snapshot_items: Vec<_> = (1..=items_count)
+            .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
+            .collect();
+        let array = CFArray::from_copyable(&snapshot_items);
+        Snapshot::try_from(array.as_concrete_TypeRef())
+    }
+}
+
+impl TryFrom<&Favorites> for CFFavorites {
+    type Error = FavoritesError;
+
+    fn try_from(favorites: &Favorites) -> Result<Self, Self::Error> {
         let items = favorites.items();
 
-        // Create snapshot
-        let snapshot = {
-            let snapshot_items: Vec<_> = (1..=items.len())
-                .map(|i| (i as i32) as *mut OpaqueLSSharedFileListItemRef)
-                .collect();
-            let array = CFArray::from_copyable(&snapshot_items);
-            Rc::new(Some(
-                Snapshot::try_from(array.as_concrete_TypeRef()).unwrap(),
-            ))
-        };
-
-        // Create display names
+        let snapshot = Rc::new(Some(Self::create_snapshot(items.len())?));
         let display_names = Rc::new(
             items
                 .iter()
-                .map(|item| {
-                    let name = item.name.as_deref().unwrap_or_default();
-                    let cf_string = CFString::new(name);
-                    DisplayName::try_from(cf_string.as_concrete_TypeRef()).unwrap()
-                })
-                .collect(),
+                .map(|item| Self::create_display_name(item.name.as_deref()))
+                .collect::<Result<Vec<_>, _>>()?,
         );
-
-        // Create URLs
         let urls = Rc::new(
             items
                 .iter()
-                .map(|item| {
-                    let is_dir = item.path.ends_with('/');
-                    let file_path = CFString::new(&item.path);
-                    let url_cf =
-                        CFURL::from_file_system_path(file_path, kCFURLPOSIXPathStyle, is_dir);
-                    Url::try_from(url_cf.as_concrete_TypeRef()).unwrap()
-                })
-                .collect(),
+                .map(|item| Self::create_url(&item.path))
+                .collect::<Result<Vec<_>, _>>()?,
         );
 
-        Self {
+        Ok(Self {
             snapshot,
             display_names,
             urls,
-        }
+        })
     }
 }
 
