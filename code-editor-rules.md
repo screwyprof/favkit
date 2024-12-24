@@ -108,6 +108,18 @@ FavKit is a modern Rust library and CLI tool for managing macOS Finder favorites
 8. **Dynamic Updates**
    - Periodically review and update `.cursorrules` based on evolving project needs and real-world usage feedback.
 
+9. **Change Tracking**
+   - Start tracking changes when user indicates with phrases like:
+     - "Let's refactor..."
+     - "Let's implement..."
+     - "Let's fix..."
+   - Keep a running summary of:
+     - What initiated the change
+     - Each modification made
+     - Files affected
+   - Use this summary when crafting commit messages
+   - Reset tracking when changes are committed
+
 ## Technical Requirements
 
 1. **Tech Stack**
