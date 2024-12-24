@@ -11,92 +11,125 @@ use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 
 use super::{favorites::FavoriteItem, mac_os_api::MockMacOsApi};
 
-// Core Foundation wrappers
-#[repr(transparent)]
-struct DisplayName(CFString);
+mod cf {
+    use super::*;
 
-impl From<&Option<String>> for DisplayName {
-    fn from(name: &Option<String>) -> Self {
-        Self(CFString::new(name.as_deref().unwrap_or_default()))
+    #[repr(transparent)]
+    pub struct DisplayName(CFString);
+
+    impl From<&Option<String>> for DisplayName {
+        fn from(name: &Option<String>) -> Self {
+            Self(CFString::new(name.as_deref().unwrap_or_default()))
+        }
+    }
+
+    impl From<DisplayName> for CFString {
+        fn from(name: DisplayName) -> Self {
+            name.0
+        }
+    }
+
+    #[repr(transparent)]
+    pub struct Url(CFURL);
+
+    impl<T: AsRef<str>> From<T> for Url {
+        fn from(path: T) -> Self {
+            let is_dir = path.as_ref().ends_with('/');
+            let file_path = CFString::new(path.as_ref());
+            Self(CFURL::from_file_system_path(
+                file_path,
+                kCFURLPOSIXPathStyle,
+                is_dir,
+            ))
+        }
+    }
+
+    impl From<Url> for CFURL {
+        fn from(url: Url) -> Self {
+            url.0
+        }
+    }
+
+    pub struct Snapshot(Vec<LSSharedFileListItemRef>);
+
+    impl From<usize> for Snapshot {
+        fn from(count: usize) -> Self {
+            Self(
+                (1..=count)
+                    .map(|i| (i as i32) as LSSharedFileListItemRef)
+                    .collect(),
+            )
+        }
+    }
+
+    impl From<Snapshot> for Vec<LSSharedFileListItemRef> {
+        fn from(snapshot: Snapshot) -> Self {
+            snapshot.0
+        }
+    }
+
+    pub struct List(LSSharedFileListRef);
+
+    impl Default for List {
+        fn default() -> Self {
+            Self(1 as *mut _)
+        }
+    }
+
+    impl List {
+        pub fn null() -> Self {
+            Self(std::ptr::null_mut())
+        }
+    }
+
+    impl From<List> for LSSharedFileListRef {
+        fn from(list: List) -> Self {
+            list.0
+        }
+    }
+
+    pub struct NullSnapshot(CFArrayRef);
+
+    impl Default for NullSnapshot {
+        fn default() -> Self {
+            Self(std::ptr::null())
+        }
+    }
+
+    impl From<NullSnapshot> for CFArrayRef {
+        fn from(snapshot: NullSnapshot) -> Self {
+            snapshot.0
+        }
     }
 }
 
-impl From<DisplayName> for CFString {
-    fn from(name: DisplayName) -> Self {
-        name.0
+use cf::*;
+
+struct ItemIndex(usize);
+
+impl From<LSSharedFileListItemRef> for ItemIndex {
+    fn from(item: LSSharedFileListItemRef) -> Self {
+        Self(((item as i32) - 1) as usize)
     }
 }
 
-#[repr(transparent)]
-struct Url(CFURL);
-
-impl<T: AsRef<str>> From<T> for Url {
-    fn from(path: T) -> Self {
-        let is_dir = path.as_ref().ends_with('/');
-        let file_path = CFString::new(path.as_ref());
-        Self(CFURL::from_file_system_path(
-            file_path,
-            kCFURLPOSIXPathStyle,
-            is_dir,
-        ))
+fn create_display_name_closure<T>(
+    items: Rc<Vec<T>>,
+    f: impl Fn(&T) -> CFStringRef + 'static,
+) -> impl FnMut(LSSharedFileListItemRef) -> CFStringRef {
+    move |item| {
+        let idx = ItemIndex::from(item).0;
+        f(&items[idx])
     }
 }
 
-impl From<Url> for CFURL {
-    fn from(url: Url) -> Self {
-        url.0
-    }
-}
-
-struct Snapshot(Vec<LSSharedFileListItemRef>);
-
-impl From<usize> for Snapshot {
-    fn from(count: usize) -> Self {
-        Self(
-            (1..=count)
-                .map(|i| (i as i32) as LSSharedFileListItemRef)
-                .collect(),
-        )
-    }
-}
-
-impl From<Snapshot> for Vec<LSSharedFileListItemRef> {
-    fn from(snapshot: Snapshot) -> Self {
-        snapshot.0
-    }
-}
-
-struct List(LSSharedFileListRef);
-
-impl Default for List {
-    fn default() -> Self {
-        Self(1 as *mut _)
-    }
-}
-
-impl List {
-    fn null() -> Self {
-        Self(std::ptr::null_mut())
-    }
-}
-
-impl From<List> for LSSharedFileListRef {
-    fn from(list: List) -> Self {
-        list.0
-    }
-}
-
-struct NullSnapshot(CFArrayRef);
-
-impl Default for NullSnapshot {
-    fn default() -> Self {
-        Self(std::ptr::null())
-    }
-}
-
-impl From<NullSnapshot> for CFArrayRef {
-    fn from(snapshot: NullSnapshot) -> Self {
-        snapshot.0
+fn create_url_closure<T>(
+    items: Rc<Vec<T>>,
+    f: impl Fn(&T) -> CFURLRef + 'static,
+) -> impl FnMut(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
+    move |item, _, _| {
+        let idx = ItemIndex::from(item).0;
+        f(&items[idx])
     }
 }
 
@@ -159,39 +192,11 @@ impl MockBuilder<WithNullSnapshot> {
 }
 
 impl MockBuilder<WithFavorites> {
-    fn get_item_index(item: LSSharedFileListItemRef) -> usize {
-        ((item as i32) - 1) as usize
-    }
-
     fn convert_items<T, F>(&self, f: F) -> Rc<Vec<T>>
     where
         F: Fn(&FavoriteItem) -> T,
     {
         Rc::new(self.state.items.iter().map(f).collect())
-    }
-
-    fn create_snapshot_closure(
-        array: Rc<CFArray<LSSharedFileListItemRef>>,
-    ) -> impl Fn(LSSharedFileListRef, *mut u32) -> CFArrayRef {
-        move |_, _| array.as_concrete_TypeRef()
-    }
-
-    fn create_display_name_closure(
-        strings: Rc<Vec<CFString>>,
-    ) -> impl Fn(LSSharedFileListItemRef) -> CFStringRef {
-        move |item| {
-            let idx = Self::get_item_index(item);
-            strings[idx].as_concrete_TypeRef()
-        }
-    }
-
-    fn create_url_closure(
-        urls: Rc<Vec<CFURL>>,
-    ) -> impl FnMut(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
-        move |item, _, _| {
-            let idx = Self::get_item_index(item);
-            urls[idx].as_concrete_TypeRef()
-        }
     }
 
     pub fn build(self) -> MockMacOsApi {
@@ -205,17 +210,19 @@ impl MockBuilder<WithFavorites> {
         let snapshot_items: Vec<_> = Snapshot::from(self.state.items.len()).into();
         let array = Rc::new(CFArray::from_copyable(&snapshot_items));
         mock.expect_ls_shared_file_list_copy_snapshot()
-            .returning_st(Self::create_snapshot_closure(array));
+            .returning_st(move |_, _| array.as_concrete_TypeRef());
 
         // Configure display names
         let strings = self.convert_items(|item| CFString::from(DisplayName::from(&item.name)));
         mock.expect_ls_shared_file_list_item_copy_display_name()
-            .returning_st(Self::create_display_name_closure(strings));
+            .returning_st(create_display_name_closure(strings, |s| {
+                s.as_concrete_TypeRef()
+            }));
 
         // Configure URLs
         let urls = self.convert_items(|item| CFURL::from(Url::from(&item.path)));
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
-            .returning_st(Self::create_url_closure(urls));
+            .returning_st(create_url_closure(urls, |u| u.as_concrete_TypeRef()));
 
         mock
     }
