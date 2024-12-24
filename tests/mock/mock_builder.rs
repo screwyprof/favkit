@@ -12,6 +12,7 @@ use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use super::{favorites::FavoriteItem, mac_os_api::MockMacOsApi};
 
 // Core Foundation wrappers
+#[repr(transparent)]
 struct DisplayName(CFString);
 
 impl From<&Option<String>> for DisplayName {
@@ -26,6 +27,7 @@ impl From<DisplayName> for CFString {
     }
 }
 
+#[repr(transparent)]
 struct Url(CFURL);
 
 impl<T: AsRef<str>> From<T> for Url {
@@ -161,6 +163,13 @@ impl MockBuilder<WithFavorites> {
         ((item as i32) - 1) as usize
     }
 
+    fn convert_items<T, F>(&self, f: F) -> Rc<Vec<T>>
+    where
+        F: Fn(&FavoriteItem) -> T,
+    {
+        Rc::new(self.state.items.iter().map(f).collect())
+    }
+
     fn create_snapshot_closure(
         array: Rc<CFArray<LSSharedFileListItemRef>>,
     ) -> impl Fn(LSSharedFileListRef, *mut u32) -> CFArrayRef {
@@ -199,24 +208,12 @@ impl MockBuilder<WithFavorites> {
             .returning_st(Self::create_snapshot_closure(array));
 
         // Configure display names
-        let strings = Rc::new(
-            self.state
-                .items
-                .iter()
-                .map(|item| CFString::from(DisplayName::from(&item.name)))
-                .collect(),
-        );
+        let strings = self.convert_items(|item| CFString::from(DisplayName::from(&item.name)));
         mock.expect_ls_shared_file_list_item_copy_display_name()
             .returning_st(Self::create_display_name_closure(strings));
 
         // Configure URLs
-        let urls = Rc::new(
-            self.state
-                .items
-                .iter()
-                .map(|item| CFURL::from(Url::from(&item.path)))
-                .collect(),
-        );
+        let urls = self.convert_items(|item| CFURL::from(Url::from(&item.path)));
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
             .returning_st(Self::create_url_closure(urls));
 
