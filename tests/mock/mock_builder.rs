@@ -4,14 +4,42 @@ use favkit::system::favorites::{DisplayName, Url};
 
 use super::{favorites::Favorites, mac_os_api::MockMacOsApi};
 
+// Type-safe wrappers
+#[derive(Clone, Copy)]
+struct Handle(LSSharedFileListRef);
+
+impl Handle {
+    fn null() -> Self {
+        Self(std::ptr::null_mut())
+    }
+
+    fn new() -> Self {
+        Self(1 as LSSharedFileListRef)
+    }
+}
+
+impl From<Handle> for LSSharedFileListRef {
+    fn from(handle: Handle) -> Self {
+        handle.0
+    }
+}
+
+struct ItemIndex(usize);
+
+impl ItemIndex {
+    fn from_raw(raw: LSSharedFileListItemRef) -> Self {
+        Self((raw as i32 - 1) as usize)
+    }
+}
+
 // States
 pub struct Initial;
 pub struct WithNullFavorites;
 pub struct WithFavorites {
-    handle: LSSharedFileListRef,
+    handle: Handle,
 }
 pub struct WithNullSnapshot {
-    handle: LSSharedFileListRef,
+    handle: Handle,
 }
 pub struct WithItems {
     favorites: Favorites,
@@ -43,7 +71,7 @@ impl MockBuilder<Initial> {
         MockBuilder {
             mock: self.mock,
             state: WithFavorites {
-                handle: 1 as LSSharedFileListRef,
+                handle: Handle::new(),
             },
         }
     }
@@ -73,7 +101,7 @@ impl MockBuilder<WithNullFavorites> {
     pub fn build(self) -> MockMacOsApi {
         let mut mock = self.mock;
         mock.expect_ls_shared_file_list_create()
-            .returning_st(move |_, _, _| std::ptr::null_mut());
+            .returning_st(move |_, _, _| Handle::null().into());
         mock
     }
 }
@@ -84,7 +112,7 @@ impl MockBuilder<WithNullSnapshot> {
         let handle = self.state.handle;
 
         mock.expect_ls_shared_file_list_create()
-            .returning_st(move |_, _, _| handle);
+            .returning_st(move |_, _, _| handle.into());
         mock.expect_ls_shared_file_list_copy_snapshot()
             .returning_st(move |_, _| std::ptr::null_mut());
 
@@ -97,13 +125,13 @@ impl MockBuilder<WithItems> {
         display_names: &[DisplayName],
         item_ref: LSSharedFileListItemRef,
     ) -> CFStringRef {
-        let idx = (item_ref as i32 - 1) as usize;
-        (&display_names[idx]).into()
+        let idx = ItemIndex::from_raw(item_ref);
+        (&display_names[idx.0]).into()
     }
 
     fn get_url(urls: &[Url], item_ref: LSSharedFileListItemRef) -> CFURLRef {
-        let idx = (item_ref as i32 - 1) as usize;
-        (&urls[idx]).into()
+        let idx = ItemIndex::from_raw(item_ref);
+        (&urls[idx.0]).into()
     }
 
     pub fn build(self) -> MockMacOsApi {
@@ -111,7 +139,7 @@ impl MockBuilder<WithItems> {
         let favorites = self.state.favorites;
 
         mock.expect_ls_shared_file_list_create()
-            .returning_st(move |_, _, _| 1 as LSSharedFileListRef);
+            .returning_st(move |_, _, _| Handle::new().into());
 
         mock.expect_ls_shared_file_list_copy_snapshot()
             .returning_st(move |_, _| {
