@@ -58,8 +58,7 @@ fn should_fail_when_snapshot_handle_is_null() -> Result<()> {
 fn should_return_empty_list_when_no_favorites() -> Result<()> {
     // Arrange
     let expected_result = SidebarItemsBuilder::new().build();
-    let items = FavoritesBuilder::new().build();
-    let mock = Builder::new().with_favorites(items).build();
+    let mock = Builder::new().with_empty_favorites().build();
     let finder = Finder::new(mock);
 
     // Act

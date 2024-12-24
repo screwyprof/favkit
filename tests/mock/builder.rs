@@ -2,7 +2,8 @@ use std::{ops::Deref, rc::Rc};
 
 use core_foundation::{
     array::{CFArray, CFArrayRef},
-    base::TCFType,
+    base::{CFTypeRef, TCFType},
+    error::CFErrorRef,
     string::{CFString, CFStringRef},
     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
 };
@@ -53,21 +54,22 @@ mod cf {
         }
     }
 
-    pub struct Snapshot(Vec<LSSharedFileListItemRef>);
+    #[derive(Clone)]
+    pub struct Snapshot(Rc<CFArray>);
 
     impl From<usize> for Snapshot {
         fn from(count: usize) -> Self {
-            Self(
-                (1..=count)
-                    .map(|i| (i as i32) as LSSharedFileListItemRef)
-                    .collect(),
-            )
+            let items: Vec<CFTypeRef> = (1..=count)
+                .map(|i| (i as i32) as LSSharedFileListItemRef)
+                .map(|item| item as CFTypeRef)
+                .collect();
+            Self(Rc::new(CFArray::from_copyable(&items)))
         }
     }
 
-    impl From<Snapshot> for Vec<LSSharedFileListItemRef> {
+    impl From<Snapshot> for CFArrayRef {
         fn from(snapshot: Snapshot) -> Self {
-            snapshot.0
+            snapshot.0.as_concrete_TypeRef()
         }
     }
 
@@ -124,20 +126,35 @@ impl Deref for ItemIndex {
     }
 }
 
-fn create_item_closure<T: Clone, R>(
-    items: Rc<Vec<T>>,
-    f: impl Fn(&T) -> R + 'static,
-) -> impl FnMut(LSSharedFileListItemRef) -> R {
+fn create_display_name_closure(
+    items: Rc<Vec<DisplayName>>,
+) -> impl FnMut(LSSharedFileListItemRef) -> CFStringRef {
     move |item| {
         let idx = ItemIndex::from(item);
-        f(&items[*idx])
+        items[*idx].clone().into()
     }
+}
+
+fn create_url_closure(
+    items: Rc<Vec<Url>>,
+) -> impl FnMut(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
+    move |item, _, _| {
+        let idx = ItemIndex::from(item);
+        items[*idx].clone().into()
+    }
+}
+
+fn create_snapshot_closure(
+    snapshot: Snapshot,
+) -> impl FnMut(LSSharedFileListRef, *mut u32) -> CFArrayRef {
+    move |_, _| snapshot.clone().into()
 }
 
 // States
 pub struct Initial;
 pub struct WithNullFavorites;
 pub struct WithNullSnapshot;
+pub struct WithEmptyFavorites;
 pub struct WithFavorites {
     items: Vec<FavoriteItem>,
 }
@@ -161,6 +178,12 @@ impl Builder<Initial> {
     pub fn with_null_snapshot(self) -> Builder<WithNullSnapshot> {
         Builder {
             state: WithNullSnapshot,
+        }
+    }
+
+    pub fn with_empty_favorites(self) -> Builder<WithEmptyFavorites> {
+        Builder {
+            state: WithEmptyFavorites,
         }
     }
 
@@ -192,32 +215,29 @@ impl Builder<WithNullSnapshot> {
     }
 }
 
+impl Builder<WithEmptyFavorites> {
+    pub fn build(self) -> MockMacOsApi {
+        let mut mock = MockMacOsApi::new();
+
+        // Configure list creation
+        mock.expect_ls_shared_file_list_create()
+            .returning_st(|_, _, _| List::default().into());
+
+        // Configure snapshots
+        let snapshot = Snapshot::from(0);
+        mock.expect_ls_shared_file_list_copy_snapshot()
+            .returning_st(create_snapshot_closure(snapshot));
+
+        mock
+    }
+}
+
 impl Builder<WithFavorites> {
     fn convert_items<T, F>(&self, f: F) -> Vec<T>
     where
         F: Fn(&FavoriteItem) -> T,
     {
         self.state.items.iter().map(f).collect()
-    }
-
-    fn configure_item_expectation<T, R, F, G>(
-        &self,
-        mock: &mut MockMacOsApi,
-        convert_fn: F,
-        expect_fn: G,
-    ) where
-        T: Clone + 'static,
-        R: 'static,
-        F: Fn(&FavoriteItem) -> T,
-        G: for<'a> FnOnce(
-            &'a mut MockMacOsApi,
-            Box<dyn FnMut(LSSharedFileListItemRef) -> R + 'static>,
-        ),
-        T: Into<R>,
-    {
-        let items = Rc::new(self.convert_items(convert_fn));
-        let closure = Box::new(create_item_closure(items, |t| t.clone().into()));
-        expect_fn(mock, closure);
     }
 
     pub fn build(self) -> MockMacOsApi {
@@ -227,31 +247,22 @@ impl Builder<WithFavorites> {
         mock.expect_ls_shared_file_list_create()
             .returning_st(|_, _, _| List::default().into());
 
-        // Create snapshot items and keep them alive
-        let snapshot_items: Vec<_> = Snapshot::from(self.state.items.len()).into();
-        let array = CFArray::from_copyable(&snapshot_items);
+        // Configure snapshots
+        let snapshot = Snapshot::from(self.state.items.len());
         mock.expect_ls_shared_file_list_copy_snapshot()
-            .returning_st(move |_, _| array.as_concrete_TypeRef());
+            .returning_st(create_snapshot_closure(snapshot));
 
         // Configure display names
-        self.configure_item_expectation(
-            &mut mock,
-            |item| DisplayName::from(&item.name),
-            |mock, closure| {
-                mock.expect_ls_shared_file_list_item_copy_display_name()
-                    .returning_st(closure);
-            },
-        );
+        let items = Rc::new(self.convert_items(|item| DisplayName::from(&item.name)));
+        let closure = create_display_name_closure(items);
+        mock.expect_ls_shared_file_list_item_copy_display_name()
+            .returning_st(closure);
 
         // Configure URLs
-        self.configure_item_expectation(
-            &mut mock,
-            |item| Url::from(&item.path),
-            |mock, mut closure| {
-                mock.expect_ls_shared_file_list_item_copy_resolved_url()
-                    .returning_st(move |item, _, _| closure(item));
-            },
-        );
+        let items = Rc::new(self.convert_items(|item| Url::from(&item.path)));
+        let closure = create_url_closure(items);
+        mock.expect_ls_shared_file_list_item_copy_resolved_url()
+            .returning_st(closure);
 
         mock
     }
