@@ -2,7 +2,10 @@ use core_foundation::{string::CFStringRef, url::CFURLRef};
 use core_services::{LSSharedFileListItemRef, LSSharedFileListRef};
 use favkit::system::favorites::{DisplayName, Url};
 
-use super::{favorites::Favorites, mac_os_api::MockMacOsApi};
+use super::{
+    favorites::{CFFavorites, Favorites},
+    mac_os_api::MockMacOsApi,
+};
 
 // Type-safe wrappers
 #[derive(Clone, Copy)]
@@ -136,23 +139,23 @@ impl MockBuilder<WithItems> {
 
     pub fn build(self) -> MockMacOsApi {
         let mut mock = self.mock;
-        let favorites = self.state.favorites;
+        let cf_favorites = CFFavorites::from(&self.state.favorites);
 
         mock.expect_ls_shared_file_list_create()
             .returning_st(move |_, _, _| Handle::new().into());
 
         mock.expect_ls_shared_file_list_copy_snapshot()
             .returning_st(move |_, _| {
-                let snapshot = favorites.snapshot.clone();
+                let snapshot = cf_favorites.snapshot.clone();
                 let snapshot = snapshot.as_ref().as_ref().unwrap();
                 snapshot.into()
             });
 
-        let display_names = favorites.display_names.clone();
+        let display_names = cf_favorites.display_names.clone();
         mock.expect_ls_shared_file_list_item_copy_display_name()
             .returning_st(move |item| Self::get_display_name(&display_names, item));
 
-        let urls = favorites.urls.clone();
+        let urls = cf_favorites.urls.clone();
         mock.expect_ls_shared_file_list_item_copy_resolved_url()
             .returning_st(move |item, _, _| Self::get_url(&urls, item));
 
