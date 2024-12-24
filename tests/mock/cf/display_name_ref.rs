@@ -4,7 +4,7 @@ use core_foundation::string::CFStringRef;
 use core_services::OpaqueLSSharedFileListItemRef;
 use favkit::system::favorites::DisplayName;
 
-use super::cf_favorites::ItemIndex;
+use super::item_index::ItemIndex;
 
 pub struct DisplayNameRef(pub(crate) CFStringRef);
 

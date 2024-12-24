@@ -1,6 +1,10 @@
 use super::{
-    cf_favorites::CFFavorites, display_name_ref::DisplayNameRef, favorites::Favorites,
-    favorites_ref::FavoritesRef, mac_os_api::MockMacOsApi, snapshot::SnapshotRef, url_ref::UrlRef,
+    cf::{
+        display_name_ref::DisplayNameRef, favorites::CFFavorites, favorites_ref::FavoritesRef,
+        snapshot_ref::SnapshotRef, url_ref::UrlRef,
+    },
+    favorites::Favorites,
+    mac_os_api::MockMacOsApi,
 };
 
 // States

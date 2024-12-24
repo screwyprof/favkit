@@ -4,7 +4,7 @@ use core_foundation::url::CFURLRef;
 use core_services::OpaqueLSSharedFileListItemRef;
 use favkit::system::favorites::Url;
 
-use super::cf_favorites::ItemIndex;
+use super::item_index::ItemIndex;
 
 pub struct UrlRef(pub(crate) CFURLRef);
 

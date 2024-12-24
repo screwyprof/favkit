@@ -6,27 +6,13 @@ use core_foundation::{
     string::CFString,
     url::{CFURL, kCFURLPOSIXPathStyle},
 };
-use core_services::{LSSharedFileListItemRef, OpaqueLSSharedFileListItemRef};
+use core_services::OpaqueLSSharedFileListItemRef;
 use favkit::system::favorites::{
     DisplayName, Snapshot, Url,
     errors::{FavoritesError, Result},
 };
 
-use super::favorites::Favorites;
-
-// Type-safe index for Core Foundation items
-#[derive(Debug)]
-pub(crate) struct ItemIndex {
-    pub(crate) index: usize,
-}
-
-impl From<LSSharedFileListItemRef> for ItemIndex {
-    fn from(raw: LSSharedFileListItemRef) -> Self {
-        Self {
-            index: (raw as i32 - 1) as usize,
-        }
-    }
-}
+use crate::mock::favorites::Favorites;
 
 #[derive(Debug, Clone)]
 pub struct CFFavorites {
