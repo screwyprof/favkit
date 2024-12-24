@@ -1,9 +1,8 @@
-use std::ops::Deref;
+use std::{ops::Deref, rc::Rc};
 
 use core_foundation::{
     array::{CFArray, CFArrayRef},
     base::TCFType,
-    error::CFErrorRef,
     string::{CFString, CFStringRef},
     url::{CFURL, CFURLRef, kCFURLPOSIXPathStyle},
 };
@@ -125,23 +124,13 @@ impl Deref for ItemIndex {
     }
 }
 
-fn create_display_name_closure<T: Clone>(
-    items: Vec<T>,
-    f: impl Fn(T) -> CFStringRef + 'static,
-) -> impl FnMut(LSSharedFileListItemRef) -> CFStringRef {
+fn create_item_closure<T: Clone, R>(
+    items: Rc<Vec<T>>,
+    f: impl Fn(&T) -> R + 'static,
+) -> impl FnMut(LSSharedFileListItemRef) -> R {
     move |item| {
         let idx = ItemIndex::from(item);
-        f(items[*idx].clone())
-    }
-}
-
-fn create_url_closure<T: Clone>(
-    items: Vec<T>,
-    f: impl Fn(T) -> CFURLRef + 'static,
-) -> impl FnMut(LSSharedFileListItemRef, u32, *mut CFErrorRef) -> CFURLRef {
-    move |item, _, _| {
-        let idx = ItemIndex::from(item);
-        f(items[*idx].clone())
+        f(&items[*idx])
     }
 }
 
@@ -211,6 +200,26 @@ impl Builder<WithFavorites> {
         self.state.items.iter().map(f).collect()
     }
 
+    fn configure_item_expectation<T, R, F, G>(
+        &self,
+        mock: &mut MockMacOsApi,
+        convert_fn: F,
+        expect_fn: G,
+    ) where
+        T: Clone + 'static,
+        R: 'static,
+        F: Fn(&FavoriteItem) -> T,
+        G: for<'a> FnOnce(
+            &'a mut MockMacOsApi,
+            Box<dyn FnMut(LSSharedFileListItemRef) -> R + 'static>,
+        ),
+        T: Into<R>,
+    {
+        let items = Rc::new(self.convert_items(convert_fn));
+        let closure = Box::new(create_item_closure(items, |t| t.clone().into()));
+        expect_fn(mock, closure);
+    }
+
     pub fn build(self) -> MockMacOsApi {
         let mut mock = MockMacOsApi::new();
 
@@ -225,14 +234,24 @@ impl Builder<WithFavorites> {
             .returning_st(move |_, _| array.as_concrete_TypeRef());
 
         // Configure display names
-        let strings = self.convert_items(|item| DisplayName::from(&item.name));
-        mock.expect_ls_shared_file_list_item_copy_display_name()
-            .returning_st(create_display_name_closure(strings, Into::into));
+        self.configure_item_expectation(
+            &mut mock,
+            |item| DisplayName::from(&item.name),
+            |mock, closure| {
+                mock.expect_ls_shared_file_list_item_copy_display_name()
+                    .returning_st(closure);
+            },
+        );
 
         // Configure URLs
-        let urls = self.convert_items(|item| Url::from(&item.path));
-        mock.expect_ls_shared_file_list_item_copy_resolved_url()
-            .returning_st(create_url_closure(urls, Into::into));
+        self.configure_item_expectation(
+            &mut mock,
+            |item| Url::from(&item.path),
+            |mock, mut closure| {
+                mock.expect_ls_shared_file_list_item_copy_resolved_url()
+                    .returning_st(move |item, _, _| closure(item));
+            },
+        );
 
         mock
     }
