@@ -13,7 +13,7 @@ SHELL := /bin/bash
 CARGO := cargo
 CARGO_FLAGS := --quiet
 LLVM_COV_FLAGS := --all-features --workspace --show-missing-lines \
-                  --ignore-filename-regex=".cargo|test.rs" \
+                  --ignore-filename-regex=".cargo|test.rs|mock|/nix/store" \
 				  --branch
 
 # Coverage settings
